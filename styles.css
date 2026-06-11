@@ -917,7 +917,8 @@ body {
   font-family: inherit;
 }
 
-.product-ssh-button {
+.product-ssh-button,
+.product-https-button {
   min-width: 82px;
   text-align: center;
 }

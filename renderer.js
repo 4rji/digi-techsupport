@@ -1326,6 +1326,17 @@ function createProductCard(item, line) {
     openSSHTerminalModal(item.id);
   });
   sshRow.appendChild(sshButton);
+
+  const httpsButton = document.createElement('button');
+  httpsButton.type = 'button';
+  httpsButton.className = 'product-link-button product-https-button';
+  httpsButton.textContent = 'Web';
+  httpsButton.title = item.ip ? `Open https://${item.ip}` : 'Configure an IP before opening HTTPS';
+  httpsButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    openItemHTTPS(item.id);
+  });
+  sshRow.appendChild(httpsButton);
   if (PRODUCT_SPECS[item.name]) {
     const specsButton = document.createElement('button');
     specsButton.type = 'button';
@@ -1369,6 +1380,34 @@ function createProductCard(item, line) {
   });
 
   return card;
+}
+
+function formatHTTPSHost(ip) {
+  const host = String(ip || '').trim();
+  if (!host) return '';
+  if (host.startsWith('http://') || host.startsWith('https://')) {
+    return host;
+  }
+  if (host.includes(':') && !host.startsWith('[')) {
+    return `https://[${host}]`;
+  }
+  return `https://${host}`;
+}
+
+function openItemHTTPS(itemId) {
+  const match = findItemById(itemId);
+  if (!match || !match.item.ip) {
+    showNotification('Configure an IP before opening HTTPS');
+    return;
+  }
+
+  const url = formatHTTPSHost(match.item.ip);
+  if (!url) {
+    showNotification('Configure an IP before opening HTTPS');
+    return;
+  }
+
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 function createDocsSearchForm(item) {

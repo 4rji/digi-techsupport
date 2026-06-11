@@ -387,10 +387,13 @@ async function loadVMs(serverId) {
                 <button class="action-button stop-btn" data-vmid="${vm.vmid}" data-server="${serverId}">Stop</button>
                 <button class="action-button hibernate-btn" data-vmid="${vm.vmid}" data-server="${serverId}">Hibernate</button>
                 <button class="action-button console-btn" data-vmid="${vm.vmid}" data-server="${serverId}">Console</button>
+                <button class="action-button https-btn" data-vmid="${vm.vmid}" data-server="${serverId}">Web</button>
               ` : (displayStatus === 'paused' || displayStatus === 'suspended' || displayStatus === 'hibernating') ? `
                 <button class="action-button resume-btn" data-vmid="${vm.vmid}" data-server="${serverId}">Resume</button>
+                <button class="action-button https-btn" data-vmid="${vm.vmid}" data-server="${serverId}">Web</button>
               ` : `
                 <button class="action-button start-btn" data-vmid="${vm.vmid}" data-server="${serverId}">Start</button>
+                <button class="action-button https-btn" data-vmid="${vm.vmid}" data-server="${serverId}">Web</button>
               `}
             </div>
           </div>
@@ -412,6 +415,35 @@ async function loadVMs(serverId) {
     }
     return { error: error.message, vms: [] };
   }
+}
+
+function getFirstVMIPAddress(ips) {
+  if (!ips || typeof ips !== 'object') return '';
+
+  for (const addresses of Object.values(ips)) {
+    if (!Array.isArray(addresses)) continue;
+
+    const ip = addresses.find(address => {
+      const value = String(address || '').trim();
+      return value && !value.startsWith('127.') && value !== '::1';
+    });
+
+    if (ip) return String(ip).trim();
+  }
+
+  return '';
+}
+
+function formatHTTPSURL(ip) {
+  const host = String(ip || '').trim();
+  if (!host) return '';
+  if (host.startsWith('http://') || host.startsWith('https://')) {
+    return host;
+  }
+  if (host.includes(':') && !host.startsWith('[')) {
+    return `https://[${host}]`;
+  }
+  return `https://${host}`;
 }
 
 // Function to set up action buttons for a specific server
@@ -508,6 +540,42 @@ function setupVMButtons(serverId) {
       } catch (error) {
         console.error('Error getting IP addresses:', error);
         showNotification(`Error getting IP addresses: ${error.message}`);
+      }
+    });
+  });
+
+  // Set up HTTPS buttons
+  document.querySelectorAll(`.https-btn${serverSelector}`).forEach(button => {
+    button.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const vmid = button.getAttribute('data-vmid');
+      const server = button.getAttribute('data-server');
+
+      if (!vmid) {
+        console.error('No VMID found on HTTPS button');
+        showNotification('Error: No VM ID found');
+        return;
+      }
+
+      try {
+        button.disabled = true;
+        showNotification('Getting IP address...');
+        const result = await window.proxmoxAPI.getVMIPs(vmid, server);
+        const ip = getFirstVMIPAddress(result && result.ips);
+
+        if (!ip) {
+          showNotification(`No IP found for VM ${vmid}`);
+          return;
+        }
+
+        window.open(formatHTTPSURL(ip), '_blank', 'noopener,noreferrer');
+      } catch (error) {
+        console.error('Error opening HTTPS for VM:', error);
+        showNotification(`Error opening HTTPS: ${error.message}`);
+      } finally {
+        button.disabled = false;
       }
     });
   });
