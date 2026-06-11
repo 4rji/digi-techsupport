@@ -543,6 +543,7 @@ let sshResizeObserver = null;
 let removeSSHDataListener = null;
 let removeSSHCloseListener = null;
 let removeSSHErrorListener = null;
+let sshPasswordSaveTimer = null;
 
 const portStatuses = new Map();
 const hostStatuses = new Map();
@@ -1490,6 +1491,40 @@ function setSSHFormState(isConnected, isConnecting = false) {
   }
 }
 
+async function saveSSHAdminPasswordPreference() {
+  const networkAPI = getNetworkAPI();
+  const usernameInput = document.getElementById('ssh-username');
+  const passwordInput = document.getElementById('ssh-password');
+  const saveAdminPasswordInput = document.getElementById('ssh-save-admin-password');
+
+  if (
+    !networkAPI ||
+    typeof networkAPI.sshSaveAdminPassword !== 'function' ||
+    !usernameInput ||
+    !passwordInput ||
+    !saveAdminPasswordInput ||
+    usernameInput.value.trim() !== 'admin'
+  ) {
+    return { success: true };
+  }
+
+  const passwordToSave = saveAdminPasswordInput.checked ? passwordInput.value : '';
+  return networkAPI.sshSaveAdminPassword(passwordToSave);
+}
+
+function queueSSHAdminPasswordSave() {
+  if (sshPasswordSaveTimer) {
+    clearTimeout(sshPasswordSaveTimer);
+  }
+  sshPasswordSaveTimer = setTimeout(async () => {
+    sshPasswordSaveTimer = null;
+    const result = await saveSSHAdminPasswordPreference();
+    if (!result || !result.success) {
+      setSSHStatus(result?.error || 'Could not save SSH password', 'error');
+    }
+  }, 350);
+}
+
 function registerSSHEventListeners() {
   const networkAPI = getNetworkAPI();
   if (!networkAPI) return;
@@ -1539,6 +1574,11 @@ function openSSHTerminalModal(itemId) {
   if (!match.item.ip) {
     showNotification('Configure an IP before opening SSH');
     return;
+  }
+
+  if (sshPasswordSaveTimer) {
+    clearTimeout(sshPasswordSaveTimer);
+    sshPasswordSaveTimer = null;
   }
 
   sshCurrentItem = match.item;
@@ -1646,6 +1686,17 @@ async function connectSSHFromForm() {
     terminal.clear();
     terminal.writeln(`Connecting to ${username}@${host}:${Number.isNaN(port) ? 22 : port}...`);
   }
+
+  if (username === 'admin' && saveAdminPasswordInput) {
+    const saveResult = await saveSSHAdminPasswordPreference();
+    if (!saveResult || !saveResult.success) {
+      setSSHStatus(saveResult?.error || 'Could not save SSH password', 'error');
+      if (terminal) {
+        terminal.writeln(`\r\n[Warning] ${saveResult?.error || 'Could not save SSH password'}`);
+      }
+    }
+  }
+
   setSSHStatus('Connecting...', 'connecting');
   setSSHFormState(false, true);
 
@@ -1669,16 +1720,7 @@ async function connectSSHFromForm() {
   }
 
   sshSessionId = result.sessionId;
-  let statusMessage = 'Connected';
-  let statusState = 'connected';
-  if (username === 'admin' && saveAdminPasswordInput && typeof networkAPI.sshSaveAdminPassword === 'function') {
-    const saveResult = await networkAPI.sshSaveAdminPassword(saveAdminPasswordInput.checked ? password : '');
-    if (!saveResult || !saveResult.success) {
-      statusMessage = saveResult?.error || 'Connected, but could not save SSH password';
-      statusState = 'error';
-    }
-  }
-  setSSHStatus(statusMessage, statusState);
+  setSSHStatus('Connected', 'connected');
   setSSHFormState(true);
   fitSSHTerminal();
   if (terminal) {
@@ -1704,6 +1746,10 @@ function closeSSHTerminalModal() {
   const modal = document.getElementById('ssh-terminal-modal');
   const passwordInput = document.getElementById('ssh-password');
   const saveAdminPasswordInput = document.getElementById('ssh-save-admin-password');
+  if (sshPasswordSaveTimer) {
+    clearTimeout(sshPasswordSaveTimer);
+    sshPasswordSaveTimer = null;
+  }
   if (modal) {
     modal.style.display = 'none';
   }
@@ -1735,6 +1781,60 @@ function setupSSHTerminalModal() {
   if (disconnectButton) {
     disconnectButton.addEventListener('click', () => {
       disconnectSSHSession();
+    });
+  }
+
+  const usernameInput = document.getElementById('ssh-username');
+  const passwordInput = document.getElementById('ssh-password');
+  const saveAdminPasswordInput = document.getElementById('ssh-save-admin-password');
+
+  if (saveAdminPasswordInput) {
+    saveAdminPasswordInput.addEventListener('change', async () => {
+      if (saveAdminPasswordInput.checked) {
+        if (usernameInput && usernameInput.value.trim() !== 'admin') {
+          saveAdminPasswordInput.checked = false;
+          setSSHStatus('Default password is only saved for admin', 'idle');
+          return;
+        }
+        if (!passwordInput || !passwordInput.value) {
+          setSSHStatus('Enter a password to save it for admin', 'idle');
+          return;
+        }
+      }
+
+      const result = await saveSSHAdminPasswordPreference();
+      if (!result || !result.success) {
+        setSSHStatus(result?.error || 'Could not save SSH password', 'error');
+        return;
+      }
+      if (saveAdminPasswordInput.checked) {
+        setSSHStatus('Admin password saved locally', 'idle');
+      } else {
+        setSSHStatus('Saved admin password removed', 'idle');
+      }
+    });
+  }
+
+  if (passwordInput) {
+    passwordInput.addEventListener('input', () => {
+      if (!saveAdminPasswordInput || !saveAdminPasswordInput.checked) return;
+      queueSSHAdminPasswordSave();
+    });
+
+    passwordInput.addEventListener('change', async () => {
+      if (!saveAdminPasswordInput || !saveAdminPasswordInput.checked) return;
+      const result = await saveSSHAdminPasswordPreference();
+      if (!result || !result.success) {
+        setSSHStatus(result?.error || 'Could not save SSH password', 'error');
+      }
+    });
+  }
+
+  if (usernameInput) {
+    usernameInput.addEventListener('change', () => {
+      if (saveAdminPasswordInput && usernameInput.value.trim() !== 'admin') {
+        saveAdminPasswordInput.checked = false;
+      }
     });
   }
 

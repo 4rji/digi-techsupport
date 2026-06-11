@@ -1208,7 +1208,7 @@ body {
 
 .ssh-login-form {
   display: grid;
-  grid-template-columns: minmax(160px, 1.2fr) minmax(78px, 0.45fr) minmax(140px, 1fr) minmax(140px, 1fr) auto;
+  grid-template-columns: minmax(160px, 1.2fr) minmax(78px, 0.45fr) minmax(140px, 1fr) minmax(140px, 1fr) minmax(150px, 0.8fr) auto;
   align-items: end;
   gap: 12px;
   padding: 14px 24px;
@@ -1230,11 +1230,13 @@ body {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin-top: 7px;
+  min-height: 38px;
+  margin: 0;
   color: #c7d2dc;
   font-size: 0.78rem;
   font-weight: 600;
   line-height: 1.2;
+  white-space: normal;
 }
 
 .ssh-save-password-option input {
