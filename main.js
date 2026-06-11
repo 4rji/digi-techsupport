@@ -2,7 +2,31 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const axios = require('axios');
 const net = require('net');
+const { execFile } = require('child_process');
 const { checkNode, checkVMStatus, checkNodeHealth, testNodeConnection } = require('./helpers/health');
+
+function pingHost(host, timeout = 3000) {
+  if (!host) {
+    return Promise.resolve({ success: false, online: false, error: 'Host is required' });
+  }
+
+  const sanitizedTimeout = Math.max(500, Math.min(Number(timeout) || 3000, 10000));
+  const args = process.platform === 'win32'
+    ? ['-n', '1', '-w', String(sanitizedTimeout), host]
+    : process.platform === 'darwin'
+      ? ['-c', '1', '-W', String(sanitizedTimeout), host]
+      : ['-c', '1', '-W', String(Math.ceil(sanitizedTimeout / 1000)), host];
+
+  return new Promise(resolve => {
+    execFile('ping', args, { timeout: sanitizedTimeout + 1000 }, (error) => {
+      resolve({
+        success: !error,
+        online: !error,
+        error: error ? error.message : null
+      });
+    });
+  });
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -153,6 +177,10 @@ ipcMain.handle('test-tcp-port', async (event, host, port, timeout = 3000) => {
       finish(false, error.message);
     }
   });
+});
+
+ipcMain.handle('ping-host', async (event, host, timeout = 3000) => {
+  return pingHost(host, timeout);
 });
 
 app.whenReady().then(createWindow);

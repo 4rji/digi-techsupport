@@ -1,0 +1,266 @@
+Host ps-ts8-mei
+    HostName 10.10.65.20
+    User root
+
+Host ps-ts16-rack
+    HostName 10.10.65.21
+    User root
+
+Host ps-ts16-mei
+    HostName 10.10.65.22
+    User root
+
+Host anywhereusb14
+    HostName 10.10.65.23
+    User root
+
+Host anywhereusb24plus
+    HostName 10.10.65.24
+    User admin
+
+Host connectport-ts16
+    HostName 10.10.65.25
+    User root
+
+Host connectport-ts16-mei
+    HostName 10.10.65.26
+    User root
+
+Host connectport-lts16
+    HostName 10.10.65.27
+    User root
+
+Host connectport-lts32
+    HostName 10.10.65.28
+    User root
+
+Host digi-passport8
+    HostName 10.10.65.29
+    User root
+
+Host digi-passport16
+    HostName 10.10.65.30
+    User root
+
+Host digi-passport32
+    HostName 10.10.65.31
+    User root
+
+Host digi-passport48
+    HostName 10.10.65.32
+    User root
+
+Host digi-cm48
+    HostName 10.10.65.33
+    User root
+
+Host digi-connect-sp
+    HostName 10.10.65.34
+    User root
+
+Host portserver-ts4
+    HostName 10.10.65.35
+    User root
+
+Host portserver-ts2
+    HostName 10.10.65.37
+    User root
+
+Host tx64-rail
+    HostName 10.10.65.38
+    User admin
+
+Host digi-connect-ez8-io
+    HostName 10.10.65.39
+    User admin
+
+Host digi-one-iap
+    HostName 10.10.65.41
+    User root
+
+Host digi-connect-ez4
+    HostName 10.10.65.42
+    User admin
+
+Host wr11-l600
+    HostName 10.10.65.43
+    User username
+
+Host wr11-l800
+    HostName 10.10.65.44
+    User username
+
+Host wr21
+    HostName 10.10.65.45
+    User username
+
+Host wr31
+    HostName 10.10.65.46
+    User username
+
+Host wr44
+    HostName 10.10.65.47
+    User username
+
+Host ix25
+    HostName 10.10.65.48
+    User admin
+
+Host lr54w
+    HostName 10.10.65.51
+    User username
+
+Host accelerated-6300cx
+    HostName 10.10.65.55
+    User admin
+
+Host accelerated-6350sr
+    HostName 10.10.65.56
+    User admin
+
+Host ex15
+    HostName 10.10.65.57
+    User admin
+
+Host ix15
+    HostName 10.10.65.58
+    User admin
+
+Host connectit-mini
+    HostName 10.10.65.59
+    User admin
+
+Host anywhereusb5
+    HostName 10.10.65.60
+    User root
+
+Host digi-ix14
+    HostName 10.10.65.61
+    User root
+
+Host ex12
+    HostName 10.10.65.62
+    User admin
+
+Host connect-es8
+    HostName 10.10.65.64
+    User root
+
+Host digi-one-sp
+    HostName 10.10.65.65
+    User root
+
+Host connectport-ts8-mei
+    HostName 10.10.65.66
+    User root
+
+Host tx54
+    HostName 10.10.65.67
+    User admin
+
+Host tx64-lte
+    HostName 10.10.65.68
+    User admin
+
+Host axon
+    HostName 10.10.65.69
+    User admin
+
+Host ex50-2
+    HostName 10.10.65.70
+    User admin
+
+Host ix20w
+    HostName 10.10.65.71
+    User admin
+
+Host ex50
+    HostName 10.10.65.72
+    User admin
+
+Host ix10
+    HostName 10.10.65.73
+    User admin
+
+Host anywhereusb8plus
+    HostName 10.10.65.74
+    User admin
+
+Host anywhereusb24pluswifi
+    HostName 10.10.65.75
+    User admin
+
+Host connect-ez-mini
+    HostName 10.10.65.76
+    User admin
+
+Host ix20
+    HostName 10.10.65.77
+    User admin
+
+Host ix30
+    HostName 10.10.65.78
+    User admin
+
+Host ix40
+    HostName 10.10.65.79
+    User admin
+
+Host connect-ez8-mei
+    HostName 10.10.65.80
+    User admin
+
+Host connect-ez16-mei
+    HostName 10.10.65.81
+    User admin
+
+Host connect-ez32
+    HostName 10.10.65.82
+    User admin
+
+Host connectit48
+    HostName 10.10.65.83
+    User admin
+
+Host connect-ez32-mei
+    HostName 10.10.65.84
+    User admin
+
+Host connect-ez8-ts
+    HostName 10.10.65.85
+    User admin
+
+Host tx40
+    HostName 10.10.65.88
+    User admin
+
+Host anywhereusb2plus
+    HostName 10.10.65.89
+    User admin
+
+Host ctk-z4550a2m
+    HostName 10.10.65.90
+    User admin
+
+Host ctk-z4500a2x
+    HostName 10.10.65.91
+    User admin
+
+Host connect-ez4-poe
+    HostName 10.10.65.93
+    User admin
+
+Host connect-ez8
+    HostName 10.10.65.94
+    User admin
+
+Host ix30-2
+    HostName 10.10.65.95
+    User admin
+
+Host connectit4
+    HostName 10.10.65.96
+    User admin
+
+Host fs-switch
+    HostName 10.10.65.210

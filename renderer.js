@@ -1,3 +1,6 @@
+import { Terminal } from './node_modules/@xterm/xterm/lib/xterm.mjs';
+import { FitAddon } from './node_modules/@xterm/addon-fit/lib/addon-fit.mjs';
+
 const PRODUCT_LINES_STORAGE_KEY = 'product_lines';
 const LEGACY_MONITOR_STORAGE_KEY = 'monitor_vm_cards';
 const ACTIVE_LINE_STORAGE_KEY = 'active_product_line';
@@ -25,6 +28,19 @@ const LOCKED_LINE_ITEMS = {
     'Digi CORE plug-in LTE modem'
   ]
 };
+const DEFAULT_ITEM_IPS = {
+  'Digi IX10 Industrial Cellular Router': '10.10.65.73',
+  'Digi IX20 Industrial 4G LTE Router': '10.10.65.77',
+  'Digi IX25 5G Industrial Cellular Router': '10.10.65.48',
+  'Digi IX30 Industrial Cellular Router': '10.10.65.78',
+  'Digi IX40 5G Edge Computing Industrial IoT Solution': '10.10.65.79',
+  'Digi TX54 5G / LTE-Advanced Cellular Router': '10.10.65.67',
+  'Digi TX64 5G / LTE-Advanced Pro Cellular Router': '10.10.65.68',
+  'Digi TX64 5G Rail Cellular Router': '10.10.65.38',
+  'Digi EX12 Cellular Extender': '10.10.65.62',
+  'Digi EX15 Cellular Extender': '10.10.65.57',
+  'Digi EX50 5G Cellular Extender': '10.10.65.72'
+};
 const LOCKED_ITEM_IMAGES = {
   'Digi IX10 Industrial Cellular Router': 'img/digi-ix10.png',
   'Digi IX20 Industrial 4G LTE Router': 'img/digi-ix20.png',
@@ -37,8 +53,8 @@ const LOCKED_ITEM_IMAGES = {
   'Digi TX64 5G Rail Cellular Router': 'img/digi-tx64-r-5gbadge.png',
   'Digi EX12 Cellular Extender': 'img/digi-ex12.png',
   'Digi EX15 Cellular Extender': 'img/Digi-EX15.png',
-  'Digi EX50 5G Cellular Extender': 'img/digi-ex50-5gbadge.png',
-  'Digi CORE plug-in LTE modem': 'img/digi-core-cm-18.png'
+  'Digi EX50 5G Cellular Extender': 'img/digi-ex50-new.png',
+  'Digi CORE plug-in LTE modem': 'img/digi-core-cm-18.jpg'
 };
 const LOCKED_ITEM_IMAGE_VARIANTS = {
   'Digi EX12 Cellular Extender': [
@@ -50,6 +66,18 @@ const LOCKED_ITEM_IMAGE_VARIANTS = {
     'img/Digi-EX15.png',
     'img/Digi-EX15-right.png',
     'img/Digi-ex15-CORE-animation-web.gif'
+  ],
+  'Digi EX50 5G Cellular Extender': [
+    'img/digi-ex50-new.png',
+    'img/digi-ex50-front.png',
+    'img/digi-ex50-left.png',
+    'img/digi-ex50-right.png',
+    'img/digi-ex50-back.png'
+  ],
+  'Digi CORE plug-in LTE modem': [
+    'img/digi-core-cm-18.jpg',
+    'img/digi-core-cm-18.png',
+    'img/Digi-CORE-1002-CM-back.png'
   ]
 };
 const PRODUCT_LINKS = {
@@ -132,6 +160,344 @@ const PRODUCT_LINKS = {
     }
   ]
 };
+const PRODUCT_SPECS = {
+  'Digi EX12 Cellular Extender': {
+    subtitle: 'Digi EX12 with Digi 360*',
+    sourceUrl: 'https://www.digi.com/products/networking/cellular-routers/enterprise/digi-ex12#specifications',
+    sections: [
+      {
+        title: 'Cellular Connectivity**',
+        rows: [
+          ['Certifications', 'Visit product certifications for latest approvals and updates'],
+          ['3GPP Cellular Bands', 'LTE: B2, B4, B5, B12, B13, B14 FirstNet, B66, B71; 3G: B2, B4, B5; transfer rate (max): 150 Mbps down, 50 Mbps up'],
+          ['Connectors', '(2) 50 ohm SMA (center pin: female)'],
+          ['SIM Slots', '(2) Mini-SIM (2FF); software selectable and hardware switchable']
+        ]
+      },
+      {
+        title: 'Software and Management*',
+        rows: [
+          ['Remote Management', 'Digi Remote Manager; SNMP v3 (user installed/managed), encrypted SMS'],
+          ['Local Management', 'WebUI (HTTP/HTTPS); CLI (SSH, serial port)'],
+          ['Protocols', 'RIP, RIPng, OSPFv2, OSPFv3, BGP, Babel, IS-IS'],
+          ['Management / Troubleshooting Tools', 'FTP client, SCP; protocol analyzer with PCAP for Wireshark; event logging with Syslog and SMTP client; NTP/SNTP'],
+          ['Memory', '256 MB RAM, 512 MB flash']
+        ]
+      },
+      {
+        title: 'Ethernet',
+        rows: [
+          ['Ports', '(2) RJ-45; 10/100 Mbps (auto-sensing)']
+        ]
+      },
+      {
+        title: 'Serial',
+        rows: [
+          ['Ports', '(1) RS-232 (RJ-45)']
+        ]
+      },
+      {
+        title: 'Physical',
+        rows: [
+          ['Dimensions (L x W x H)', '127 mm x 127 mm x 25 mm (5.0 in x 5.0 in x 1.0 in)'],
+          ['Weight', '0.24 kg (8.25 oz)'],
+          ['Status LEDs', 'LAN (link = solid, flashing = act), WAN (link = solid, flashing = act), LTE, 5 signal'],
+          ['Enclosure', 'Plastic']
+        ]
+      },
+      {
+        title: 'Power Requirements',
+        rows: [
+          ['Power Input', '18 VDC, 1 A, reverse polarity protection'],
+          ['Other', 'Includes PSU, cables, antennas and optional Remote Mounting Kit: passive PoE injector, mounting bracket and accessories (see part number for details). Only the Digi-supplied power supply and passive PoE injector are recommended for use with Digi EX12.']
+        ]
+      },
+      {
+        title: 'Environmental',
+        rows: [
+          ['Operating Temperature', '0 C to 40 C (32 F to 104 F)'],
+          ['Relative Humidity', '5% to 95% (non-condensing)']
+        ]
+      },
+      {
+        title: 'Approvals**',
+        rows: [
+          ['Cellular', 'PTCRB; US: AT&T, FirstNet Capable, T-Mobile, US Cellular, Verizon; Canada'],
+          ['Emissions / Immunity', 'FCC Part 15, Subpart B, Class B; CE, RCM; CAN ICES-3(B)/NMB-3(B)']
+        ]
+      },
+      {
+        title: 'Warranty***',
+        rows: [
+          ['Product Warranty', '1-year']
+        ]
+      }
+    ]
+  },
+  'Digi EX15 Cellular Extender': {
+    subtitle: 'Digi EX15 with Digi 360*',
+    sourceUrl: 'https://www.digi.com/products/networking/cellular-routers/enterprise/digi-ex15#specifications',
+    sections: [
+      {
+        title: 'Cellular Connectivity**',
+        rows: [
+          ['Certifications', 'Visit product certifications for latest certifications and updates'],
+          ['Digi CORE Plug-in LTE Modems', 'LTE Cat 4 (Global): B1, B2, B3, B4, B5, B7, B8, B12, B13, B18, B19, B20, B25, B26, B28, B39, B40, B41; 3G: B1, B2, B4, B5, B6, B8, B19; 2G EDGE / GPRS: 850 / 900 / 1800 / 1900 MHz; transfer rate (max): 150 Mbps down, 50 Mbps up'],
+          ['LTE-A Cat 7 (US)', 'B2, B4, B5, B7, B12, B13, B25, B26, B41, B42, B43, B48, B66, B71; WCDMA: B2, B5; transfer rate (max): 300 Mbps down, 150 Mbps up'],
+          ['Connectors', '(2) 50 ohm SMA (center pin: female)'],
+          ['SIM Slots', '(2) Mini-SIM (2FF); software selectable and hardware switchable'],
+          ['eSIM Support', 'Digi eSIM optional 2FF accessory (EX15-XXG4-GLB)']
+        ]
+      },
+      {
+        title: 'Software and Management*',
+        rows: [
+          ['Remote Management', 'Digi Remote Manager; SNMP v3 (user installed/managed), encrypted SMS'],
+          ['Local Management', 'WebUI (HTTP/HTTPS); CLI (SSH, serial port)'],
+          ['Protocols', 'RIP, RIPng, OSPFv2, OSPFv3, BGP, Babel, IS-IS'],
+          ['Management / Troubleshooting Tools', 'FTP client, SCP; protocol analyzer with PCAP for Wireshark; event logging with Syslog; NTP/SNTP'],
+          ['Memory', '256 MB RAM, 512 MB flash']
+        ]
+      },
+      {
+        title: 'Ethernet',
+        rows: [
+          ['Ports', '(2) RJ-45; 10/100/1000 Mbps (auto-sensing)']
+        ]
+      },
+      {
+        title: 'Wi-Fi (Optional)',
+        rows: [
+          ['Connectivity', '2 x 2 MIMO 2.4/5 GHz: 802.11 b/g/n 2.4 GHz or 802.11 n/a/ac 5 GHz']
+        ]
+      },
+      {
+        title: 'Serial',
+        rows: [
+          ['Ports', '(1) RS-232 (RJ-45)']
+        ]
+      },
+      {
+        title: 'Physical',
+        rows: [
+          ['Dimensions (L x W x H)', '142 x 128 x 31 mm (5.6 x 5.0 x 1.2 in)'],
+          ['Weight', '0.2 kg (7.0 oz)'],
+          ['Status LEDs', 'LAN (link = solid, flashing = act), WAN (link = solid, flashing = act), LTE, 5 signal, SIM 1 and 2 LEDs'],
+          ['Enclosure', 'Plastic']
+        ]
+      },
+      {
+        title: 'Power Requirements',
+        rows: [
+          ['Power Input', '18 VDC, 1 A, reverse polarity protection'],
+          ['Included Accessories', 'Includes PSU, antennas*** and remote mounting kit: passive PoE injector, mounting bracket and accessories']
+        ]
+      },
+      {
+        title: 'Environmental',
+        rows: [
+          ['Operating Temperature', '0 C to 40 C (32 F to 104 F)'],
+          ['Relative Humidity', '5% to 95% (non-condensing)']
+        ]
+      },
+      {
+        title: 'Approvals*',
+        rows: [
+          ['Cellular', 'PTCRB; US: AT&T, T-Mobile, Verizon; Canada; Europe'],
+          ['Emissions / Immunity', 'FCC Part 15, Subpart B, Class A; CE, RCM; CAN ICES-3(B)/NMB-3(B)']
+        ]
+      },
+      {
+        title: 'Warranty***',
+        rows: [
+          ['Product Warranty', '1-year']
+        ]
+      },
+      {
+        title: 'Notes',
+        rows: [
+          ['*', 'Includes the Digi 360 solution for Digi EX15 (1-year) with Digi Remote Manager, warranty and customer care.'],
+          ['**', 'Visit product certifications for latest approvals and updates.'],
+          ['***', 'Product warranty can be extended with Digi 360 extensions or renewals.'],
+          ['****', 'Digi EX15 models supporting LTE Cat 4 and LTE-Advanced Cat 7 require two cellular antennas.']
+        ]
+      }
+    ]
+  },
+  'Digi EX50 5G Cellular Extender': {
+    subtitle: 'Digi EX50 5G with Digi 360*',
+    sourceUrl: 'https://www.digi.com/products/networking/cellular-routers/enterprise/digi-ex50#specifications',
+    sections: [
+      {
+        title: 'Cellular Connectivity**',
+        rows: [
+          ['5G NR', 'Bands: n1, n2, n3, n5, n7, n8, n12, n20, n25, n28, n38, n40, n41, n48 CBRS, n66, n71, n77 C-band, n78, n79'],
+          ['4G LTE-Advanced Pro', 'Bands: B1, B2, B3, B4, B5, B7, B8, B12, B13, B14 FirstNet, B17, B18, B19, B20, B25, B26, B28, B29, B30, B32, B34, B38, B39, B40, B41, B42, B43, B46 LAA, B48 CBRS, B66, B71'],
+          ['3G HSPA+', 'Bands: B1, B2, B4, B5, B6, B8, B9, B19'],
+          ['Antenna Connectors', '(4) 50 ohm SMA (center pin: female)'],
+          ['SIM Slots', '(2) Mini-SIM (2FF); software selectable, hardware switchable; SIM slot cover plate']
+        ]
+      },
+      {
+        title: 'Software and Management*',
+        rows: [
+          ['Software', 'Digi Accelerated Linux (DAL OS); secure, reliable, intelligent, customizable'],
+          ['Remote Management', 'Digi Remote Manager; security, management, updates, alerts, scheduling and intelligence'],
+          ['Local Management', 'Web Interface (HTTPS); Command Line Interface (SSH, serial port)']
+        ]
+      },
+      {
+        title: 'Performance',
+        rows: [
+          ['Ethernet Throughput', '2.5 Gbps'],
+          ['Cellular Throughput', '1.4 Gbps'],
+          ['IPsec VPN Throughput', '500 Mbps'],
+          ['VPN Tunnels', '10 tunnels'],
+          ['Client Count', '256 clients (typical)']
+        ]
+      },
+      {
+        title: 'Processor',
+        rows: [
+          ['Application Processor', 'ARM Cortex-A53, 1.8 GHz, quad-core, 64-bit'],
+          ['Memory', '512 MB RAM, 512 MB flash']
+        ]
+      },
+      {
+        title: 'Ethernet',
+        rows: [
+          ['Ports', '(2) RJ-45; 10/100/1000/2500 Mbps (auto-sensing)']
+        ]
+      },
+      {
+        title: 'Wi-Fi',
+        rows: [
+          ['Radios', 'Wi-Fi 6 / 802.11ax, enterprise-grade, dual-band simultaneous, 2x2 MIMO; 2.4 GHz: 802.11b/g/n/ax; 2.4 GHz and 5 GHz: 802.11a/n/ac/ax'],
+          ['Antennas', 'Integrated 2x2 MIMO, 2.4 with 8 dBi gain, 5 GHz with 5 dBi gain'],
+          ['Security', 'Open, Enhanced Open, WPA, WPA2, WPA3; Personal, Enterprise'],
+          ['Modes', '(4) Wi-Fi access points; (2) Wi-Fi clients; (256) Wi-Fi users (typical)']
+        ]
+      },
+      {
+        title: 'Serial',
+        rows: [
+          ['Ports', '(1) RS-232 (RJ-45); Cisco straight-through pinout; for out-of-band management of network appliances and servers']
+        ]
+      },
+      {
+        title: 'Physical',
+        rows: [
+          ['Dimensions (L x W x H)', '158 mm x 158 mm x 35 mm (6.2 in x 6.2 in x 1.4 in)'],
+          ['Weight', '600 g (21 oz)'],
+          ['Status LEDs', '(14) total for easy visual troubleshooting; Power, LAN, WAN, Wi-Fi 2.4/5, Online, Cellular Signal, Cellular Service, SIM 1/2'],
+          ['Enclosure', 'Hybrid (die-cast aluminum + ABS plastic); Kensington Security Slot']
+        ]
+      },
+      {
+        title: 'Power Requirements',
+        rows: [
+          ['DC Barrel Input', '19 VDC / 2.5 A barrel connector, 2.5 mm pin, center-positive'],
+          ['Power over Ethernet', 'Standards-based, IEEE 802.3at, PoE+ (25.5 W)'],
+          ['Power Consumption', '8 W (idle), 15 W (typical), 25 W (maximum)']
+        ]
+      },
+      {
+        title: 'Environmental',
+        rows: [
+          ['Operating Temperature', '-30 C to 60 C (-22 F to 140 F) with Power over Ethernet or industrial-rated power supply; 0 C to 40 C (32 F to 104 F) with included commercial-rated power supply'],
+          ['Relative Humidity', '5% to 95% (non-condensing)']
+        ]
+      },
+      {
+        title: 'Approvals**',
+        rows: [
+          ['Cellular', 'Visit product certifications for latest approvals and updates'],
+          ['Emissions / Immunity', 'CE; RED; FCC Part 15 Subpart B; CAN ICES-003'],
+          ['Safety', 'IEC62368-1, CB, EN62311']
+        ]
+      },
+      {
+        title: 'Warranty***',
+        rows: [
+          ['Product Warranty', '1-year']
+        ]
+      },
+      {
+        title: 'Notes',
+        rows: [
+          ['*', 'Includes the Digi 360 solution for Digi EX50 (1-year) with Digi Remote Manager, warranty and customer care.'],
+          ['**', 'Visit product certifications for latest approvals and updates.'],
+          ['***', 'Product warranty can be extended with Digi 360 extensions or renewals.']
+        ]
+      }
+    ]
+  },
+  'Digi CORE plug-in LTE modem': {
+    subtitle: 'Digi CORE Plug-in LTE Modem',
+    sourceUrl: 'https://www.digi.com/products/networking/cellular-routers/enterprise/digi-core-plug-in-lte-modem#specifications',
+    sections: [
+      {
+        title: 'Software',
+        rows: [
+          ['Remote Management', 'Digi Remote Manager'],
+          ['Protocols', 'USB 2.0 / 3.0 (CM module interface), UMTS, EVDO, HSPA+, LTE, LTE-A, LTE-A Pro (supported cellular protocols vary by module type)'],
+          ['Security', 'Tamper-proof with internal SIM slots and optional locking mechanism']
+        ]
+      },
+      {
+        title: 'Physical',
+        rows: [
+          ['Dimensions (L x W x H)', '102 mm x 51 mm x 15 mm (4.0 in x 2.0 in x 0.6 in)'],
+          ['Weight', '0.156 kg (5.5 oz)']
+        ]
+      },
+      {
+        title: 'Environmental',
+        rows: [
+          ['Operating Temperature', 'Commercial temperature: 0 C to 40 C (32 F to 104 F); industrial temperature: -40 C to 70 C (-40 F to 158 F)'],
+          ['Storage Temp and Humidity', '-45 C to 75 C (-49 F to 167 F); 5% to 95% non-condensing']
+        ]
+      },
+      {
+        title: 'Approvals',
+        rows: [
+          ['Emissions / Immunity', 'FCC Part 15, Subpart B, Class A; CE, RCM; CAN ICES-3(B)/NMB-3(B)']
+        ]
+      },
+      {
+        title: 'Cellular Specifications',
+        rows: [
+          ['Cellular Antenna', '(1, 2, 3 or 4) Dipole; frequency: 700-960/1575-2700 Hz; gain: 1-4 dBi'],
+          ['SIM', '(2) SIM card slot (size 2FF), software selectable and hardware switchable'],
+          ['eSIM Support', 'Digi eSIM optional 2FF accessory (1002-CMG4-GLB)']
+        ]
+      },
+      {
+        title: 'Digi CORE Plug-in LTE Modem*',
+        rows: [
+          ['Digi CORE 1002-CMM1 (North America)', 'LTE Cat M1 / NB1; LTE Bands: B1, B2, B3, B4, B5, B8, B12, B13, B18, B19, B20, B26, B28; 2G (EGPRS): 850 / 900 / 1800 / 1900 MHz; transfer rate (max): M1: 300 kbps down, 375 kbps up; NB1: 21 kbps down, 62.5 kbps up; 2G: 296 kbps down, 236 kbps up; industrial temperature'],
+          ['Digi CORE 1002-CMF4 (North America)', 'LTE Cat 4; LTE Bands: B2, B4, B5, B12, B13, B14 FirstNet, B66, B71; 3G: B2, B4, B5; transfer rate (max): 150 Mbps down, 50 Mbps up; industrial temperature'],
+          ['Digi CORE 1002-CMG4 (Global)', 'LTE Cat 4; LTE Bands: B1, B2, B3, B4, B5, B7, B8, B12, B13, B18, B19, B20, B25, B26, B28, B39, B40, B41; 3G: B1, B2, B4, B5, B6, B8, B19; 2G EDGE / GPRS: 850 / 900 / 1800 / 1900 MHz; transfer rate (max): 150 Mbps down, 50 Mbps up; industrial temperature'],
+          ['Digi CORE 1002-CMG4-G (EMEA)', 'LTE Cat 4; LTE Bands: B1, B2, B3, B4, B5, B7, B8, B12, B13, B18, B19, B20, B25, B26, B28, B39, B40, B41; 3G: B1, B2, B4, B5, B6, B8, B19; 2G EDGE / GPRS: 850 / 900 / 1800 / 1900 MHz; transfer rate (max): 150 Mbps down, 50 Mbps up; industrial temperature'],
+          ['Digi CORE 1002-CM45 (EMEA)', 'LTE Cat 4; LTE Bands: B3, B7, B20, B31, B72; 450 MHz support; transfer rate (max): 150 Mbps down, 50 Mbps up; industrial temperature'],
+          ['Digi CORE 1003-CM07 (North America)', 'LTE-Advanced Cat 7; LTE Bands: B2, B4, B5, B7, B12, B13, B14 FirstNet, B25, B26, B41, B42, B43, B48, B66, B71; 3G: B2, B5; transfer rate (max): 300 Mbps down, 150 Mbps up; industrial temperature']
+        ]
+      },
+      {
+        title: 'Digi CORE Plug-in LTE Modem with GNSS Support*',
+        rows: [
+          ['Digi CORE 1003-CM07 (North America) and Digi CORE 1002-CMG4-G (EMEA)', 'GPS, GLONASS, BeiDou, Galileo, QZSS; connector: 50 ohm SMA (center pin: female); protocol NMEA 0183 V3.0; acquisition time hot start 1 s, warm start 29 s, cold start 32 s; accuracy horizontal: < 2 m (50%), < 5 m (90%); altitude: < 4 m (50%), < 8 m (90%); velocity: < 0.2 m/s']
+        ]
+      },
+      {
+        title: 'Notes',
+        rows: [
+          ['*', 'Please reference router/chassis datasheets for Digi CORE plug-in LTE modem compatibility. Transfer rates are network operator dependent.']
+        ]
+      }
+    ]
+  }
+};
 const DOCS_PORTAL_BASE_URL = 'https://docsportal.digi.com';
 
 const KNOWN_PORT_SERVICES = {
@@ -169,14 +535,26 @@ let imageViewerState = {
 };
 let imageSwipeStartX = null;
 let portPollTimer = null;
+let sshTerminal = null;
+let sshFitAddon = null;
+let sshSessionId = null;
+let sshCurrentItem = null;
+let sshResizeObserver = null;
+let removeSSHDataListener = null;
+let removeSSHCloseListener = null;
+let removeSSHErrorListener = null;
 
 const portStatuses = new Map();
+const hostStatuses = new Map();
 const itemOnlineStates = new Map();
 const pendingPortChecks = new Set();
+const pendingHostChecks = new Set();
 
 document.addEventListener('DOMContentLoaded', () => {
   initializeProductLines();
   setupProductImageModal();
+  setupProductSpecsModal();
+  setupSSHTerminalModal();
   setupItemConfigModal();
   setupControls();
   setupConfigTransferControls();
@@ -185,6 +563,12 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('beforeunload', () => {
   if (portPollTimer) {
     clearInterval(portPollTimer);
+  }
+  if (sshSessionId) {
+    const networkAPI = getNetworkAPI();
+    if (networkAPI && typeof networkAPI.sshDisconnect === 'function') {
+      networkAPI.sshDisconnect(sshSessionId);
+    }
   }
 });
 
@@ -234,7 +618,7 @@ function createNamedProductItem(name) {
   return {
     id: createItemId(),
     name,
-    ip: '',
+    ip: DEFAULT_ITEM_IPS[name] || '',
     imageUrl: LOCKED_ITEM_IMAGES[name] || '',
     ports: [],
     scanInterval: 5,
@@ -330,7 +714,7 @@ function normalizeProductItem(item, index, lineName) {
   return {
     id: fallbackId,
     name: fallbackName,
-    ip: item?.ip || '',
+    ip: item?.ip || DEFAULT_ITEM_IPS[fallbackName] || '',
     imageUrl: item?.imageUrl || item?.image || '',
     ports: normalizePorts(item?.ports),
     scanInterval: Number.isNaN(intervalValue) || intervalValue < 1 ? 5 : intervalValue,
@@ -376,6 +760,9 @@ function syncLockedLineItems() {
       const existingItem = existingByName.get(name);
       const item = normalizeProductItem(existingItem || createNamedProductItem(name), index, line.name);
       item.imageUrl = LOCKED_ITEM_IMAGES[name] || item.imageUrl;
+      if (!item.ip && DEFAULT_ITEM_IPS[name]) {
+        item.ip = DEFAULT_ITEM_IPS[name];
+      }
       return item;
     });
   });
@@ -435,6 +822,7 @@ function initializeProductLines() {
 
   saveProductLines();
   renderProductApp();
+  startPortPolling();
 }
 
 function saveProductLines() {
@@ -545,6 +933,7 @@ function createProductCard(item, line) {
   card.dataset.itemId = item.id;
   card.setAttribute('role', 'button');
   card.tabIndex = 0;
+  updateCardStatusIndicator(card, item, isItemOnline(item));
 
   const cardContent = document.createElement('div');
   cardContent.className = 'vm-card-content';
@@ -581,8 +970,14 @@ function createProductCard(item, line) {
   titleRow.appendChild(name);
 
   const status = document.createElement('div');
-  status.className = 'vm-status';
-  status.textContent = item.ip ? `IP: ${item.ip}` : 'IP not set';
+  status.className = 'vm-status product-ip-status';
+  const statusDot = document.createElement('span');
+  statusDot.className = 'product-status-dot';
+  statusDot.setAttribute('aria-hidden', 'true');
+  const statusText = document.createElement('span');
+  statusText.textContent = item.ip ? `IP: ${item.ip}` : 'IP not set';
+  status.appendChild(statusDot);
+  status.appendChild(statusText);
 
   const dns = document.createElement('div');
   dns.className = 'product-dns';
@@ -591,6 +986,8 @@ function createProductCard(item, line) {
   const links = PRODUCT_LINKS[item.name] || [];
   const linksRow = document.createElement('div');
   linksRow.className = 'product-links';
+  const sshRow = document.createElement('div');
+  sshRow.className = 'product-ssh-row';
   links.forEach(link => {
     const anchor = document.createElement('a');
     anchor.href = link.url;
@@ -602,10 +999,30 @@ function createProductCard(item, line) {
     });
     linksRow.appendChild(anchor);
   });
+  const sshButton = document.createElement('button');
+  sshButton.type = 'button';
+  sshButton.className = 'product-link-button product-ssh-button';
+  sshButton.textContent = 'SSH';
+  sshButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    openSSHTerminalModal(item.id);
+  });
+  sshRow.appendChild(sshButton);
+  if (PRODUCT_SPECS[item.name]) {
+    const specsButton = document.createElement('button');
+    specsButton.type = 'button';
+    specsButton.className = 'product-link-button';
+    specsButton.textContent = 'Specs';
+    specsButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      openProductSpecsModal(item.name);
+    });
+    linksRow.appendChild(specsButton);
+  }
 
   cardContent.appendChild(icon);
   cardContent.appendChild(titleRow);
-  if (status.textContent && item.ip) {
+  if (item.ip) {
     cardContent.appendChild(status);
   }
   if (dns.textContent) {
@@ -614,12 +1031,16 @@ function createProductCard(item, line) {
   if (linksRow.children.length > 0) {
     cardContent.appendChild(linksRow);
   }
+  if (sshRow.children.length > 0) {
+    cardContent.appendChild(sshRow);
+  }
 
   const docsSearch = createDocsSearchForm(item);
   if (docsSearch) {
     cardContent.appendChild(docsSearch);
   }
   card.appendChild(cardContent);
+  updateCardStatusIndicator(card, item, isItemOnline(item));
 
   card.addEventListener('click', () => openItemConfigModal(item.id));
   card.addEventListener('keydown', (event) => {
@@ -829,6 +1250,74 @@ function closeProductImageModal() {
   };
 }
 
+function openProductSpecsModal(itemName) {
+  const modal = document.getElementById('product-specs-modal');
+  const title = document.getElementById('product-specs-title');
+  const eyebrow = document.getElementById('product-specs-eyebrow');
+  const body = document.getElementById('product-specs-body');
+  const specs = PRODUCT_SPECS[itemName];
+
+  if (!modal || !title || !body || !specs) return;
+
+  title.textContent = itemName;
+  if (eyebrow) {
+    eyebrow.textContent = specs.subtitle || 'Specifications';
+  }
+
+  body.innerHTML = '';
+  if (specs.sourceUrl) {
+    const sourceLink = document.createElement('a');
+    sourceLink.className = 'product-specs-source-link';
+    sourceLink.href = specs.sourceUrl;
+    sourceLink.target = '_blank';
+    sourceLink.rel = 'noopener noreferrer';
+    sourceLink.textContent = 'Open official specifications';
+    sourceLink.addEventListener('click', (event) => {
+      event.stopPropagation();
+    });
+    body.appendChild(sourceLink);
+  }
+  specs.sections.forEach(section => {
+    const sectionElement = document.createElement('section');
+    sectionElement.className = 'product-specs-section';
+
+    const heading = document.createElement('h3');
+    heading.textContent = section.title;
+    sectionElement.appendChild(heading);
+
+    const table = document.createElement('div');
+    table.className = 'product-specs-table';
+    section.rows.forEach(([label, value]) => {
+      const row = document.createElement('div');
+      row.className = 'product-specs-row';
+
+      const labelElement = document.createElement('div');
+      labelElement.className = 'product-specs-label';
+      labelElement.textContent = label;
+
+      const valueElement = document.createElement('div');
+      valueElement.className = 'product-specs-value';
+      valueElement.textContent = value;
+
+      row.appendChild(labelElement);
+      row.appendChild(valueElement);
+      table.appendChild(row);
+    });
+
+    sectionElement.appendChild(table);
+    body.appendChild(sectionElement);
+  });
+
+  modal.style.display = 'flex';
+}
+
+function closeProductSpecsModal() {
+  const modal = document.getElementById('product-specs-modal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+}
+
 function renderProductImageModal() {
   const image = document.getElementById('product-image-preview');
   const prevButton = document.getElementById('product-image-prev');
@@ -900,6 +1389,375 @@ function setupProductImageModal() {
       rotateProductImage(1);
     }
   });
+}
+
+function setupProductSpecsModal() {
+  const modal = document.getElementById('product-specs-modal');
+  const closeButton = document.getElementById('close-product-specs');
+
+  if (!modal) return;
+
+  if (closeButton) {
+    closeButton.addEventListener('click', closeProductSpecsModal);
+  }
+
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) {
+      closeProductSpecsModal();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (modal.style.display === 'flex' && event.key === 'Escape') {
+      closeProductSpecsModal();
+    }
+  });
+}
+
+function ensureSSHTerminal() {
+  const container = document.getElementById('ssh-terminal-container');
+  if (!container) return null;
+
+  if (!sshTerminal) {
+    sshTerminal = new Terminal({
+      cursorBlink: true,
+      convertEol: true,
+      fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
+      fontSize: 13,
+      lineHeight: 1.18,
+      theme: {
+        background: '#050505',
+        foreground: '#f2f2f2',
+        cursor: '#9fd7ff',
+        selectionBackground: '#2f5f7a'
+      }
+    });
+    sshFitAddon = new FitAddon();
+    sshTerminal.loadAddon(sshFitAddon);
+    sshTerminal.open(container);
+    sshTerminal.onData(data => {
+      const networkAPI = getNetworkAPI();
+      if (sshSessionId && networkAPI && typeof networkAPI.sshWrite === 'function') {
+        networkAPI.sshWrite(sshSessionId, data);
+      }
+    });
+  }
+
+  requestAnimationFrame(() => fitSSHTerminal());
+  return sshTerminal;
+}
+
+function fitSSHTerminal() {
+  if (!sshTerminal || !sshFitAddon) return;
+  try {
+    sshFitAddon.fit();
+    const networkAPI = getNetworkAPI();
+    if (sshSessionId && networkAPI && typeof networkAPI.sshResize === 'function') {
+      networkAPI.sshResize(sshSessionId, sshTerminal.cols, sshTerminal.rows);
+    }
+  } catch (error) {
+    console.error('Error fitting SSH terminal:', error);
+  }
+}
+
+function setSSHStatus(message, state = 'idle') {
+  const status = document.getElementById('ssh-terminal-status');
+  if (!status) return;
+  status.textContent = message;
+  status.dataset.state = state;
+}
+
+function setSSHFormState(isConnected, isConnecting = false) {
+  const connectButton = document.getElementById('ssh-connect-btn');
+  const disconnectButton = document.getElementById('ssh-disconnect-btn');
+  const usernameInput = document.getElementById('ssh-username');
+  const passwordInput = document.getElementById('ssh-password');
+  const portInput = document.getElementById('ssh-port');
+  const saveAdminPasswordInput = document.getElementById('ssh-save-admin-password');
+
+  if (connectButton) {
+    connectButton.disabled = isConnected || isConnecting;
+    connectButton.textContent = isConnecting ? 'Connecting...' : 'Connect';
+  }
+  if (disconnectButton) {
+    disconnectButton.disabled = !isConnected && !isConnecting;
+  }
+  [usernameInput, passwordInput, portInput].forEach(input => {
+    if (input) input.disabled = isConnected || isConnecting;
+  });
+  if (saveAdminPasswordInput) {
+    saveAdminPasswordInput.disabled = isConnected || isConnecting;
+  }
+}
+
+function registerSSHEventListeners() {
+  const networkAPI = getNetworkAPI();
+  if (!networkAPI) return;
+
+  if (!removeSSHDataListener && typeof networkAPI.onSSHData === 'function') {
+    removeSSHDataListener = networkAPI.onSSHData(payload => {
+      if (!payload || payload.sessionId !== sshSessionId || !sshTerminal) return;
+      sshTerminal.write(payload.data || '');
+    });
+  }
+
+  if (!removeSSHCloseListener && typeof networkAPI.onSSHClose === 'function') {
+    removeSSHCloseListener = networkAPI.onSSHClose(payload => {
+      if (!payload || payload.sessionId !== sshSessionId) return;
+      sshSessionId = null;
+      setSSHStatus('Disconnected', 'idle');
+      setSSHFormState(false);
+      if (sshTerminal) {
+        sshTerminal.writeln('\r\n[SSH session closed]');
+      }
+    });
+  }
+
+  if (!removeSSHErrorListener && typeof networkAPI.onSSHError === 'function') {
+    removeSSHErrorListener = networkAPI.onSSHError(payload => {
+      if (!payload || payload.sessionId !== sshSessionId) return;
+      setSSHStatus(payload.error || 'SSH error', 'error');
+      if (sshTerminal) {
+        sshTerminal.writeln(`\r\n[SSH error] ${payload.error || 'Unknown error'}`);
+      }
+    });
+  }
+}
+
+function openSSHTerminalModal(itemId) {
+  const modal = document.getElementById('ssh-terminal-modal');
+  const title = document.getElementById('ssh-terminal-title');
+  const eyebrow = document.getElementById('ssh-terminal-eyebrow');
+  const hostInput = document.getElementById('ssh-host');
+  const usernameInput = document.getElementById('ssh-username');
+  const portInput = document.getElementById('ssh-port');
+  const passwordInput = document.getElementById('ssh-password');
+  const saveAdminPasswordInput = document.getElementById('ssh-save-admin-password');
+  const match = findItemById(itemId);
+
+  if (!modal || !hostInput || !match) return;
+  if (!match.item.ip) {
+    showNotification('Configure an IP before opening SSH');
+    return;
+  }
+
+  sshCurrentItem = match.item;
+  hostInput.value = match.item.ip;
+  if (portInput) portInput.value = '22';
+  if (usernameInput) usernameInput.value = 'admin';
+  if (passwordInput) passwordInput.value = '';
+  if (saveAdminPasswordInput) saveAdminPasswordInput.checked = false;
+  if (title) title.textContent = match.item.name || 'SSH Terminal';
+  if (eyebrow) eyebrow.textContent = `SSH to ${match.item.ip}`;
+
+  modal.style.display = 'flex';
+  registerSSHEventListeners();
+  ensureSSHTerminal();
+  if (sshTerminal && !sshSessionId) {
+    sshTerminal.clear();
+  }
+  setSSHStatus(sshSessionId ? 'Connected' : 'Not connected', sshSessionId ? 'connected' : 'idle');
+  setSSHFormState(Boolean(sshSessionId));
+  applySSHDefaults(match.item.ip);
+  applySSHAdminPasswordDefault(match.item.ip);
+  if (usernameInput && !sshSessionId) {
+    usernameInput.focus();
+  }
+}
+
+async function applySSHAdminPasswordDefault(host) {
+  const networkAPI = getNetworkAPI();
+  const hostInput = document.getElementById('ssh-host');
+  const usernameInput = document.getElementById('ssh-username');
+  const passwordInput = document.getElementById('ssh-password');
+  const saveAdminPasswordInput = document.getElementById('ssh-save-admin-password');
+
+  if (!networkAPI || typeof networkAPI.sshAdminPassword !== 'function') return;
+
+  const result = await networkAPI.sshAdminPassword();
+  if (!hostInput || hostInput.value !== host || !usernameInput || !passwordInput) return;
+
+  if (!result || !result.success) {
+    setSSHStatus(result?.error || 'Could not load saved SSH password', 'error');
+    return;
+  }
+
+  if (saveAdminPasswordInput) {
+    saveAdminPasswordInput.checked = Boolean(result.hasPassword);
+  }
+  if (result.hasPassword && usernameInput.value.trim() === 'admin' && !passwordInput.value) {
+    passwordInput.value = result.password || '';
+  }
+}
+
+async function applySSHDefaults(host) {
+  const networkAPI = getNetworkAPI();
+  const usernameInput = document.getElementById('ssh-username');
+  const portInput = document.getElementById('ssh-port');
+  const eyebrow = document.getElementById('ssh-terminal-eyebrow');
+
+  if (!networkAPI || typeof networkAPI.sshDefaults !== 'function') return;
+
+  const result = await networkAPI.sshDefaults(host);
+  const defaults = result && result.success ? result.defaults : null;
+  if (!defaults) return;
+
+  if (usernameInput && defaults.username && !usernameInput.value) {
+    usernameInput.value = defaults.username;
+  }
+  if (portInput && defaults.port) {
+    portInput.value = String(defaults.port);
+  }
+  if (eyebrow && defaults.alias) {
+    eyebrow.textContent = `SSH to ${defaults.alias} (${host})`;
+  }
+}
+
+async function connectSSHFromForm() {
+  const networkAPI = getNetworkAPI();
+  const hostInput = document.getElementById('ssh-host');
+  const usernameInput = document.getElementById('ssh-username');
+  const passwordInput = document.getElementById('ssh-password');
+  const portInput = document.getElementById('ssh-port');
+  const saveAdminPasswordInput = document.getElementById('ssh-save-admin-password');
+
+  if (!networkAPI || typeof networkAPI.sshConnect !== 'function') {
+    setSSHStatus('SSH is only available in the Electron app', 'error');
+    return;
+  }
+  if (!hostInput || !usernameInput) return;
+
+  const host = hostInput.value.trim();
+  const username = usernameInput.value.trim();
+  const password = passwordInput ? passwordInput.value : '';
+  const port = portInput ? parseInt(portInput.value, 10) : 22;
+
+  if (!host || !username) {
+    setSSHStatus('Host and username are required', 'error');
+    return;
+  }
+
+  if (sshSessionId) {
+    await disconnectSSHSession();
+  }
+
+  const terminal = ensureSSHTerminal();
+  if (terminal) {
+    terminal.clear();
+    terminal.writeln(`Connecting to ${username}@${host}:${Number.isNaN(port) ? 22 : port}...`);
+  }
+  setSSHStatus('Connecting...', 'connecting');
+  setSSHFormState(false, true);
+
+  const result = await networkAPI.sshConnect({
+    host,
+    username,
+    password,
+    port: Number.isNaN(port) ? 22 : port,
+    cols: terminal ? terminal.cols : 80,
+    rows: terminal ? terminal.rows : 24
+  });
+
+  if (!result || !result.success) {
+    sshSessionId = null;
+    setSSHStatus(result?.error || 'Could not connect', 'error');
+    setSSHFormState(false);
+    if (terminal) {
+      terminal.writeln(`\r\n[Connection failed] ${result?.error || 'Unknown error'}`);
+    }
+    return;
+  }
+
+  sshSessionId = result.sessionId;
+  let statusMessage = 'Connected';
+  let statusState = 'connected';
+  if (username === 'admin' && saveAdminPasswordInput && typeof networkAPI.sshSaveAdminPassword === 'function') {
+    const saveResult = await networkAPI.sshSaveAdminPassword(saveAdminPasswordInput.checked ? password : '');
+    if (!saveResult || !saveResult.success) {
+      statusMessage = saveResult?.error || 'Connected, but could not save SSH password';
+      statusState = 'error';
+    }
+  }
+  setSSHStatus(statusMessage, statusState);
+  setSSHFormState(true);
+  fitSSHTerminal();
+  if (terminal) {
+    terminal.focus();
+  }
+}
+
+async function disconnectSSHSession() {
+  const networkAPI = getNetworkAPI();
+  const sessionId = sshSessionId;
+  sshSessionId = null;
+  if (networkAPI && typeof networkAPI.sshDisconnect === 'function' && sessionId) {
+    await networkAPI.sshDisconnect(sessionId);
+  }
+  setSSHStatus('Disconnected', 'idle');
+  setSSHFormState(false);
+  if (sshTerminal) {
+    sshTerminal.writeln('\r\n[Disconnected]');
+  }
+}
+
+function closeSSHTerminalModal() {
+  const modal = document.getElementById('ssh-terminal-modal');
+  const passwordInput = document.getElementById('ssh-password');
+  const saveAdminPasswordInput = document.getElementById('ssh-save-admin-password');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+  if (passwordInput) {
+    passwordInput.value = '';
+  }
+  if (saveAdminPasswordInput) {
+    saveAdminPasswordInput.checked = false;
+  }
+  if (sshSessionId) {
+    disconnectSSHSession();
+  }
+}
+
+function setupSSHTerminalModal() {
+  const modal = document.getElementById('ssh-terminal-modal');
+  const form = document.getElementById('ssh-login-form');
+  const closeButton = document.getElementById('close-ssh-terminal');
+  const disconnectButton = document.getElementById('ssh-disconnect-btn');
+  const container = document.getElementById('ssh-terminal-container');
+
+  if (!modal || !form) return;
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    connectSSHFromForm();
+  });
+
+  if (disconnectButton) {
+    disconnectButton.addEventListener('click', () => {
+      disconnectSSHSession();
+    });
+  }
+
+  if (closeButton) {
+    closeButton.addEventListener('click', closeSSHTerminalModal);
+  }
+
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) {
+      closeSSHTerminalModal();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (modal.style.display === 'flex' && event.key === 'Escape') {
+      closeSSHTerminalModal();
+    }
+  });
+
+  if (container && 'ResizeObserver' in window) {
+    sshResizeObserver = new ResizeObserver(() => fitSSHTerminal());
+    sshResizeObserver.observe(container);
+  }
 }
 
 function setupItemConfigModal() {
@@ -1162,26 +2020,71 @@ function updatePortIconElements(itemId, port) {
   icons.forEach(icon => updatePortIconAppearance(icon, match.item, parseInt(port, 10)));
 }
 
-function isItemOnline(item) {
+function getHostStatus(item) {
   if (!item || !item.ip) {
+    return 'offline';
+  }
+
+  const entry = hostStatuses.get(item.id);
+  if (entry) {
+    return entry.status;
+  }
+
+  return 'pending';
+}
+
+function isItemOnline(item) {
+  const hostStatus = getHostStatus(item);
+  if (hostStatus === 'online') {
+    return true;
+  }
+  if (hostStatus === 'offline') {
     return false;
+  }
+
+  const lastKnown = itemOnlineStates.get(item.id);
+  if (typeof lastKnown === 'boolean') {
+    return lastKnown;
   }
 
   const statuses = getPortStatuses(item);
   if (statuses.length === 0) {
-    return true;
+    return false;
   }
 
   if (statuses.some(status => status === 'open')) {
     return true;
   }
 
-  if (statuses.some(status => status === 'pending')) {
-    const lastKnown = itemOnlineStates.get(item.id);
-    return typeof lastKnown === 'boolean' ? lastKnown : true;
+  return false;
+}
+
+function updateCardStatusIndicator(card, item, online) {
+  if (!card) return;
+
+  const hostStatus = getHostStatus(item);
+  const visibleStatus = hostStatus === 'pending' && !itemOnlineStates.has(item?.id)
+    ? 'pending'
+    : online ? 'online' : 'offline';
+  const label = visibleStatus === 'online'
+    ? 'Online'
+    : visibleStatus === 'pending'
+      ? 'Checking status'
+      : 'Offline';
+
+  card.classList.toggle('online', online);
+  card.dataset.onlineStatus = visibleStatus;
+
+  const status = card.querySelector('.product-ip-status');
+  if (status) {
+    status.title = item?.ip ? `${label} - ${item.ip}` : label;
+    status.setAttribute('aria-label', status.title);
   }
 
-  return false;
+  const dot = card.querySelector('.product-status-dot');
+  if (dot) {
+    dot.title = label;
+  }
 }
 
 function updateItemOnlineState(itemId) {
@@ -1191,8 +2094,64 @@ function updateItemOnlineState(itemId) {
   const online = isItemOnline(match.item);
   itemOnlineStates.set(match.item.id, online);
   document.querySelectorAll(`.product-card[data-item-id="${itemId}"]`).forEach(card => {
-    card.classList.toggle('online', online);
+    updateCardStatusIndicator(card, match.item, online);
   });
+}
+
+function setHostStatus(itemId, status) {
+  const itemExists = productLines.some(line => line.items.some(item => item.id === itemId));
+  if (!itemExists) {
+    hostStatuses.delete(itemId);
+    return;
+  }
+
+  hostStatuses.set(itemId, {
+    status,
+    checkedAt: Date.now()
+  });
+  updateItemOnlineState(itemId);
+}
+
+function scheduleHostCheck(item) {
+  if (!item) return;
+
+  if (!item.ip) {
+    setHostStatus(item.id, 'offline');
+    return;
+  }
+
+  const entry = hostStatuses.get(item.id);
+  const intervalMs = Math.max((item.scanInterval || 5) * 1000, 2000);
+  const due = !entry || (Date.now() - entry.checkedAt >= intervalMs) || entry.status === 'pending';
+  if (!due || pendingHostChecks.has(item.id)) {
+    return;
+  }
+
+  setHostStatus(item.id, 'pending');
+  runHostCheck(item);
+}
+
+async function runHostCheck(item) {
+  if (!item || pendingHostChecks.has(item.id)) return;
+
+  const networkAPI = getNetworkAPI();
+  if (!networkAPI || typeof networkAPI.pingHost !== 'function') {
+    setHostStatus(item.id, 'offline');
+    return;
+  }
+
+  pendingHostChecks.add(item.id);
+  try {
+    const timeout = Math.max((item.scanInterval || 5) * 1000, 2000);
+    const result = await networkAPI.pingHost(item.ip, timeout);
+    const online = result && (result.online || result.success);
+    setHostStatus(item.id, online ? 'online' : 'offline');
+  } catch (error) {
+    console.error('Error pinging host', item.ip, error);
+    setHostStatus(item.id, 'offline');
+  } finally {
+    pendingHostChecks.delete(item.id);
+  }
 }
 
 function schedulePortChecks(item) {
@@ -1244,8 +2203,10 @@ async function runPortCheck(item, port) {
 
 function cleanupPortStatuses() {
   const validKeys = new Set();
+  const validItemIds = new Set();
   productLines.forEach(line => {
     line.items.forEach(item => {
+      validItemIds.add(item.id);
       if (Array.isArray(item.ports)) {
         item.ports.forEach(port => validKeys.add(`${item.id}-${port}`));
       }
@@ -1257,9 +2218,17 @@ function cleanupPortStatuses() {
       portStatuses.delete(key);
     }
   });
+
+  Array.from(hostStatuses.keys()).forEach(itemId => {
+    if (!validItemIds.has(itemId)) {
+      hostStatuses.delete(itemId);
+    }
+  });
 }
 
 function invalidatePortStatuses(itemId) {
+  hostStatuses.delete(itemId);
+  pendingHostChecks.delete(itemId);
   Array.from(portStatuses.keys()).forEach(key => {
     if (key.startsWith(`${itemId}-`)) {
       portStatuses.delete(key);
@@ -1272,12 +2241,20 @@ function invalidatePortStatuses(itemId) {
   });
 }
 
+function pollActiveLineStatuses() {
+  const line = getActiveLine();
+  if (!line) return;
+  line.items.forEach(item => {
+    scheduleHostCheck(item);
+    schedulePortChecks(item);
+  });
+}
+
 function startPortPolling() {
   if (portPollTimer) return;
+  pollActiveLineStatuses();
   portPollTimer = setInterval(() => {
-    const line = getActiveLine();
-    if (!line) return;
-    line.items.forEach(item => schedulePortChecks(item));
+    pollActiveLineStatuses();
   }, PORT_POLL_INTERVAL);
 }
 
@@ -1362,8 +2339,10 @@ function applyImportedConfiguration(configData) {
     : productLines[0].id;
 
   portStatuses.clear();
+  hostStatuses.clear();
   itemOnlineStates.clear();
   pendingPortChecks.clear();
+  pendingHostChecks.clear();
 
   saveProductLines();
   renderProductApp();

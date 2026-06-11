@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Digi TechSupport</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="node_modules/@xterm/xterm/css/xterm.css">
 </head>
 <body>
   <header class="product-topbar">
@@ -27,6 +28,57 @@
       <button id="product-image-prev" type="button" class="product-image-nav product-image-prev" title="Previous image">‹</button>
       <img id="product-image-preview" class="product-image-preview" alt="">
       <button id="product-image-next" type="button" class="product-image-nav product-image-next" title="Next image">›</button>
+    </div>
+  </div>
+
+  <div id="product-specs-modal" class="product-specs-modal" style="display:none;">
+    <div class="product-specs-content">
+      <button id="close-product-specs" type="button" class="close-button product-specs-close">×</button>
+      <div class="product-specs-header">
+        <p id="product-specs-eyebrow" class="product-specs-eyebrow">Specifications</p>
+        <h2 id="product-specs-title"></h2>
+      </div>
+      <div id="product-specs-body" class="product-specs-body"></div>
+    </div>
+  </div>
+
+  <div id="ssh-terminal-modal" class="ssh-terminal-modal" style="display:none;">
+    <div class="ssh-terminal-content">
+      <div class="ssh-terminal-header">
+        <div>
+          <p id="ssh-terminal-eyebrow" class="ssh-terminal-eyebrow">SSH Terminal</p>
+          <h2 id="ssh-terminal-title">Connect to device</h2>
+        </div>
+        <button id="close-ssh-terminal" type="button" class="close-button ssh-terminal-close">×</button>
+      </div>
+      <form id="ssh-login-form" class="ssh-login-form">
+        <div class="form-group">
+          <label for="ssh-host">Host</label>
+          <input type="text" id="ssh-host" autocomplete="off" readonly>
+        </div>
+        <div class="form-group">
+          <label for="ssh-port">Port</label>
+          <input type="number" id="ssh-port" min="1" max="65535" value="22">
+        </div>
+        <div class="form-group">
+          <label for="ssh-username">Username <span class="field-required">*</span></label>
+          <input type="text" id="ssh-username" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label for="ssh-password">Password</label>
+          <input type="password" id="ssh-password" autocomplete="current-password">
+          <label class="ssh-save-password-option" for="ssh-save-admin-password">
+            <input type="checkbox" id="ssh-save-admin-password">
+            <span>Save as default for admin</span>
+          </label>
+        </div>
+        <div class="form-buttons ssh-login-buttons">
+          <button type="button" id="ssh-disconnect-btn" class="cancel-button" disabled>Disconnect</button>
+          <button type="submit" id="ssh-connect-btn" class="save-button">Connect</button>
+        </div>
+      </form>
+      <div id="ssh-terminal-status" class="ssh-terminal-status">Not connected</div>
+      <div id="ssh-terminal-container" class="ssh-terminal-container"></div>
     </div>
   </div>
 
