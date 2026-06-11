@@ -11,6 +11,7 @@ function pingHost(host, timeout = 3000) {
   }
 
   const sanitizedTimeout = Math.max(500, Math.min(Number(timeout) || 3000, 10000));
+  const pingCommand = process.platform === 'darwin' ? '/sbin/ping' : 'ping';
   const args = process.platform === 'win32'
     ? ['-n', '1', '-w', String(sanitizedTimeout), host]
     : process.platform === 'darwin'
@@ -18,7 +19,7 @@ function pingHost(host, timeout = 3000) {
       : ['-c', '1', '-W', String(Math.ceil(sanitizedTimeout / 1000)), host];
 
   return new Promise(resolve => {
-    execFile('ping', args, { timeout: sanitizedTimeout + 1000 }, (error) => {
+    execFile(pingCommand, args, { timeout: sanitizedTimeout + 1000 }, (error) => {
       resolve({
         success: !error,
         online: !error,

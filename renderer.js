@@ -163,6 +163,216 @@ const PRODUCT_LINKS = {
   ]
 };
 const PRODUCT_SPECS = {
+  'Digi TX64 5G / LTE-Advanced Pro Cellular Router': {
+    subtitle: 'Digi TX64 5G with Digi 360*',
+    sourceUrl: 'https://www.digi.com/products/networking/cellular-routers/transportation/digi-tx64#specifications',
+    sections: [
+      {
+        title: 'Wireless Interfaces',
+        rows: [
+          ['WWAN**', '5G NR Sub-6 GHz with 4G LTE-Advanced Pro and 3G fallback (TX64-A161); LTE-Advanced Pro Cat 18 (TX64-A141); 4G LTE-Advanced Cat 11 (TX64-A121)'],
+          ['5G NR Sub-6', 'n1, n2, n3, n5, n7, n8, n12, n20, n25, n28, n38, n40, n41, n48 CBRS, n66, n71, n77, n78, n79 C-band'],
+          ['4G LTE-Advanced Pro', 'B1, B2, B3, B4, B5, B7, B8, B12, B13, B14 FirstNet®, B17, B18, B19, B20, B25, B26, B28, B29, B30, B32, B34, B38, B39, B40, B41, B42, B46, B48 CBRS, B66, B71'],
+          ['4G LTE-Advanced Cat 11', 'B1, B2, B3, B4, B5, B7, B8, B12, B13, B17, B20, B25, B26, B28, B29, B30, B66'],
+          ['3G', 'B1, B2, B3, B4, B5, B6, B8, B9, B19'],
+          ['Connector', '(2) or (4) 50 Ω SMA per module (center pin: female)'],
+          ['SIM Slots', '(2) Mini-SIM (2FF) per module (4 total)'],
+          ['SIM Security', 'SIM slot cover plate included']
+        ]
+      },
+      {
+        title: 'Wi-Fi',
+        rows: [
+          ['Technology', 'Private backhaul: Wi-Fi 6 (802.11ax), 5 GHz, 4 x 4 MIMO, up to 128 clients; Public Wi-Fi: Wi-Fi 6 (802.11ax), 2.4 / 5 GHz, 2 x 2 MIMO, up to 128 clients'],
+          ['Security', 'WPA, WPA2 and WPA3 Personal and Enterprise, Open and Open Enhanced security standards'],
+          ['Hotspot', 'Captive portal with customizable splash page, terms and conditions, shared password, user-specific password, RADIUS authentication'],
+          ['Third-Party Services', 'Content filtering, embedded advertising'],
+          ['Modes', 'Up to 8 access points and 1 client per Wi-Fi module (16 + 2 total)'],
+          ['Connectors', 'Private backhaul: (4) 50 Ω RP-SMA (center pin: male); Public Wi-Fi: (2) 50 Ω RP-SMA (center pin: male)']
+        ]
+      },
+      {
+        title: 'GNSS',
+        rows: [
+          ['Technology', 'GPS, Galileo, BeiDou and GLONASS with Untethered Dead Reckoning (UDR), multiple geofence support'],
+          ['Sensitivity', 'Tracking and navigation: −160 dBm'],
+          ['Protocol', 'NMEA 0183 4.0, TAIP'],
+          ['Connector', '(1) 50 Ω SMA (center pin: female); +3.3 VDC active antenna drive']
+        ]
+      },
+      {
+        title: 'Wired Interfaces',
+        rows: [
+          ['Ethernet', '(4) RJ-45; 10/100/1000 Mbps Base-T (auto-sensing); IEEE 802.3; configurable as WAN or LAN'],
+          ['Serial', '(1) RS-232; DB-9 male (DTE)'],
+          ['USB', '(3) USB 3.0 Type A']
+        ]
+      },
+      {
+        title: 'Software and Management*',
+        rows: [
+          ['Remote Management', 'Digi Remote Manager (cloud based); SNMP v2c/v3 (user installed/managed), SMS'],
+          ['Local Management', 'Web UI (HTTPS); CLI (SSH, serial)'],
+          ['Management Tools', 'SFTP, SCP; protocol analyzer with PCAP for Wireshark; event logging with Syslog']
+        ]
+      },
+      {
+        title: 'Memory',
+        rows: [
+          ['RAM / Flash', '2 GB / 8 GB']
+        ]
+      },
+      {
+        title: 'Physical',
+        rows: [
+          ['Dimensions (L x W x H)', '260 mm x 196 mm x 67 mm (10.2 in x 7.8 in x 2.6 in)'],
+          ['Weight', '3.3 kg (7.25 lbs)'],
+          ['Status LEDs', 'Power, WWAN (signal, service), Wi-Fi service (per module), GNSS service, LAN (link, activty)'],
+          ['Enclosure / Rating', 'Aluminum alloy / IP40']
+        ]
+      },
+      {
+        title: 'Power',
+        rows: [
+          ['Power Input', '9 – 36 VDC, reverse polarity protection, 60 W minimum power source required, ignition sense'],
+          ['Power Consumption', '28 W typical (idle), 41 W (peak RF Tx/Rx)']
+        ]
+      },
+      {
+        title: 'Environmental',
+        rows: [
+          ['Operating Temperature', '−30 °C to 70 °C (−22 °F to 158 °F)'],
+          ['Storage Temperature', '−40 °C to 85 °C (−40 °F to 185 °F)'],
+          ['Relative Humidity', '5% to 95% (non-condensing) at 25 °C (77 °F)'],
+          ['NEMA', 'Meets or exceeds the NEMA TS2 environmental requirements (−34 °C to 74 °C temperature range; 18% to 95% humidity over the temperature range; vibration: 0.5 g at 5 Hz to 30 Hz; shock: 10 g)']
+        ]
+      },
+      {
+        title: 'Approvals**',
+        rows: [
+          ['Cellular', 'PTCRB, AT&T, FirstNet Capable™, FirstNet Trusted™, T-Mobile, Verizon, Verizon Frontline'],
+          ['Safety', 'UL 60950, EN 62368, CSA 22.2 No. 60950'],
+          ['Vehicle', 'E-Mark (UNECE Reg. 10), SAE J1113-2, SAE J1455, ISO 7637-2/3, ISO 10605, ISO 16750-2 load dump'],
+          ['Emissions / Immunity', 'CE, FCC Part 15 Class B with IC, EN 303413, EN 301489-1/-19, CISPR 25, Level 3, ISO 11452-2, ISO 11452-4'],
+          ['Environmental', 'MIL-STD 810G (temperature, humidity, vibration, shock, dust)']
+        ]
+      },
+      {
+        title: 'Warranty***',
+        rows: [
+          ['Product Warranty', '1-year']
+        ]
+      }
+    ]
+  },
+  'Digi TX64 5G Rail Cellular Router': {
+    subtitle: 'Digi TX64 5G Rail with Digi 360*',
+    sourceUrl: 'https://www.digi.com/products/networking/cellular-routers/transportation/digi-tx64-5g-rail#specifications',
+    sections: [
+      {
+        title: 'Wireless Interfaces',
+        rows: [
+          ['WWAN**', '5G Sub-6 GHz with 4G LTE-Advanced Pro and 3G fallback — global'],
+          ['5G Sub-6', 'n1, n2, n3, n5, n7, n8, n12, n20, n25, n28, n38, n40, n41, n48 CBRS, n66, n71, n77, n78, n79, C-band'],
+          ['4G LTE', 'B1, B2, B3, B4, B5, B7, B8, B12, B13, B14 — FirstNet®, B17, B18, B19, B20, B25, B26, B28, B29, B30, B32, B34, B38, B39, B40, B41, B42, B43, B46, B48 CBRS, B66, B71'],
+          ['3G', 'B1, B2, B3, B4, B5, B6, B8, B9, B19'],
+          ['Connector', '(4) 50 Ω TNC (center pin: female)'],
+          ['SIM Slots', '2 Mini-SIM (2FF)'],
+          ['SIM Security', 'SIM slot cover plate included']
+        ]
+      },
+      {
+        title: 'Wi-Fi',
+        rows: [
+          ['Technology', 'Private backhaul: Wi-Fi 6 (802.11ax), 2.4 / 5 GHz, 2 x 2 MIMO, up to 128 clients; Public Wi-Fi: Wi-Fi 6 (802.11ax), 2.4 / 5 GHz, 2 x 2 MIMO, up to 128 clients'],
+          ['Hotspot', 'Captive portal with customizable splash page'],
+          ['Authentication', 'Basic terms and conditions acceptance, enterprise RADIUS, shared password, HotSpotSystem'],
+          ['Third-Party Services', 'Content filtering, embedded advertising'],
+          ['Modes', 'Up to 8 access points and 1 client per Wi-Fi module (16 + 2 total)'],
+          ['Connectors', 'Private backhaul: (2) 50 Ω RP-TNC (center pin: male); Public Wi-Fi: (2) 50 Ω RP-TNC (center pin: male)']
+        ]
+      },
+      {
+        title: 'GNSS',
+        rows: [
+          ['Technology', 'GPS, Galileo, BeiDou and GLONASS with Untethered Dead Reckoning (UDR), multiple geofence support'],
+          ['Sensitivity', 'Tracking and navigation: −160 dBm'],
+          ['Protocol', 'NMEA 0183 4.0, TAIP'],
+          ['Connector', '(1) 50 Ω RP-TNC (center pin: male); +3.3 VDC active antenna drive']
+        ]
+      },
+      {
+        title: 'Wired Interfaces',
+        rows: [
+          ['Ethernet', '(4) M12 X-code / IEEE 802.3; 10/100/1000 Base-T'],
+          ['Serial', '(1) RS-232; DB-9 male'],
+          ['USB', '(2) USB 3.0, Type A']
+        ]
+      },
+      {
+        title: 'Software and Management*',
+        rows: [
+          ['Remote Management', 'Digi Remote Manager (cloud based); SNMP v2c/v3 (user installed/managed), SMS'],
+          ['Local Management', 'Web UI (HTTPS); CLI (SSH, serial)'],
+          ['Management Tools', 'SFTP, SCP; protocol analyzer with PCAP for Wireshark; event logging with Syslog']
+        ]
+      },
+      {
+        title: 'Memory',
+        rows: [
+          ['RAM / Flash', '2 GB / 8 GB']
+        ]
+      },
+      {
+        title: 'Physical',
+        rows: [
+          ['Dimensions (L x W x H)', '260 mm x 196 mm x 51 mm (10.2 in x 7.8 in x 2 in)'],
+          ['Weight', '3.9 kg (8.6 lbs)'],
+          ['Status LEDs', 'Power, WWAN (signal, service) per module, Wi-Fi service (per module), GNSS service, LAN (link, activty)'],
+          ['Enclosure / Rating', 'Aluminum alloy / IP66']
+        ]
+      },
+      {
+        title: 'Power',
+        rows: [
+          ['Power Input', '9 – 36 VDC, 60 W minimum power source required, reverse polarity protection, M12 T-CODE with ignition sense'],
+          ['Power Consumption', '28 W typical (idle), 41 W (peak RF Tx/Rx)']
+        ]
+      },
+      {
+        title: 'Environmental',
+        rows: [
+          ['Mounting', 'Slotted mounting flanges, grounding stud'],
+          ['Operating Temperature', '−40 °C to 74 °C (−40 °F to 165.2 °F)'],
+          ['Storage Temperature', '−40 °C to 85 °C (−40 °F to 185 °F)'],
+          ['Relative Humidity', '5% to 95% (non-condensing) at 25 °C (77 °F)']
+        ]
+      },
+      {
+        title: 'Approvals**',
+        rows: [
+          ['Cellular', 'PTCRB, AT&T, FirstNet Trusted™, T-Mobile, Verizon'],
+          ['Shock / Vibration', 'MIL-STD-810G: vibration (Method 414.6C-10, Category 11), shock (Method 516.6, Procedure I)'],
+          ['Emissions / Immunity', 'FCC Part 15 Class B, EN 50121-3-2, CISPR 16-2-3'],
+          ['Environmental / Industrial', 'EN 50155, EN 45545-2, IEC 60068-2-1/2-2/2-30']
+        ]
+      },
+      {
+        title: 'Warranty***',
+        rows: [
+          ['Product Warranty', '1-year']
+        ]
+      },
+      {
+        title: 'Notes',
+        rows: [
+          ['*', 'Includes the Digi 360 solution for Digi TX64 5G Rail (1-year) with Digi Remote Manager, warranty and customer care.'],
+          ['**', 'Visit product certifications for latest approvals and updates.'],
+          ['***', 'Product warranty can be extended with Digi 360 extensions or renewals.']
+        ]
+      }
+    ]
+  },
   'Digi EX12 Cellular Extender': {
     subtitle: 'Digi EX12 with Digi 360*',
     sourceUrl: 'https://www.digi.com/products/networking/cellular-routers/enterprise/digi-ex12#specifications',
@@ -2276,6 +2486,13 @@ function setupItemConfigModal() {
 
   modal.addEventListener('click', (event) => {
     if (event.target === modal) {
+      closeItemConfigModal();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (modal.style.display === 'flex' && event.key === 'Escape') {
+      event.preventDefault();
       closeItemConfigModal();
     }
   });
