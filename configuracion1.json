@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "exportedAt": "2025-11-14T05:32:52.753Z",
+  "visibleServers": 1,
+  "activeServer": "monitor",
+  "monitorVMs": [
+    {
+      "id": "monitor-vm-1",
+      "name": "Ecom",
+      "ip": "192.168.3.15",
+      "imageUrl": "https://docs.4rji.com/proxnex-img/ecom.webp",
+      "ports": [
+        22
+      ],
+      "scanInterval": 5,
+      "dnsDomain": "",
+      "score": 0,
+      "lastScoreCheck": 1763098370367
+    },
+    {
+      "id": "monitor-vm-2",
+      "name": "Webmail",
+      "ip": "192.168.44.44",
+      "imageUrl": "https://docs.4rji.com/proxnex-img/webm.webp",
+      "ports": [
+        22,
+        80,
+        443,
+        3306
+      ],
+      "scanInterval": 5,
+      "dnsDomain": "",
+      "score": 0,
+      "lastScoreCheck": 1763098371601
+    },
+    {
+      "id": "monitor-vm-3",
+      "name": "Splunk",
+      "ip": "1",
+      "imageUrl": "https://docs.4rji.com/proxnex-img/splunk.webp",
+      "ports": [
+        22,
+        8000,
+        8089,
+        9997
+      ],
+      "scanInterval": 5,
+      "dnsDomain": "",
+      "score": 0,
+      "lastScoreCheck": 1763098371499
+    },
+    {
+      "id": "monitor-vm-5",
+      "name": "AD/DNS",
+      "ip": "1",
+      "imageUrl": "https://docs.4rji.com/proxnex-img/ad.webp",
+      "ports": [
+        53,
+        88,
+        135,
+        389,
+        445,
+        464,
+        636,
+        3268,
+        3269
+      ],
+      "scanInterval": 5,
+      "dnsDomain": "",
+      "score": 0,
+      "lastScoreCheck": 1763098371507
+    },
+    {
+      "id": "monitor-vm-6",
+      "name": "WebServer",
+      "ip": "1",
+      "imageUrl": "https://docs.4rji.com/proxnex-img/webs.webp",
+      "ports": [
+        80,
+        443
+      ],
+      "scanInterval": 5,
+      "dnsDomain": "",
+      "score": 0,
+      "lastScoreCheck": 1763098371505
+    },
+    {
+      "id": "monitor-vm-7",
+      "name": "FTP-Server",
+      "ip": "1",
+      "imageUrl": "https://docs.4rji.com/proxnex-img/ftps.webp",
+      "ports": [
+        20,
+        21,
+        1024
+      ],
+      "scanInterval": 5,
+      "dnsDomain": "",
+      "score": 0,
+      "lastScoreCheck": 1763098371507
+    }
+  ],
+  "credentials": {}
+}

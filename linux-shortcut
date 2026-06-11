@@ -1,0 +1,27 @@
+Para crear un acceso en favoritos (como acceso directo en el menú o dock) en Debian para `/opt/4rji/bin/proxnex.AppImage`, crea un archivo `.desktop`:
+
+
+sudo mv dist/Proxnex-1.0.0.AppImage /opt/4rji/bin/proxnex.AppImage 
+sudo cp build/icon.png /usr/share/icons/proxnex.png 
+
+```bash
+nano ~/.local/share/applications/proxnex.desktop
+```
+
+Contenido:
+
+```ini
+[Desktop Entry]
+Name=Proxnex
+Exec=/opt/4rji/bin/proxnex.AppImage
+Icon=proxnex
+Type=Application
+Categories=Utility;
+Terminal=false
+```
+
+**Notas rápidas:**
+
+* Asegúrate de que el AppImage tenga permisos de ejecución: `chmod +x /opt/4rji/bin/proxnex.AppImage`
+* El ícono `proxnex` debe estar en `/usr/share/icons` o usa una ruta absoluta si tienes un PNG o SVG, por ejemplo: `Icon=/opt/4rji/bin/proxnex.png`
+* Luego puedes buscarlo en el menú y anclarlo.

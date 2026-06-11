@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product Lines</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="product-topbar">
+    <div class="tabs product-tabs" id="product-tabs"></div>
+    <div class="product-top-controls" aria-label="Product line controls">
+      <button id="add-line-btn" class="control-button line-control-button" type="button" title="Add product line">
+        <span class="plus-icon">+</span>
+      </button>
+      <button id="remove-line-btn" class="control-button line-control-button remove-control-button" type="button" title="Remove product line">
+        <span class="plus-icon">-</span>
+      </button>
+    </div>
+  </header>
+
+  <main id="product-workspace" class="product-workspace"></main>
+
+  <div id="product-image-modal" class="product-image-modal" style="display:none;">
+    <div class="product-image-modal-content">
+      <button id="close-product-image" type="button" class="close-button product-image-close">×</button>
+      <button id="product-image-prev" type="button" class="product-image-nav product-image-prev" title="Previous image">‹</button>
+      <img id="product-image-preview" class="product-image-preview" alt="">
+      <button id="product-image-next" type="button" class="product-image-nav product-image-next" title="Next image">›</button>
+    </div>
+  </div>
+
+  <div id="item-config-modal" class="monitor-config-modal" style="display:none;">
+    <div class="monitor-config-content">
+      <button id="close-item-config" type="button" class="close-button">×</button>
+      <h2>Product Settings</h2>
+      <form id="item-config-form" class="monitor-config-form">
+        <div class="form-group">
+          <label for="item-ip">IP Address <span class="field-required">*</span></label>
+          <input type="text" id="item-ip" placeholder="192.168.0.10" autocomplete="off" required>
+        </div>
+        <div class="form-group">
+          <label for="item-image">Image URL</label>
+          <input type="text" id="item-image" placeholder="https://example.com/image.png" autocomplete="off">
+          <div class="image-file-row">
+            <input type="file" id="item-image-file" accept="image/*">
+            <button type="button" id="clear-item-image" class="clear-ports-button">Clear Image</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="item-scan-interval">Scan Interval (seconds)</label>
+          <input type="number" id="item-scan-interval" min="1" placeholder="5" value="5">
+        </div>
+        <div class="form-group">
+          <label for="item-dns-domain">DNS Domain</label>
+          <input type="text" id="item-dns-domain" placeholder="example.com" autocomplete="off">
+        </div>
+        <div class="form-buttons monitor-form-buttons">
+          <button type="button" id="cancel-item-config" class="cancel-button">Cancel</button>
+          <button type="submit" class="save-button">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="config-transfer-bar config-transfer-bar-right" id="product-config-transfer">
+    <button type="button" class="config-transfer-button" id="export-config-btn">Save config</button>
+    <button type="button" class="config-transfer-button" id="import-config-btn">Load config</button>
+    <input type="file" id="import-config-input" accept="application/json" style="display:none;">
+  </div>
+
+  <script type="module" src="renderer.js"></script>
+</body>
+</html>

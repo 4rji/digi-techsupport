@@ -1,0 +1,41 @@
+{
+  "name": "proxnex",
+  "version": "1.0.0",
+  "description": "Product line TCP checker",
+  "author": "Havi Arji <havi@4rji.com>",
+  "homepage": "https://proxnex.org/",
+  "main": "index.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "serve-http": "node server-http.js"
+  },
+  "devDependencies": {
+    "electron": "34.5.6",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.proxnex.app",
+    "files": [
+      "**/*"
+    ],
+    "directories": {
+      "buildResources": "build"
+    },
+    "mac": {
+      "icon": "build/icon.icns",
+      "identity": null
+    },
+    "win": {
+      "icon": "build/icon.ico"
+    },
+    "linux": {
+      "icon": "build/icon.png"
+    }
+  },
+  "dependencies": {
+    "electron-store": "^10.0.1",
+    "node-fetch": "^2.7.0",
+    "store": "^2.0.12"
+  }
+}

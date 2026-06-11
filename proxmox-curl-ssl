@@ -1,0 +1,31 @@
+
+  // Manejar el envío del formulario de configuración
+  const configForm = document.getElementById(`config-form-${serverNum}`);
+  configForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    
+    const config = {
+      serverName: document.getElementById(`server-name-${serverNum}`).value,
+      host: document.getElementById(`proxmox-host-${serverNum}`).value,
+      apiUser: document.getElementById(`api-user-${serverNum}`).value,
+      username: document.getElementById(`username-${serverNum}`).value,
+      password: document.getElementById(`password-${serverNum}`).value,
+      tokenName: document.getElementById(`token-name-${serverNum}`).value,
+      tokenValue: document.getElementById(`token-value-${serverNum}`).value,
+      node: document.getElementById(`node-select-${serverNum}`).value,
+      serverId: serverId
+    };
+
+    // Handle SSL certificate if provided
+    const sslCertFile = document.getElementById(`ssl-cert-${serverNum}`).files[0];
+    if (sslCertFile) {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        config.sslCertificate = e.target.result;
+        await saveAndUpdateConfig(config, serverId, serverNum, credentialsPanel);
+      };
+      reader.readAsText(sslCertFile);
+    } else {
+      await saveAndUpdateConfig(config, serverId, serverNum, credentialsPanel);
+    }
+  });
