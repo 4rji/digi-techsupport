@@ -199,6 +199,7 @@ function setupIPCHandlers() {
     const port = Math.max(1, Math.min(Number(options.port) || 22, 65535));
     const cols = Math.max(20, Math.min(Number(options.cols) || 80, 240));
     const rows = Math.max(10, Math.min(Number(options.rows) || 24, 80));
+    const directShell = Boolean(options.directShell);
 
     if (!host || !username) {
       return { success: false, error: 'Host and username are required' };
@@ -216,11 +217,16 @@ function setupIPCHandlers() {
       };
 
       conn.on('ready', () => {
-        conn.shell({
+        const ptyOptions = {
           term: 'xterm-256color',
           cols,
           rows
-        }, (error, stream) => {
+        };
+        const openStream = directShell
+          ? callback => conn.exec('/bin/sh', { pty: ptyOptions }, callback)
+          : callback => conn.shell(ptyOptions, callback);
+
+        openStream((error, stream) => {
           if (error) {
             conn.end();
             finish({ success: false, error: error.message });
@@ -239,11 +245,13 @@ function setupIPCHandlers() {
             }
           });
 
-          stream.stderr.on('data', data => {
-            if (!event.sender.isDestroyed()) {
-              event.sender.send('ssh-data', { sessionId, data: data.toString('utf8') });
-            }
-          });
+          if (stream.stderr) {
+            stream.stderr.on('data', data => {
+              if (!event.sender.isDestroyed()) {
+                event.sender.send('ssh-data', { sessionId, data: data.toString('utf8') });
+              }
+            });
+          }
 
           stream.on('close', () => {
             sshSessions.delete(sessionId);

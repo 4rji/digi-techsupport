@@ -1209,7 +1209,7 @@ body {
 
 .ssh-login-form {
   display: grid;
-  grid-template-columns: minmax(160px, 1.2fr) minmax(78px, 0.45fr) minmax(140px, 1fr) minmax(140px, 1fr) minmax(150px, 0.8fr) auto;
+  grid-template-columns: minmax(160px, 1.2fr) minmax(78px, 0.45fr) minmax(140px, 1fr) minmax(140px, 1fr) auto;
   align-items: end;
   gap: 12px;
   padding: 14px 24px;
@@ -1227,7 +1227,8 @@ body {
   background: rgba(76, 175, 80, 0.08);
 }
 
-.ssh-save-password-option {
+.ssh-save-password-option,
+.ssh-direct-shell-option {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -1240,13 +1241,24 @@ body {
   white-space: normal;
 }
 
-.ssh-save-password-option input {
+.ssh-save-password-option {
+  grid-column: 1 / span 2;
+}
+
+.ssh-direct-shell-option {
+  grid-column: 3 / span 2;
+}
+
+.ssh-save-password-option input,
+.ssh-direct-shell-option input {
   width: 14px;
   height: 14px;
   margin: 0;
 }
 
 .ssh-login-buttons {
+  grid-column: 5;
+  grid-row: 1 / span 2;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2495,6 +2507,13 @@ body {
   .ssh-login-form {
     grid-template-columns: 1fr;
     padding: 14px 18px;
+  }
+
+  .ssh-save-password-option,
+  .ssh-direct-shell-option,
+  .ssh-login-buttons {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .ssh-login-buttons {

@@ -2061,6 +2061,7 @@ function setSSHFormState(isConnected, isConnecting = false) {
   const passwordInput = document.getElementById('ssh-password');
   const portInput = document.getElementById('ssh-port');
   const saveAdminPasswordInput = document.getElementById('ssh-save-admin-password');
+  const directShellInput = document.getElementById('ssh-direct-shell');
 
   if (connectButton) {
     connectButton.disabled = isConnected || isConnecting;
@@ -2074,6 +2075,9 @@ function setSSHFormState(isConnected, isConnecting = false) {
   });
   if (saveAdminPasswordInput) {
     saveAdminPasswordInput.disabled = isConnected || isConnecting;
+  }
+  if (directShellInput) {
+    directShellInput.disabled = isConnected || isConnecting;
   }
 }
 
@@ -2154,6 +2158,7 @@ function openSSHTerminalModal(itemId) {
   const portInput = document.getElementById('ssh-port');
   const passwordInput = document.getElementById('ssh-password');
   const saveAdminPasswordInput = document.getElementById('ssh-save-admin-password');
+  const directShellInput = document.getElementById('ssh-direct-shell');
   const match = findItemById(itemId);
 
   if (!modal || !hostInput || !match) return;
@@ -2173,6 +2178,7 @@ function openSSHTerminalModal(itemId) {
   if (usernameInput) usernameInput.value = 'admin';
   if (passwordInput) passwordInput.value = '';
   if (saveAdminPasswordInput) saveAdminPasswordInput.checked = false;
+  if (directShellInput) directShellInput.checked = false;
   if (title) title.textContent = match.item.name || 'SSH Terminal';
   if (eyebrow) eyebrow.textContent = `SSH to ${match.item.ip}`;
 
@@ -2246,6 +2252,7 @@ async function connectSSHFromForm() {
   const passwordInput = document.getElementById('ssh-password');
   const portInput = document.getElementById('ssh-port');
   const saveAdminPasswordInput = document.getElementById('ssh-save-admin-password');
+  const directShellInput = document.getElementById('ssh-direct-shell');
 
   if (!networkAPI || typeof networkAPI.sshConnect !== 'function') {
     setSSHStatus('SSH is only available in the Electron app', 'error');
@@ -2257,6 +2264,7 @@ async function connectSSHFromForm() {
   const username = usernameInput.value.trim();
   const password = passwordInput ? passwordInput.value : '';
   const port = portInput ? parseInt(portInput.value, 10) : 22;
+  const directShell = Boolean(directShellInput && directShellInput.checked);
 
   if (!host || !username) {
     setSSHStatus('Host and username are required', 'error');
@@ -2270,7 +2278,10 @@ async function connectSSHFromForm() {
   const terminal = ensureSSHTerminal();
   if (terminal) {
     terminal.clear();
-    terminal.writeln(`Connecting to ${username}@${host}:${Number.isNaN(port) ? 22 : port}...`);
+    const target = `${username}@${host}:${Number.isNaN(port) ? 22 : port}`;
+    terminal.writeln(directShell
+      ? `Connecting to ${target} and starting /bin/sh...`
+      : `Connecting to ${target}...`);
   }
 
   if (username === 'admin' && saveAdminPasswordInput) {
@@ -2291,6 +2302,7 @@ async function connectSSHFromForm() {
     username,
     password,
     port: Number.isNaN(port) ? 22 : port,
+    directShell,
     cols: terminal ? terminal.cols : 80,
     rows: terminal ? terminal.rows : 24
   });
