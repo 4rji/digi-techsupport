@@ -2,8 +2,10 @@ import { Terminal } from './node_modules/@xterm/xterm/lib/xterm.mjs';
 import { FitAddon } from './node_modules/@xterm/addon-fit/lib/addon-fit.mjs';
 
 const PRODUCT_LINES_STORAGE_KEY = 'product_lines';
+const TEMPLATES_STORAGE_KEY = 'support_templates';
 const LEGACY_MONITOR_STORAGE_KEY = 'monitor_vm_cards';
 const ACTIVE_LINE_STORAGE_KEY = 'active_product_line';
+const TEMPLATES_VIEW_ID = '__templates__';
 const DEFAULT_LINE_NAMES = ['IX', 'TX', 'EX'];
 const NEXT_LINE_NAMES = ['AX', 'BX', 'CX', 'DX', 'GX', 'HX', 'MX', 'PX', 'RX', 'ZX'];
 const PORT_POLL_INTERVAL = 2000;
@@ -519,7 +521,61 @@ const KNOWN_PORT_SERVICES = {
   8089: 'HTTP Alt'
 };
 
+const DEFAULT_SUPPORT_TEMPLATES = [
+  {
+    id: 'connectivity-troubleshooting',
+    title: 'Connectivity Troubleshooting',
+    body: `Hello,
+
+Thank you for contacting technical support.
+
+To troubleshoot the connectivity issue, please confirm the device model, serial number, current firmware version, SIM/carrier information, and the current LED status. Also include the WAN IP address, signal strength, and whether the device is reachable locally.
+
+Recommended first steps:
+1. Power cycle the device and confirm it boots normally.
+2. Verify antennas, SIM card, Ethernet cabling, and power supply.
+3. Confirm APN and cellular profile settings.
+4. Run a ping test to 8.8.8.8 and a DNS test to google.com.
+
+Please send screenshots or logs from the device status page so we can review the next steps.`
+  },
+  {
+    id: 'firmware-upgrade',
+    title: 'Firmware Upgrade Request',
+    body: `Hello,
+
+We recommend verifying the current firmware before making configuration changes.
+
+Please provide the device model, serial number, current firmware version, and the target firmware version you want to install. Before upgrading, export a backup of the current configuration and confirm the device has stable power and network access.
+
+If the device is remote, please schedule a maintenance window in case a reboot or rollback is required.`
+  },
+  {
+    id: 'remote-access',
+    title: 'Remote Access Setup',
+    body: `Hello,
+
+To help configure remote access, please confirm the access method you want to use, such as VPN, SSH, HTTPS, or Digi Remote Manager.
+
+Please include the device IP address, LAN subnet, firewall requirements, user permissions, and whether access should be limited to specific source IP addresses.
+
+For security, avoid sending passwords by email. Share only the required connection details and confirm who should have access.`
+  },
+  {
+    id: 'case-follow-up',
+    title: 'Case Follow-up',
+    body: `Hello,
+
+I am following up on this support case to confirm whether the issue is still occurring.
+
+Please let us know if the device is currently online, whether any changes were made since the last update, and if you can provide recent logs or screenshots from the device status page.
+
+If the issue has been resolved, please confirm the fix so we can document the case outcome.`
+  }
+];
+
 let productLines = [];
+let supportTemplates = [];
 let activeLineId = '';
 let itemCounter = 0;
 let lineCounter = 0;
@@ -739,6 +795,47 @@ function normalizeProductLine(line, index) {
   };
 }
 
+function normalizeSupportTemplate(template, index) {
+  const fallback = DEFAULT_SUPPORT_TEMPLATES[index] || {
+    id: `template-${index + 1}`,
+    title: `Template ${index + 1}`,
+    body: ''
+  };
+
+  return {
+    id: String(template?.id || fallback.id || `template-${index + 1}`),
+    title: String(template?.title || fallback.title || `Template ${index + 1}`),
+    body: String(template?.body ?? fallback.body ?? '')
+  };
+}
+
+function loadSupportTemplates() {
+  try {
+    const storedTemplates = localStorage.getItem(TEMPLATES_STORAGE_KEY);
+    if (storedTemplates) {
+      const parsed = JSON.parse(storedTemplates);
+      if (Array.isArray(parsed)) {
+        supportTemplates = parsed.map((template, index) => normalizeSupportTemplate(template, index));
+        return;
+      }
+    }
+  } catch (error) {
+    console.error('Error loading support templates:', error);
+  }
+
+  supportTemplates = DEFAULT_SUPPORT_TEMPLATES.map((template, index) => normalizeSupportTemplate(template, index));
+  saveSupportTemplates();
+}
+
+function saveSupportTemplates() {
+  try {
+    localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(supportTemplates));
+  } catch (error) {
+    console.error('Error saving support templates:', error);
+    showNotification('Could not save templates');
+  }
+}
+
 function createDefaultProductLines(legacyItems = []) {
   return DEFAULT_LINE_NAMES.map((name, index) => {
     const line = createProductLine(name, { items: [] });
@@ -789,6 +886,8 @@ function recalculateCounters() {
 }
 
 function initializeProductLines() {
+  loadSupportTemplates();
+
   try {
     const storedLines = localStorage.getItem(PRODUCT_LINES_STORAGE_KEY);
     if (storedLines) {
@@ -817,9 +916,11 @@ function initializeProductLines() {
   recalculateCounters();
 
   const savedActiveLineId = localStorage.getItem(ACTIVE_LINE_STORAGE_KEY);
-  activeLineId = productLines.some(line => line.id === savedActiveLineId)
-    ? savedActiveLineId
-    : productLines[0]?.id || '';
+  activeLineId = savedActiveLineId === TEMPLATES_VIEW_ID
+    ? TEMPLATES_VIEW_ID
+    : (productLines.some(line => line.id === savedActiveLineId)
+      ? savedActiveLineId
+      : productLines[0]?.id || '');
 
   saveProductLines();
   renderProductApp();
@@ -839,6 +940,7 @@ function saveProductLines() {
 }
 
 function getActiveLine() {
+  if (activeLineId === TEMPLATES_VIEW_ID) return null;
   return productLines.find(line => line.id === activeLineId) || productLines[0] || null;
 }
 
@@ -863,6 +965,19 @@ function renderProductTabs() {
   if (!tabs) return;
 
   tabs.innerHTML = '';
+  const templatesButton = document.createElement('button');
+  templatesButton.type = 'button';
+  templatesButton.className = 'tab-button';
+  templatesButton.dataset.lineId = TEMPLATES_VIEW_ID;
+  templatesButton.textContent = 'Templates';
+  templatesButton.classList.toggle('active', activeLineId === TEMPLATES_VIEW_ID);
+  templatesButton.addEventListener('click', () => {
+    activeLineId = TEMPLATES_VIEW_ID;
+    saveProductLines();
+    renderProductApp();
+  });
+  tabs.appendChild(templatesButton);
+
   productLines.forEach(line => {
     const button = document.createElement('button');
     button.type = 'button';
@@ -884,6 +999,12 @@ function renderActiveLine() {
   if (!workspace) return;
 
   workspace.innerHTML = '';
+
+  if (activeLineId === TEMPLATES_VIEW_ID) {
+    renderTemplatesView(workspace);
+    return;
+  }
+
   const line = getActiveLine();
 
   if (!line) {
@@ -926,6 +1047,162 @@ function renderActiveLine() {
 
   workspace.appendChild(grid);
   cleanupPortStatuses();
+}
+
+function renderTemplatesView(workspace) {
+  const header = document.createElement('div');
+  header.className = 'vm-header monitor-header product-line-header templates-header';
+
+  const headerText = document.createElement('div');
+  headerText.className = 'monitor-header-text';
+
+  const headerRow = document.createElement('div');
+  headerRow.className = 'monitor-header-row';
+
+  const title = document.createElement('h2');
+  title.id = 'product-line-header-title';
+  title.textContent = 'Templates';
+
+  headerRow.appendChild(title);
+  const controls = document.createElement('div');
+  controls.className = 'product-top-controls template-top-controls';
+
+  const addButton = document.createElement('button');
+  addButton.type = 'button';
+  addButton.id = 'add-template-btn';
+  addButton.className = 'control-button line-control-button';
+  addButton.title = 'Add template';
+  addButton.setAttribute('aria-label', 'Add template');
+  addButton.innerHTML = '<span class="plus-icon">+</span>';
+  addButton.addEventListener('click', addSupportTemplate);
+
+  const removeButton = document.createElement('button');
+  removeButton.type = 'button';
+  removeButton.id = 'remove-template-btn';
+  removeButton.className = 'control-button line-control-button remove-control-button';
+  removeButton.title = 'Remove template';
+  removeButton.setAttribute('aria-label', 'Remove template');
+  removeButton.innerHTML = '<span class="plus-icon">-</span>';
+  removeButton.addEventListener('click', removeSupportTemplate);
+
+  controls.appendChild(addButton);
+  controls.appendChild(removeButton);
+  headerRow.appendChild(controls);
+  headerText.appendChild(headerRow);
+  header.appendChild(headerText);
+  workspace.appendChild(header);
+
+  const grid = document.createElement('div');
+  grid.className = 'templates-grid';
+
+  if (supportTemplates.length === 0) {
+    grid.classList.add('empty');
+    const emptyState = document.createElement('div');
+    emptyState.className = 'monitor-placeholder-card';
+    emptyState.innerHTML = '<h3>No templates yet</h3>';
+    grid.appendChild(emptyState);
+  } else {
+    supportTemplates.forEach((template, index) => {
+      grid.appendChild(createTemplateCard(template, index));
+    });
+  }
+
+  workspace.appendChild(grid);
+}
+
+function createSupportTemplate(index) {
+  const fallbackTitle = `Template ${index + 1}`;
+  return {
+    id: `support-template-${Date.now()}-${index + 1}`,
+    title: fallbackTitle,
+    body: ''
+  };
+}
+
+function addSupportTemplate() {
+  supportTemplates.push(createSupportTemplate(supportTemplates.length));
+  saveSupportTemplates();
+  renderProductApp();
+}
+
+function removeSupportTemplate() {
+  if (supportTemplates.length === 0) return;
+  supportTemplates.pop();
+  saveSupportTemplates();
+  renderProductApp();
+}
+
+function createTemplateCard(template, index) {
+  const card = document.createElement('section');
+  card.className = 'template-card';
+
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.className = 'template-title-input';
+  titleInput.value = template.title;
+  titleInput.setAttribute('aria-label', 'Template title');
+
+  const bodyInput = document.createElement('textarea');
+  bodyInput.className = 'template-body-input';
+  bodyInput.value = template.body;
+  bodyInput.rows = 14;
+  bodyInput.setAttribute('aria-label', `${template.title} body`);
+
+  const actions = document.createElement('div');
+  actions.className = 'template-actions';
+
+  const saveButton = document.createElement('button');
+  saveButton.type = 'button';
+  saveButton.className = 'save-button template-action-button';
+  saveButton.textContent = 'Save';
+  saveButton.addEventListener('click', () => {
+    supportTemplates[index] = {
+      ...template,
+      title: titleInput.value.trim() || `Template ${index + 1}`,
+      body: bodyInput.value
+    };
+    saveSupportTemplates();
+    showNotification('Template saved');
+    renderProductApp();
+  });
+
+  const copyButton = document.createElement('button');
+  copyButton.type = 'button';
+  copyButton.className = 'config-transfer-button template-action-button';
+  copyButton.textContent = 'Copy';
+  copyButton.addEventListener('click', () => {
+    copyTemplateText(bodyInput.value);
+  });
+
+  actions.appendChild(saveButton);
+  actions.appendChild(copyButton);
+  card.appendChild(titleInput);
+  card.appendChild(bodyInput);
+  card.appendChild(actions);
+
+  return card;
+}
+
+async function copyTemplateText(text) {
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const scratch = document.createElement('textarea');
+      scratch.value = text;
+      scratch.setAttribute('readonly', '');
+      scratch.style.position = 'fixed';
+      scratch.style.opacity = '0';
+      document.body.appendChild(scratch);
+      scratch.select();
+      document.execCommand('copy');
+      document.body.removeChild(scratch);
+    }
+    showNotification('Template copied');
+  } catch (error) {
+    console.error('Error copying template:', error);
+    showNotification('Could not copy template');
+  }
 }
 
 function createProductCard(item, line) {
@@ -1143,6 +1420,8 @@ function updateControlButtonsState() {
   const addButton = document.getElementById('add-item-btn');
   const removeButton = document.getElementById('remove-item-btn');
   const removeLineButton = document.getElementById('remove-line-btn');
+  const addTemplateButton = document.getElementById('add-template-btn');
+  const removeTemplateButton = document.getElementById('remove-template-btn');
   const line = getActiveLine();
 
   if (addButton) {
@@ -1152,7 +1431,13 @@ function updateControlButtonsState() {
     removeButton.disabled = !line || isLineLockedForManualItems(line) || line.items.length === 0;
   }
   if (removeLineButton) {
-    removeLineButton.disabled = productLines.length === 0;
+    removeLineButton.disabled = activeLineId === TEMPLATES_VIEW_ID || productLines.length === 0;
+  }
+  if (addTemplateButton) {
+    addTemplateButton.disabled = activeLineId !== TEMPLATES_VIEW_ID;
+  }
+  if (removeTemplateButton) {
+    removeTemplateButton.disabled = activeLineId !== TEMPLATES_VIEW_ID || supportTemplates.length === 0;
   }
 }
 
@@ -2361,10 +2646,11 @@ function startPortPolling() {
 function collectConfigurationSnapshot() {
   return {
     type: 'product-line-config',
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     activeLineId,
-    productLines: productLines.map((line, index) => normalizeProductLine(line, index))
+    productLines: productLines.map((line, index) => normalizeProductLine(line, index)),
+    supportTemplates: supportTemplates.map((template, index) => normalizeSupportTemplate(template, index))
   };
 }
 
@@ -2434,9 +2720,16 @@ function applyImportedConfiguration(configData) {
   recalculateCounters();
   syncLockedLineItems();
   recalculateCounters();
-  activeLineId = productLines.some(line => line.id === configData.activeLineId)
+  activeLineId = (
+    productLines.some(line => line.id === configData.activeLineId)
+    || configData.activeLineId === TEMPLATES_VIEW_ID
+  )
     ? configData.activeLineId
     : productLines[0].id;
+
+  supportTemplates = Array.isArray(configData.supportTemplates)
+    ? configData.supportTemplates.map((template, index) => normalizeSupportTemplate(template, index))
+    : DEFAULT_SUPPORT_TEMPLATES.map((template, index) => normalizeSupportTemplate(template, index));
 
   portStatuses.clear();
   hostStatuses.clear();
@@ -2445,6 +2738,7 @@ function applyImportedConfiguration(configData) {
   pendingHostChecks.clear();
 
   saveProductLines();
+  saveSupportTemplates();
   renderProductApp();
 }
 

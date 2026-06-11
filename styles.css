@@ -2248,6 +2248,78 @@ body {
   align-items: stretch;
 }
 
+.templates-header {
+  margin-bottom: 12px;
+}
+
+.templates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  padding: 12px 0 28px;
+}
+
+.templates-grid.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+}
+
+.template-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 420px;
+  padding: 16px;
+  border-radius: 8px;
+  background: #161616;
+  border: 1px solid #333;
+}
+
+.template-title-input,
+.template-body-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #0b0b0b;
+  color: #fff;
+  font: inherit;
+  outline: none;
+}
+
+.template-title-input {
+  min-height: 42px;
+  padding: 9px 11px;
+  color: #d6ffe0;
+  font-weight: 700;
+}
+
+.template-body-input {
+  flex: 1 1 auto;
+  min-height: 300px;
+  padding: 12px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.template-title-input:focus,
+.template-body-input:focus {
+  border-color: #4caf50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.18);
+}
+
+.template-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.template-action-button {
+  min-width: 82px;
+}
+
 .product-card {
   min-height: 300px;
 }
