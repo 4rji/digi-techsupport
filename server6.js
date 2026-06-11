@@ -1,20 +1,20 @@
-// server6.js - Módulo específico para el servidor 6
+// server6.js - Server-specific module for server 6
 
 import { initializeServer, loadVMs } from './server-module.js';
 import { initializeCredentials } from './server-credentials.js';
 
-// ID del servidor
+// Server ID
 const SERVER_ID = 'server6';
 const SERVER_NUM = '6';
 
-// Inicializar el servidor cuando el DOM esté cargado
+// Initialize the server when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   console.log(`Initializing ${SERVER_ID}...`);
   initializeServer(SERVER_ID, SERVER_NUM);
-  initializeCredentials(); // Asegurar que las credenciales se inicialicen
+  initializeCredentials(); // Ensure credentials are initialized
 });
 
-// Función para cargar las VMs del servidor 6
+// Function to load VMs for server 6
 async function loadServer6VMs() {
   console.log('Attempting to load VMs for server6...');
   try {
@@ -34,7 +34,7 @@ async function loadServer6VMs() {
   }
 }
 
-// Exportar funciones específicas del servidor 6
+// Export server-specific functions for server 6
 export {
   loadServer6VMs,
   SERVER_ID

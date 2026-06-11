@@ -1,35 +1,35 @@
-Product Lines App
-=================
+Digi TechSupport
+================
 
-Desarrollo
-----------
+Development
+-----------
 1. `npm install`
 2. `npm start`
 
-Servidor HTTP opcional
----------------------
-- `npm run serve-http` arranca el servidor estático en `http://localhost:3000`.
-- Por defecto sirve `dist/` cuando existe o el directorio raíz del proyecto.
-- Cambia el puerto con `PROXNEX_HTTP_PORT=XXXX npm run serve-http` o la carpeta servida con `PROXNEX_STATIC_ROOT=./dist npm run serve-http`.
+Optional HTTP Server
+--------------------
+- `npm run serve-http` starts the static server at `http://localhost:3000`.
+- By default it serves `dist/` when it exists, otherwise it serves the project root.
+- Change the port with `DIGI_TECHSUPPORT_HTTP_PORT=XXXX npm run serve-http` or the served folder with `DIGI_TECHSUPPORT_STATIC_ROOT=./dist npm run serve-http`.
 
-Compilación general
--------------------
+General Build
+-------------
 - `npm run build`
-- Artefactos: `dist/mac/`, `dist/win/`, `dist/linux/`
+- Artifacts: `dist/mac/`, `dist/win/`, `dist/linux/`
 
-Compilaciones por plataforma
-----------------------------
+Platform Builds
+---------------
 - macOS universal: `npm run build --mac`
 - Windows: `npm run build --win`
 - Linux: `npm run build --linux`
 
-Arquitecturas macOS específicas
--------------------------------
+Specific macOS Architectures
+----------------------------
 - Apple Silicon (M1/M2/M3): `npm run build --mac --arm64`
 - Intel: `npm run build --mac --x64`
 
-Chequeos TCP
-------------
-La pantalla principal organiza productos por líneas como `IX`, `TX` y `EX`. Cada línea puede tener más productos, y también se pueden crear líneas nuevas.
+TCP Checks
+----------
+The main screen organizes products by lines such as `IX`, `TX`, and `EX`. Each line can include more products, and new lines can also be created.
 
-Cada tarjeta guarda nombre, IP, dominio DNS, puertos TCP, intervalo de chequeo e imagen propia. La imagen puede ser una URL o un archivo local cargado desde el modal de configuración de la tarjeta.
+Each card stores a name, IP address, DNS domain, TCP ports, scan interval, and custom image. The image can be a URL or a local file loaded from the card settings modal.

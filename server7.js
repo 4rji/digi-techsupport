@@ -1,20 +1,20 @@
-// server7.js - Módulo específico para el servidor 7
+// server7.js - Server-specific module for server 7
 
 import { initializeServer, loadVMs } from './server-module.js';
 import { initializeCredentials } from './server-credentials.js';
 
-// ID del servidor
+// Server ID
 const SERVER_ID = 'server7';
 const SERVER_NUM = '7';
 
-// Inicializar el servidor cuando el DOM esté cargado
+// Initialize the server when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   console.log(`Initializing ${SERVER_ID}...`);
   initializeServer(SERVER_ID, SERVER_NUM);
-  initializeCredentials(); // Asegurar que las credenciales se inicialicen
+  initializeCredentials(); // Ensure credentials are initialized
 });
 
-// Función para cargar las VMs del servidor 7
+// Function to load VMs for server 7
 async function loadServer7VMs() {
   console.log('Attempting to load VMs for server7...');
   try {
@@ -34,7 +34,7 @@ async function loadServer7VMs() {
   }
 }
 
-// Exportar funciones específicas del servidor 7
+// Export server-specific functions for server 7
 export {
   loadServer7VMs,
   SERVER_ID

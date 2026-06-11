@@ -1,29 +1,29 @@
-// Importar la función de notificación
+// Import the notification function
 import { showNotification } from './server-module.js';
 
-// Objeto para almacenar las credenciales de cada servidor
+// Object for storing each server credentials
 const serverCredentials = {};
 
-// Función para guardar las credenciales de un servidor
+// Function to save server credentials
 export function saveServerCredentials(serverId, credentials) {
   try {
-    // Validar que tenemos todas las credenciales necesarias
+    // Validate that all required credentials are present
     if (!credentials.serverName || !credentials.host || !credentials.apiUser) {
       throw new Error('Missing required credentials');
     }
 
-    // Inicializar el objeto de credenciales si no existe
+    // Initialize the credentials object if it does not exist
     if (!serverCredentials[serverId]) {
       serverCredentials[serverId] = {};
     }
 
-    // Guardar las credenciales en memoria
+    // Save credentials in memory
     serverCredentials[serverId] = {
       ...credentials,
       lastUpdated: new Date().toISOString()
     };
 
-    // Guardar en localStorage
+    // Save in localStorage
     localStorage.setItem(`credentials_${serverId}`, JSON.stringify(serverCredentials[serverId]));
 
     return true;
@@ -33,19 +33,19 @@ export function saveServerCredentials(serverId, credentials) {
   }
 }
 
-// Función para obtener las credenciales de un servidor
+// Function to get server credentials
 export function getServerCredentials(serverId) {
   try {
-    // Intentar obtener las credenciales de la memoria
+    // Try to get credentials from memory
     if (serverCredentials[serverId]) {
       return serverCredentials[serverId];
     }
 
-    // Si no están en memoria, intentar obtenerlas del localStorage
+    // If they are not in memory, try to get them from localStorage
     const savedCredentials = localStorage.getItem(`credentials_${serverId}`);
     if (savedCredentials) {
       const credentials = JSON.parse(savedCredentials);
-      serverCredentials[serverId] = credentials; // Guardar en memoria
+      serverCredentials[serverId] = credentials; // Save in memory
       return credentials;
     }
 
@@ -56,10 +56,10 @@ export function getServerCredentials(serverId) {
   }
 }
 
-// Función para inicializar las credenciales al cargar la aplicación
+// Function to initialize credentials when the app loads
 export function initializeCredentials() {
   try {
-    // Cargar todas las credenciales guardadas en localStorage
+    // Load all credentials saved in localStorage
     for (let i = 1; i <= 10; i++) {
       const serverId = `server${i}`;
       const savedCredentials = localStorage.getItem(`credentials_${serverId}`);
@@ -72,7 +72,7 @@ export function initializeCredentials() {
   }
 }
 
-// Función para manejar el envío del formulario de credenciales
+// Function to handle credentials form submission
 export function handleCredentialsSubmit(event, serverId) {
   event.preventDefault();
   console.log(`Handling credentials submit for ${serverId}`);
@@ -93,7 +93,7 @@ export function handleCredentialsSubmit(event, serverId) {
     serverName: credentials.serverName,
     host: credentials.host,
     apiUser: credentials.apiUser,
-    // No mostrar datos sensibles en la consola
+    // Do not show sensitive data in the console
     hasPassword: !!credentials.password,
     hasToken: !!credentials.tokenValue
   });
@@ -101,7 +101,7 @@ export function handleCredentialsSubmit(event, serverId) {
   try {
     saveServerCredentials(serverId, credentials);
     
-    // Ocultar el panel de credenciales
+    // Hide the credentials panel
     const serverNum = serverId.replace('server', '');
     const panelId = `credentials-panel-${serverNum}`;
     const panel = document.getElementById(panelId);
@@ -111,21 +111,21 @@ export function handleCredentialsSubmit(event, serverId) {
       console.log(`Credentials panel hidden for ${serverId}`);
     }
     
-    // Actualizar el nombre del servidor en la pestaña
+    // Update the server name in the tab
     const serverButton = document.querySelector(`.tab-button[onclick*="${serverId}"]`);
     if (serverButton) {
       serverButton.textContent = credentials.serverName;
       console.log(`Updated tab button text for ${serverId} to ${credentials.serverName}`);
     }
     
-    // Actualizar el encabezado
+    // Update the header
     const serverHeader = document.getElementById(`${serverId}-header`);
     if (serverHeader) {
       serverHeader.textContent = `Virtual Machines - ${credentials.serverName}`;
       console.log(`Updated header for ${serverId}`);
     }
 
-    // Mostrar notificación de éxito
+    // Show success notification
     if (typeof showNotification === 'function') {
       showNotification(`Credentials saved for ${credentials.serverName}`);
     } else {
@@ -140,9 +140,9 @@ export function handleCredentialsSubmit(event, serverId) {
   }
 }
 
-// Función para mostrar/ocultar el panel de credenciales
+// Function to show/hide the credentials panel
 export function toggleCredentialsPanel(serverId) {
-  // Extraer el número del servidor (1-10)
+  // Extract the server number (1-10)
   const serverNum = serverId.replace('server', '');
   const panelId = `credentials-panel-${serverNum}`;
   const panel = document.getElementById(panelId);
@@ -150,7 +150,7 @@ export function toggleCredentialsPanel(serverId) {
   console.log(`Toggling credentials panel: ${panelId} for server ${serverId}`);
   
   if (panel) {
-    // Cambiar la visibilidad del panel
+    // Toggle panel visibility
     panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
     console.log(`Panel ${panelId} display set to: ${panel.style.display}`);
   } else {
@@ -158,7 +158,7 @@ export function toggleCredentialsPanel(serverId) {
   }
 }
 
-// Función para verificar si un servidor tiene credenciales guardadas
+// Function to check whether a server has saved credentials
 export function hasCredentials(serverId) {
   return getServerCredentials(serverId) !== null;
 } 

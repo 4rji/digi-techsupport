@@ -1,20 +1,20 @@
-// server10.js - Módulo específico para el servidor 10
+// server10.js - Server-specific module for server 10
 
 import { initializeServer, loadVMs } from './server-module.js';
 import { initializeCredentials } from './server-credentials.js';
 
-// ID del servidor
+// Server ID
 const SERVER_ID = 'server10';
 const SERVER_NUM = '10';
 
-// Inicializar el servidor cuando el DOM esté cargado
+// Initialize the server when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   console.log(`Initializing ${SERVER_ID}...`);
   initializeServer(SERVER_ID, SERVER_NUM);
-  initializeCredentials(); // Asegurar que las credenciales se inicialicen
+  initializeCredentials(); // Ensure credentials are initialized
 });
 
-// Función para cargar las VMs del servidor 10
+// Function to load VMs for server 10
 async function loadServer10VMs() {
   console.log('Attempting to load VMs for server10...');
   try {
@@ -34,7 +34,7 @@ async function loadServer10VMs() {
   }
 }
 
-// Exportar funciones específicas del servidor 10
+// Export server-specific functions for server 10
 export {
   loadServer10VMs,
   SERVER_ID

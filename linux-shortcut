@@ -1,27 +1,27 @@
-Para crear un acceso en favoritos (como acceso directo en el menú o dock) en Debian para `/opt/4rji/bin/proxnex.AppImage`, crea un archivo `.desktop`:
+To create a favorite shortcut (menu or dock launcher) in Debian for `/opt/4rji/bin/digi-techsupport.AppImage`, create a `.desktop` file:
 
 
-sudo mv dist/Proxnex-1.0.0.AppImage /opt/4rji/bin/proxnex.AppImage 
-sudo cp build/icon.png /usr/share/icons/proxnex.png 
+sudo mv dist/digi-techsupport-1.0.0.AppImage /opt/4rji/bin/digi-techsupport.AppImage
+sudo cp build/icon.png /usr/share/icons/digi-techsupport.png
 
 ```bash
-nano ~/.local/share/applications/proxnex.desktop
+nano ~/.local/share/applications/digi-techsupport.desktop
 ```
 
-Contenido:
+Content:
 
 ```ini
 [Desktop Entry]
-Name=Proxnex
-Exec=/opt/4rji/bin/proxnex.AppImage
-Icon=proxnex
+Name=Digi TechSupport
+Exec=/opt/4rji/bin/digi-techsupport.AppImage
+Icon=digi-techsupport
 Type=Application
 Categories=Utility;
 Terminal=false
 ```
 
-**Notas rápidas:**
+**Quick notes:**
 
-* Asegúrate de que el AppImage tenga permisos de ejecución: `chmod +x /opt/4rji/bin/proxnex.AppImage`
-* El ícono `proxnex` debe estar en `/usr/share/icons` o usa una ruta absoluta si tienes un PNG o SVG, por ejemplo: `Icon=/opt/4rji/bin/proxnex.png`
-* Luego puedes buscarlo en el menú y anclarlo.
+* Make sure the AppImage has execute permissions: `chmod +x /opt/4rji/bin/digi-techsupport.AppImage`
+* The `digi-techsupport` icon must be in `/usr/share/icons`, or use an absolute path if you have a PNG or SVG, for example: `Icon=/opt/4rji/bin/digi-techsupport.png`
+* Then you can search for it in the menu and pin it.

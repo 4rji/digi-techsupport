@@ -542,19 +542,19 @@ body {
   background-color: rgba(255, 235, 59, 0.2);
 }
 
-/* Estado específico para VMs encendidas */
+/* Specific state for powered-on VMs */
 .vm-card[data-status="running"] .vm-icon {
   background-color: #1e4620; /* Verde oscuro apagado */
   border-color: rgba(76, 175, 80, 0.95);
   box-shadow: 0 0 16px rgba(76, 175, 80, 0.35);
 }
 
-/* Estado específico para VMs apagadas */
+/* Specific state for powered-off VMs */
 .vm-card[data-status="stopped"] .vm-icon {
   background-color: #2a2a2a; /* Negro mate */
 }
 
-/* Estado específico para VMs pausadas, suspendidas o hibernando */
+/* Specific state for paused, suspended, or hibernating VMs */
 .vm-card[data-status="paused"] .vm-icon,
 .vm-card[data-status="suspended"] .vm-icon,
 .vm-card[data-status="hibernating"] .vm-icon {
@@ -719,7 +719,7 @@ body {
   background-color: #c62828;
 }
 
-/* Estilos para la cabecera de VMs */
+/* Styles for the VM header */
 .vm-header {
   display: flex;
   justify-content: space-between;
@@ -1196,7 +1196,7 @@ body {
   background: #5dc85d;
 }
 
-/* Estilos para el botón de credenciales */
+/* Styles for the credentials button */
 .credentials-button {
   background-color: #1e4620;
   color: white;
@@ -1211,7 +1211,7 @@ body {
   background-color: #2a5a2a;
 }
 
-/* Estilos para el panel de credenciales */
+/* Styles for the credentials panel */
 .credentials-panel {
   position: fixed;
   top: 50%;
@@ -1233,7 +1233,7 @@ body {
   margin-bottom: 20px;
 }
 
-/* Estilos para los botones del formulario */
+/* Styles for form buttons */
 .form-buttons {
   display: flex;
   gap: 10px;
@@ -1267,7 +1267,7 @@ body {
   background: #5a2a2a;
 }
 
-/* Estilos para el contenedor de pestañas */
+/* Styles for the tabs container */
 .tabs {
   display: flex;
   flex-wrap: wrap;
@@ -1283,7 +1283,7 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Estilos para los botones de las pestañas */
+/* Styles for tab buttons */
 .tab-button {
   padding: 12px 24px;
   border: none;
@@ -1373,7 +1373,7 @@ body {
   box-shadow: 0 4px 12px rgba(70, 30, 30, 0.3);
 }
 
-/* Estilos para los botones de control de servidores */
+/* Styles for server control buttons */
 .server-controls {
   position: fixed;
   bottom: 20px;
@@ -1446,14 +1446,14 @@ body {
   background: #5a2a2a;
 }
 
-/* Estilos para los botones deshabilitados */
+/* Styles for disabled buttons */
 .control-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   pointer-events: none;
 }
 
-/* Asegurarse de que los botones de control estén siempre visibles */
+/* Ensure control buttons are always visible */
 #add-server-btn,
 #remove-server-btn {
   display: block !important;
@@ -1603,7 +1603,7 @@ body {
   font-family: monospace;
 }
 
-/* Estilos para el modal de IPs */
+/* Styles for the IPs modal */
 .ip-modal {
   position: fixed;
   top: 50%;
@@ -2074,7 +2074,7 @@ body {
   }
 }
 
-/* Estilos para el indicador de estado de conexión */
+/* Styles for the connection status indicator */
 .connection-status {
   display: flex;
   align-items: center;

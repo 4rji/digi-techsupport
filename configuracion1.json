@@ -8,7 +8,7 @@
       "id": "monitor-vm-1",
       "name": "Ecom",
       "ip": "192.168.3.15",
-      "imageUrl": "https://docs.4rji.com/proxnex-img/ecom.webp",
+      "imageUrl": "https://docs.4rji.com/digi-techsupport-img/ecom.webp",
       "ports": [
         22
       ],
@@ -21,7 +21,7 @@
       "id": "monitor-vm-2",
       "name": "Webmail",
       "ip": "192.168.44.44",
-      "imageUrl": "https://docs.4rji.com/proxnex-img/webm.webp",
+      "imageUrl": "https://docs.4rji.com/digi-techsupport-img/webm.webp",
       "ports": [
         22,
         80,
@@ -37,7 +37,7 @@
       "id": "monitor-vm-3",
       "name": "Splunk",
       "ip": "1",
-      "imageUrl": "https://docs.4rji.com/proxnex-img/splunk.webp",
+      "imageUrl": "https://docs.4rji.com/digi-techsupport-img/splunk.webp",
       "ports": [
         22,
         8000,
@@ -53,7 +53,7 @@
       "id": "monitor-vm-5",
       "name": "AD/DNS",
       "ip": "1",
-      "imageUrl": "https://docs.4rji.com/proxnex-img/ad.webp",
+      "imageUrl": "https://docs.4rji.com/digi-techsupport-img/ad.webp",
       "ports": [
         53,
         88,
@@ -74,7 +74,7 @@
       "id": "monitor-vm-6",
       "name": "WebServer",
       "ip": "1",
-      "imageUrl": "https://docs.4rji.com/proxnex-img/webs.webp",
+      "imageUrl": "https://docs.4rji.com/digi-techsupport-img/webs.webp",
       "ports": [
         80,
         443
@@ -88,7 +88,7 @@
       "id": "monitor-vm-7",
       "name": "FTP-Server",
       "ip": "1",
-      "imageUrl": "https://docs.4rji.com/proxnex-img/ftps.webp",
+      "imageUrl": "https://docs.4rji.com/digi-techsupport-img/ftps.webp",
       "ports": [
         20,
         21,

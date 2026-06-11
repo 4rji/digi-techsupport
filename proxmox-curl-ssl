@@ -1,5 +1,5 @@
 
-  // Manejar el envío del formulario de configuración
+  // Handle the configuration form submission
   const configForm = document.getElementById(`config-form-${serverNum}`);
   configForm.addEventListener('submit', async (event) => {
     event.preventDefault();

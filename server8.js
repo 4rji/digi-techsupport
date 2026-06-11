@@ -1,20 +1,20 @@
-// server8.js - Módulo específico para el servidor 8
+// server8.js - Server-specific module for server 8
 
 import { initializeServer, loadVMs } from './server-module.js';
 import { initializeCredentials } from './server-credentials.js';
 
-// ID del servidor
+// Server ID
 const SERVER_ID = 'server8';
 const SERVER_NUM = '8';
 
-// Inicializar el servidor cuando el DOM esté cargado
+// Initialize the server when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   console.log(`Initializing ${SERVER_ID}...`);
   initializeServer(SERVER_ID, SERVER_NUM);
-  initializeCredentials(); // Asegurar que las credenciales se inicialicen
+  initializeCredentials(); // Ensure credentials are initialized
 });
 
-// Función para cargar las VMs del servidor 8
+// Function to load VMs for server 8
 async function loadServer8VMs() {
   console.log('Attempting to load VMs for server8...');
   try {
@@ -34,7 +34,7 @@ async function loadServer8VMs() {
   }
 }
 
-// Exportar funciones específicas del servidor 8
+// Export server-specific functions for server 8
 export {
   loadServer8VMs,
   SERVER_ID

@@ -1,20 +1,20 @@
-// server4.js - Módulo específico para el servidor 4
+// server4.js - Server-specific module for server 4
 
 import { initializeServer, loadVMs } from './server-module.js';
 import { initializeCredentials } from './server-credentials.js';
 
-// ID del servidor
+// Server ID
 const SERVER_ID = 'server4';
 const SERVER_NUM = '4';
 
-// Inicializar el servidor cuando el DOM esté cargado
+// Initialize the server when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   console.log(`Initializing ${SERVER_ID}...`);
   initializeServer(SERVER_ID, SERVER_NUM);
-  initializeCredentials(); // Asegurar que las credenciales se inicialicen
+  initializeCredentials(); // Ensure credentials are initialized
 });
 
-// Función para cargar las VMs del servidor 4
+// Function to load VMs for server 4
 async function loadServer4VMs() {
   console.log('Attempting to load VMs for server4...');
   try {
@@ -34,7 +34,7 @@ async function loadServer4VMs() {
   }
 }
 
-// Exportar funciones específicas del servidor 4
+// Export server-specific functions for server 4
 export {
   loadServer4VMs,
   SERVER_ID

@@ -1,20 +1,20 @@
-// server2.js - Módulo específico para el servidor 2
+// server2.js - Server-specific module for server 2
 
 import { initializeServer, loadVMs } from './server-module.js';
 import { initializeCredentials } from './server-credentials.js';
 
-// ID del servidor
+// Server ID
 const SERVER_ID = 'server2';
 const SERVER_NUM = '2';
 
-// Inicializar el servidor cuando el DOM esté cargado
+// Initialize the server when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   console.log(`Initializing ${SERVER_ID}...`);
   initializeServer(SERVER_ID, SERVER_NUM);
-  initializeCredentials(); // Asegurar que las credenciales se inicialicen
+  initializeCredentials(); // Ensure credentials are initialized
 });
 
-// Función para cargar las VMs del servidor 2
+// Function to load VMs for server 2
 async function loadServer2VMs() {
   console.log('Attempting to load VMs for server2...');
   try {
@@ -34,7 +34,7 @@ async function loadServer2VMs() {
   }
 }
 
-// Exportar funciones específicas del servidor 2
+// Export server-specific functions for server 2
 export {
   loadServer2VMs,
   SERVER_ID

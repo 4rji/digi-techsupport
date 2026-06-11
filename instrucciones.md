@@ -1,18 +1,18 @@
-# Proxnex
+# Digi TechSupport
 
-## Requisitos
+## Requirements
 
-- Linux (probado en Ubuntu/Debian)
+- Linux (tested on Ubuntu/Debian)
 - Git
 
-### Instalar Node.js y npm
+### Install Node.js and npm
 
 ```bash
 sudo apt update
 sudo apt install -y nodejs npm
 ```
 
-## Instalación de dependencias del proyecto
+## Install Project Dependencies
 
 ```bash
 npm install
@@ -20,7 +20,7 @@ npm install
 
 ---
 
-## Ejecutar en modo desarrollo
+## Run in Development Mode
 
 ```bash
 npm start
@@ -28,28 +28,28 @@ npm start
 
 ---
 
-## Generar instalador (build)
+## Generate Installer (Build)
 
 ```bash
 npm run build
 ```
 
-Los archivos se generan en `dist/`:
+The files are generated in `dist/`:
 
 - `.AppImage`
 - `.deb`
 
 ---
 
-## Ejecutar app instalada
+## Run Installed App
 
 ```bash
 # AppImage
-chmod +x dist/Proxnex-*.AppImage
-./dist/Proxnex-*.AppImage
+chmod +x dist/digi-techsupport-*.AppImage
+./dist/digi-techsupport-*.AppImage
 
-# o instalar el .deb
-sudo dpkg -i dist/proxnex_*.deb
+# or install the .deb
+sudo dpkg -i dist/digi-techsupport-*.deb
 ```
 
 ---

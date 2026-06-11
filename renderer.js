@@ -53,10 +53,82 @@ const LOCKED_ITEM_IMAGE_VARIANTS = {
   ]
 };
 const PRODUCT_LINKS = {
+  'Digi IX10 Industrial Cellular Router': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/cellular-routers/industrial/digi-ix10'
+    }
+  ],
+  'Digi IX20 Industrial 4G LTE Router': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/cellular-routers/industrial/digi-ix20'
+    }
+  ],
+  'Digi IX25 5G Industrial Cellular Router': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/cellular-routers/industrial/digi-ix25'
+    }
+  ],
+  'Digi IX30 Industrial Cellular Router': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/cellular-routers/industrial/digi-ix30'
+    }
+  ],
+  'Digi IX40 5G Edge Computing Industrial IoT Solution': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/cellular-routers/industrial/digi-ix40'
+    }
+  ],
+  'Digi TX40 5G Cellular Router': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/cellular-routers/transportation/digi-tx40-cellular-router'
+    }
+  ],
+  'Digi TX54 5G / LTE-Advanced Cellular Router': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/cellular-routers/transportation/digi-tx54'
+    }
+  ],
+  'Digi TX64 5G / LTE-Advanced Pro Cellular Router': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/cellular-routers/transportation/digi-tx64'
+    }
+  ],
+  'Digi TX64 5G Rail Cellular Router': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/cellular-routers/transportation/digi-tx64-5g-rail'
+    }
+  ],
   'Digi EX12 Cellular Extender': [
     {
       label: 'Website',
       url: 'https://www.digi.com/products/networking/cellular-routers/enterprise/digi-ex12'
+    }
+  ],
+  'Digi EX15 Cellular Extender': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/cellular-routers/enterprise/digi-ex15'
+    }
+  ],
+  'Digi EX50 5G Cellular Extender': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/cellular-routers/enterprise/digi-ex50'
+    }
+  ],
+  'Digi CORE plug-in LTE modem': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/cellular-routers/enterprise/digi-core-plug-in-lte-modem'
     }
   ]
 };
@@ -570,13 +642,13 @@ function createDocsSearchForm(item) {
   const input = document.createElement('input');
   input.type = 'search';
   input.className = 'docs-search-input';
-  input.placeholder = 'Buscar en docs';
+  input.placeholder = 'Search docs';
   input.autocomplete = 'off';
 
   const button = document.createElement('button');
   button.type = 'submit';
   button.className = 'docs-search-button';
-  button.textContent = 'Buscar';
+  button.textContent = 'Search';
 
   form.appendChild(input);
   form.appendChild(button);

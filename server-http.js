@@ -6,12 +6,12 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = Number(process.env.PROXNEX_HTTP_PORT) || 3000;
+const PORT = Number(process.env.DIGI_TECHSUPPORT_HTTP_PORT) || 3000;
 const DEFAULT_FILE = 'index.html';
 
 function resolveStaticRoot() {
-  if (process.env.PROXNEX_STATIC_ROOT) {
-    return path.resolve(process.env.PROXNEX_STATIC_ROOT);
+  if (process.env.DIGI_TECHSUPPORT_STATIC_ROOT) {
+    return path.resolve(process.env.DIGI_TECHSUPPORT_STATIC_ROOT);
   }
 
   const distRoot = path.join(__dirname, 'dist');

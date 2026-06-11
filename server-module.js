@@ -1,17 +1,17 @@
-// server-module.js - Módulo común para la gestión de servidores Proxmox
+// server-module.js - Shared module for Proxmox server management
 
-// Función para inicializar un servidor
+// Function to initialize a server
 function initializeServer(serverId, serverNum) {
   // Precargar valores predeterminados
   document.getElementById(`api-user-${serverNum}`).value = 'API@pve';
   document.getElementById(`username-${serverNum}`).value = 'root';
   document.getElementById(`token-name-${serverNum}`).value = 'mytoken';
   
-  // Obtener elementos de estado de conexión
+  // Get connection status elements
   const statusDot = document.querySelector(`#connection-status-${serverNum} .status-dot`);
   const statusText = document.querySelector(`#connection-status-${serverNum} .status-text`);
   
-  // Cargar credenciales guardadas (primero intentar desde localStorage para compatibilidad)
+  // Load saved credentials (try localStorage first for compatibility)
   const savedCredentials = JSON.parse(localStorage.getItem(`credentials_${serverId}`)) || {};
   const applySavedCredentials = (credentials) => {
     if (!credentials || typeof credentials !== 'object') {
@@ -66,7 +66,7 @@ function initializeServer(serverId, serverNum) {
     }
   };
 
-  // Solo establecer el host predeterminado si no hay credenciales guardadas
+  // Only set the default host when no credentials are saved
   if (!savedCredentials.host) {
     document.getElementById(`proxmox-host-${serverNum}`).value = 'https://IP:8006/api2/json';
   }
@@ -112,7 +112,7 @@ function initializeServer(serverId, serverNum) {
     }
   });
   
-  // Configurar botones para mostrar/ocultar el panel de credenciales
+  // Configure buttons to show/hide the credentials panel
   const showCredentialsBtn = document.getElementById(`show-credentials-btn-${serverNum}`);
   const closeCredentialsBtn = document.getElementById(`close-credentials-btn-${serverNum}`);
   const credentialsPanel = document.getElementById(`credentials-panel-${serverNum}`);
@@ -125,7 +125,7 @@ function initializeServer(serverId, serverNum) {
     credentialsPanel.style.display = 'none';
   });
 
-  // Manejar el envío del formulario de configuración
+  // Handle the configuration form submission
   const configForm = document.getElementById(`config-form-${serverNum}`);
   configForm.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -142,11 +142,11 @@ function initializeServer(serverId, serverNum) {
       serverId: serverId
     };
 
-    // Actualizar el estado de conexión
+    // Update the connection status
     const statusDot = document.querySelector(`#connection-status-${serverNum} .status-dot`);
     const statusText = document.querySelector(`#connection-status-${serverNum} .status-text`);
 
-    // Guardar credenciales en localStorage
+    // Save credentials in localStorage
     localStorage.setItem(`credentials_${serverId}`, JSON.stringify({
       serverName: config.serverName,
       username: config.username,
@@ -158,7 +158,7 @@ function initializeServer(serverId, serverNum) {
       node: config.node
     }));
 
-    // Actualizar el texto del botón de la pestaña con el nombre del servidor
+    // Update the tab button text with the server name
     const tabButton = document.querySelector(`.tab-button[onclick*="${serverId}"]`);
     const header = document.getElementById(`${serverId}-header`);
     if (tabButton && config.serverName) {
@@ -168,30 +168,30 @@ function initializeServer(serverId, serverNum) {
       header.textContent = `Virtual Machines - ${config.serverName}`;
     }
 
-    // Mostrar mensaje de guardado
+    // Show saving message
     showNotification(`Saving credentials for ${config.serverName}...`);
 
-    // Enviar la configuración al proceso principal
+    // Send the configuration to the main process
     const result = await window.proxmoxAPI.saveConfig(config);
     
     if (result.success) {
-      // Actualizar el estado de conexión
+      // Update the connection status
       statusDot.classList.add('connected');
       statusText.classList.add('connected');
       statusText.textContent = 'Host is reachable';
       updateTabStatus(serverId, true);
       
       showNotification(`Credentials for ${config.serverName} saved successfully`);
-      credentialsPanel.style.display = 'none'; // Ocultar el panel después de guardar
+      credentialsPanel.style.display = 'none'; // Hide the panel after saving
       
-      // Recargar las VMs con la nueva configuración
+      // Reload VMs with the new configuration
       try {
         await loadVMs(serverId);
       } catch (error) {
         console.error('Error reloading VMs after config save:', error);
       }
     } else {
-      // Actualizar el estado de conexión
+      // Update the connection status
       statusDot.classList.remove('connected');
       statusText.classList.remove('connected');
       statusText.textContent = 'Host is not reachable';
@@ -201,20 +201,20 @@ function initializeServer(serverId, serverNum) {
     }
   });
 
-  // Añadir evento para cargar nodos cuando se cambia el host
+  // Add event to load nodes when the host changes
   document.getElementById(`proxmox-host-${serverNum}`).addEventListener('change', async function() {
     const host = this.value;
     const apiUser = document.getElementById(`api-user-${serverNum}`).value;
     const tokenName = document.getElementById(`token-name-${serverNum}`).value;
     const tokenValue = document.getElementById(`token-value-${serverNum}`).value;
     
-    // Actualizar el estado de conexión
+    // Update the connection status
     const statusDot = document.querySelector(`#connection-status-${serverNum} .status-dot`);
     const statusText = document.querySelector(`#connection-status-${serverNum} .status-text`);
     
     if (host && apiUser && tokenName && tokenValue) {
       try {
-        // Crear una configuración temporal para probar la conexión
+        // Create a temporary configuration to test the connection
         const tempConfig = {
           host,
           apiUser,
@@ -223,7 +223,7 @@ function initializeServer(serverId, serverNum) {
           serverId: serverId
         };
         
-        // Guardar la configuración temporal
+        // Save the temporary configuration
         const saveResult = await window.proxmoxAPI.saveConfig(tempConfig);
         if (!saveResult.success) {
           console.error('Error saving temporary configuration:', saveResult.error);
@@ -244,7 +244,7 @@ function initializeServer(serverId, serverNum) {
             nodeSelect.remove(1);
           }
           
-          // Añadir los nodos como opciones
+          // Add the nodes as options
           result.nodes.forEach(node => {
             const option = document.createElement('option');
             option.value = node.node;
@@ -252,7 +252,7 @@ function initializeServer(serverId, serverNum) {
             nodeSelect.appendChild(option);
           });
           
-          // Actualizar el estado de conexión
+          // Update the connection status
           statusDot.classList.add('connected');
           statusText.classList.add('connected');
           statusText.textContent = 'Host is reachable';
@@ -352,7 +352,7 @@ async function loadVMs(serverId) {
         // Ajustar el estado para mostrar 'hibernating' cuando corresponda
         let displayStatus = vm.status;
         if (vm.status === 'stopped' && vm.template !== 1) {
-          // Por ahora, asumimos que si la VM está detenida y no es una plantilla, está apagada
+          // For now, assume that if the VM is stopped and is not a template, it is powered off
           displayStatus = 'stopped';
         }
         
@@ -423,7 +423,7 @@ function setupVMButtons(serverId) {
   document.querySelectorAll(`.ip-button${serverSelector}`).forEach(button => {
     let tooltipTimeout;
     
-    // Función para actualizar el tooltip con las IPs
+    // Function to update the tooltip with the IPs
     const updateTooltip = async (tooltip) => {
       const vmid = button.getAttribute('data-vmid');
       const server = button.getAttribute('data-server');
@@ -471,7 +471,7 @@ function setupVMButtons(serverId) {
       if (tooltip) {
         tooltipTimeout = setTimeout(() => {
           updateTooltip(tooltip);
-        }, 300); // Pequeño retraso para evitar actualizaciones innecesarias
+        }, 300); // Short delay to avoid unnecessary updates
       }
     });
 
@@ -518,7 +518,7 @@ function setupVMButtons(serverId) {
       event.preventDefault();
       console.log('Start button clicked');
       
-      // Deshabilitar el botón mientras se procesa la acción
+      // Disable the button while the action is processed
       button.disabled = true;
       button.textContent = 'Starting...';
       
@@ -539,7 +539,7 @@ function setupVMButtons(serverId) {
         
         if (result && result.success) {
           showNotification('VM started successfully');
-          // Recargar la lista después de un breve retraso
+          // Reload the list after a short delay
           setTimeout(() => {
             loadVMs(server);
             button.disabled = false;
@@ -565,7 +565,7 @@ function setupVMButtons(serverId) {
       event.preventDefault();
       console.log('Resume button clicked');
       
-      // Deshabilitar el botón mientras se procesa la acción
+      // Disable the button while the action is processed
       button.disabled = true;
       button.textContent = 'Resuming...';
       
@@ -586,7 +586,7 @@ function setupVMButtons(serverId) {
         
         if (result && result.success) {
           showNotification('VM resumed successfully');
-          // Recargar la lista después de un breve retraso
+          // Reload the list after a short delay
           setTimeout(() => {
             loadVMs(server);
             button.disabled = false;
@@ -612,7 +612,7 @@ function setupVMButtons(serverId) {
       event.preventDefault();
       console.log('Stop button clicked');
       
-      // Deshabilitar el botón mientras se procesa la acción
+      // Disable the button while the action is processed
       button.disabled = true;
       button.textContent = 'Stopping...';
       
@@ -633,7 +633,7 @@ function setupVMButtons(serverId) {
         
         if (result && result.success) {
           showNotification('VM stopped successfully');
-          // Recargar la lista después de un breve retraso
+          // Reload the list after a short delay
           setTimeout(() => {
             loadVMs(server);
             button.disabled = false;
@@ -659,7 +659,7 @@ function setupVMButtons(serverId) {
       event.preventDefault();
       console.log('Hibernate button clicked');
       
-      // Deshabilitar el botón mientras se procesa la acción
+      // Disable the button while the action is processed
       button.disabled = true;
       button.textContent = 'Hibernating...';
       
@@ -680,7 +680,7 @@ function setupVMButtons(serverId) {
         
         if (result && result.success) {
           showNotification('VM hibernated successfully');
-          // Recargar la lista después de un breve retraso
+          // Reload the list after a short delay
           setTimeout(() => {
             loadVMs(server);
             button.disabled = false;
@@ -706,7 +706,7 @@ function setupVMButtons(serverId) {
       event.preventDefault();
       console.log('Console button clicked');
       
-      // Deshabilitar el botón mientras se procesa la acción
+      // Disable the button while the action is processed
       button.disabled = true;
       button.textContent = 'Opening...';
       
@@ -731,7 +731,7 @@ function setupVMButtons(serverId) {
           showNotification(`Error opening console: ${result.error || 'Unknown error'}`);
         }
         
-        // Habilitar el botón después de un breve retraso
+        // Enable the button after a short delay
         setTimeout(() => {
           button.disabled = false;
           button.textContent = 'Console';
@@ -962,7 +962,7 @@ function stopAutoRefresh(serverId) {
   }
 }
 
-// Exportar las funciones para que puedan ser utilizadas por otros módulos
+// Export functions so they can be used by other modules
 export {
   initializeServer,
   loadVMs,

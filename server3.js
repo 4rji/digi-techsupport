@@ -1,20 +1,20 @@
-// server3.js - Módulo específico para el servidor 3
+// server3.js - Server-specific module for server 3
 
 import { initializeServer, loadVMs } from './server-module.js';
 import { initializeCredentials } from './server-credentials.js';
 
-// ID del servidor
+// Server ID
 const SERVER_ID = 'server3';
 const SERVER_NUM = '3';
 
-// Inicializar el servidor cuando el DOM esté cargado
+// Initialize the server when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   console.log(`Initializing ${SERVER_ID}...`);
   initializeServer(SERVER_ID, SERVER_NUM);
-  initializeCredentials(); // Asegurar que las credenciales se inicialicen
+  initializeCredentials(); // Ensure credentials are initialized
 });
 
-// Función para cargar las VMs del servidor 3
+// Function to load VMs for server 3
 async function loadServer3VMs() {
   console.log('Attempting to load VMs for server3...');
   try {
@@ -34,7 +34,7 @@ async function loadServer3VMs() {
   }
 }
 
-// Exportar funciones específicas del servidor 3
+// Export server-specific functions for server 3
 export {
   loadServer3VMs,
   SERVER_ID
