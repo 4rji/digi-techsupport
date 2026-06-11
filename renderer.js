@@ -799,13 +799,15 @@ function normalizeSupportTemplate(template, index) {
   const fallback = DEFAULT_SUPPORT_TEMPLATES[index] || {
     id: `template-${index + 1}`,
     title: `Template ${index + 1}`,
-    body: ''
+    body: '',
+    hidden: false
   };
 
   return {
     id: String(template?.id || fallback.id || `template-${index + 1}`),
     title: String(template?.title || fallback.title || `Template ${index + 1}`),
-    body: String(template?.body ?? fallback.body ?? '')
+    body: String(template?.body ?? fallback.body ?? ''),
+    hidden: Boolean(template?.hidden ?? fallback.hidden ?? false)
   };
 }
 
@@ -1094,6 +1096,9 @@ function renderTemplatesView(workspace) {
 
   const grid = document.createElement('div');
   grid.className = 'templates-grid';
+  const visibleTemplates = supportTemplates
+    .map((template, index) => ({ template, index }))
+    .filter(entry => !entry.template.hidden);
 
   if (supportTemplates.length === 0) {
     grid.classList.add('empty');
@@ -1101,9 +1106,15 @@ function renderTemplatesView(workspace) {
     emptyState.className = 'monitor-placeholder-card';
     emptyState.innerHTML = '<h3>No templates yet</h3>';
     grid.appendChild(emptyState);
+  } else if (visibleTemplates.length === 0) {
+    grid.classList.add('empty');
+    const emptyState = document.createElement('div');
+    emptyState.className = 'monitor-placeholder-card';
+    emptyState.innerHTML = '<h3>No templates visible</h3>';
+    grid.appendChild(emptyState);
   } else {
-    supportTemplates.forEach((template, index) => {
-      grid.appendChild(createTemplateCard(template, index));
+    visibleTemplates.forEach(entry => {
+      grid.appendChild(createTemplateCard(entry.template, entry.index));
     });
   }
 
@@ -1115,20 +1126,33 @@ function createSupportTemplate(index) {
   return {
     id: `support-template-${Date.now()}-${index + 1}`,
     title: fallbackTitle,
-    body: ''
+    body: '',
+    hidden: false
   };
 }
 
 function addSupportTemplate() {
-  supportTemplates.push(createSupportTemplate(supportTemplates.length));
+  const hiddenIndex = [...supportTemplates].map((template, index) => ({ template, index })).reverse().find(entry => entry.template.hidden)?.index;
+  if (typeof hiddenIndex === 'number') {
+    supportTemplates[hiddenIndex].hidden = false;
+  } else {
+    supportTemplates.push(createSupportTemplate(supportTemplates.length));
+  }
   saveSupportTemplates();
   renderProductApp();
 }
 
 function removeSupportTemplate() {
-  if (supportTemplates.length === 0) return;
-  supportTemplates.pop();
+  const visibleTemplates = supportTemplates
+    .map((template, index) => ({ template, index }))
+    .filter(entry => !entry.template.hidden);
+
+  if (visibleTemplates.length === 0) return;
+
+  const entry = visibleTemplates[visibleTemplates.length - 1];
+  supportTemplates[entry.index].hidden = true;
   saveSupportTemplates();
+  showNotification('Template hidden');
   renderProductApp();
 }
 
@@ -1174,8 +1198,24 @@ function createTemplateCard(template, index) {
     copyTemplateText(bodyInput.value);
   });
 
+  const deleteButton = document.createElement('button');
+  deleteButton.type = 'button';
+  deleteButton.className = 'delete-button template-action-button';
+  deleteButton.textContent = 'Delete';
+  deleteButton.addEventListener('click', () => {
+    const templateTitle = titleInput.value.trim() || template.title || `Template ${index + 1}`;
+    const shouldDelete = window.confirm(`Delete "${templateTitle}" permanently? This cannot be undone.`);
+    if (!shouldDelete) return;
+
+    supportTemplates.splice(index, 1);
+    saveSupportTemplates();
+    showNotification('Template deleted');
+    renderProductApp();
+  });
+
   actions.appendChild(saveButton);
   actions.appendChild(copyButton);
+  actions.appendChild(deleteButton);
   card.appendChild(titleInput);
   card.appendChild(bodyInput);
   card.appendChild(actions);
@@ -1423,6 +1463,7 @@ function updateControlButtonsState() {
   const addTemplateButton = document.getElementById('add-template-btn');
   const removeTemplateButton = document.getElementById('remove-template-btn');
   const line = getActiveLine();
+  const visibleTemplateCount = supportTemplates.filter(template => !template.hidden).length;
 
   if (addButton) {
     addButton.disabled = !line || isLineLockedForManualItems(line);
@@ -1437,7 +1478,7 @@ function updateControlButtonsState() {
     addTemplateButton.disabled = activeLineId !== TEMPLATES_VIEW_ID;
   }
   if (removeTemplateButton) {
-    removeTemplateButton.disabled = activeLineId !== TEMPLATES_VIEW_ID || supportTemplates.length === 0;
+    removeTemplateButton.disabled = activeLineId !== TEMPLATES_VIEW_ID || visibleTemplateCount === 0;
   }
 }
 
