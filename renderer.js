@@ -59,6 +59,17 @@ const LOCKED_ITEM_IMAGES = {
   'Digi CORE plug-in LTE modem': 'img/digi-core-cm-18.jpg'
 };
 const LOCKED_ITEM_IMAGE_VARIANTS = {
+  'Digi IX10 Industrial Cellular Router': [
+    'img/digi-ix10.png',
+    'img/digi-ix10-front.png',
+    'img/Digi-ix10-left.png',
+    'img/digi-ix10-mounting.gif'
+  ],
+  'Digi IX20 Industrial 4G LTE Router': [
+    'img/digi-ix20.png',
+    'img/digi-ix20-front.png',
+    'img/digi-ix20-front-no-wifi.png'
+  ],
   'Digi EX12 Cellular Extender': [
     'img/digi-ex12.png',
     'img/digi-ex12-left.png',
