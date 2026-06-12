@@ -10,6 +10,7 @@ const { generateSupportTemplate } = require('./template-generator');
 const APP_ICON_PATH = path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const sshSessions = new Map();
 const SSH_ADMIN_PASSWORD_FILE = 'ssh-admin-password.json';
+let mainWindow = null;
 
 function getSSHAdminPasswordPath() {
   return path.join(app.getPath('userData'), SSH_ADMIN_PASSWORD_FILE);
@@ -348,7 +349,7 @@ function setupIPCHandlers() {
 }
 
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     icon: APP_ICON_PATH,
@@ -361,7 +362,17 @@ function createWindow() {
     autoHideMenuBar: true
   });
 
-  win.loadFile('index.html');
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+
+  mainWindow.loadFile('index.html').then(() => {
+    if (!mainWindow) return;
+    mainWindow.show();
+    mainWindow.focus();
+  }).catch(error => {
+    console.error('Failed to load index.html:', error);
+  });
 }
 
 app.whenReady().then(() => {
@@ -372,7 +383,10 @@ app.whenReady().then(() => {
   createWindow();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    } else {
       createWindow();
     }
   });
