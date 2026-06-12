@@ -5,6 +5,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { generateSupportTemplate } = require('./template-generator');
 
 const PORT = Number(process.env.DIGI_TECHSUPPORT_HTTP_PORT) || 3000;
 const DEFAULT_FILE = 'index.html';
@@ -48,6 +49,10 @@ function sendResponse(res, status, contentType, payload) {
   res.end(payload);
 }
 
+function sendJson(res, status, payload) {
+  sendResponse(res, status, 'application/json', JSON.stringify(payload));
+}
+
 function sendNotFound(res) {
   sendResponse(res, 404, 'text/plain', '404 Not Found');
 }
@@ -62,9 +67,51 @@ function getContentType(filePath) {
   return MIME_TYPES[ext] || 'application/octet-stream';
 }
 
+function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk;
+      if (body.length > 1024 * 1024) {
+        req.destroy();
+        reject(new Error('Request body is too large'));
+      }
+    });
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch {
+        reject(new Error('Invalid JSON payload'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+async function handleTemplateGenerationRequest(req, res) {
+  if (req.method !== 'POST') {
+    sendJson(res, 405, { success: false, error: 'Method not allowed' });
+    return;
+  }
+
+  try {
+    const payload = await readJsonBody(req);
+    const result = await generateSupportTemplate(payload);
+    sendJson(res, result.success ? 200 : 400, result);
+  } catch (error) {
+    sendJson(res, 400, { success: false, error: error.message });
+  }
+}
+
 async function handleRequest(req, res) {
   try {
-    const requestedPath = decodeURIComponent(new URL(req.url, `http://localhost`).pathname);
+    const requestUrl = new URL(req.url, `http://localhost`);
+    if (requestUrl.pathname === '/api/generate-template') {
+      await handleTemplateGenerationRequest(req, res);
+      return;
+    }
+
+    const requestedPath = decodeURIComponent(requestUrl.pathname);
     const safePath = requestedPath.replace(/\0/g, '');
     let filePath = path.join(STATIC_ROOT, safePath);
     filePath = path.normalize(filePath);

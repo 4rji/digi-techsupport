@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 console.log('Preload script starting...');
 
-const SENSITIVE_FIELD_NAMES = ['password', 'token', 'secret'];
+const SENSITIVE_FIELD_NAMES = ['password', 'token', 'secret', 'key'];
 
 const redactSensitive = (value) => {
   if (Array.isArray(value)) {
@@ -22,6 +22,17 @@ const redactSensitive = (value) => {
 const redactArgs = (name, args) => {
   if (name === 'sshSaveAdminPassword') {
     return ['[redacted]'];
+  }
+  if (name === 'generateSupportTemplate') {
+    return args.map((arg) => {
+      if (!arg || typeof arg !== 'object') return arg;
+      return {
+        provider: arg.provider,
+        apiKey: arg.apiKey ? '[redacted]' : '',
+        skill: typeof arg.skill === 'string' ? `[${arg.skill.length} chars]` : '',
+        sourceText: typeof arg.sourceText === 'string' ? `[${arg.sourceText.length} chars]` : ''
+      };
+    });
   }
   return args.map(redactSensitive);
 };
@@ -72,6 +83,9 @@ contextBridge.exposeInMainWorld('appAPI', {
   }),
   sshDisconnect: logWrapper('sshDisconnect', (sessionId) => {
     return ipcRenderer.invoke('ssh-disconnect', sessionId);
+  }),
+  generateSupportTemplate: logWrapper('generateSupportTemplate', (options) => {
+    return ipcRenderer.invoke('generate-support-template', options);
   }),
   onSSHData: (callback) => {
     const listener = (_event, payload) => callback(payload);

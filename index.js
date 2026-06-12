@@ -5,6 +5,7 @@ const fs = require('fs');
 const { execFile } = require('child_process');
 const crypto = require('crypto');
 const { Client } = require('ssh2');
+const { generateSupportTemplate } = require('./template-generator');
 
 const APP_ICON_PATH = path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const sshSessions = new Map();
@@ -136,6 +137,10 @@ function pingHost(host, timeout = 3000) {
 function setupIPCHandlers() {
   ipcMain.handle('ping-host', async (_event, host, timeout = 3000) => {
     return pingHost(host, timeout);
+  });
+
+  ipcMain.handle('generate-support-template', async (_event, options) => {
+    return generateSupportTemplate(options);
   });
 
   ipcMain.handle('test-tcp-port', async (_event, host, port, timeout = 3000) => {

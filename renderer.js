@@ -1327,8 +1327,41 @@ function renderTemplatesView(workspace) {
   createInput.rows = 2;
   createInput.placeholder = 'Paste text here';
 
+  const createControls = document.createElement('div');
+  createControls.className = 'template-create-controls';
+
+  const createActions = document.createElement('div');
+  createActions.className = 'template-generate-row';
+
+  const providerBadge = document.createElement('span');
+  providerBadge.className = 'template-provider-badge';
+  providerBadge.textContent = getPreferredProviderConfig().label;
+
+  const generateButton = document.createElement('button');
+  generateButton.type = 'button';
+  generateButton.className = 'save-button template-generate-button';
+  generateButton.textContent = 'Generate';
+  generateButton.disabled = true;
+  generateButton.addEventListener('click', () => {
+    handleTemplateGeneration(createInput, generateButton);
+  });
+
+  createInput.addEventListener('input', () => {
+    generateButton.disabled = createInput.value.trim().length === 0;
+  });
+  createInput.addEventListener('keydown', (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+      event.preventDefault();
+      generateButton.click();
+    }
+  });
+
+  createActions.appendChild(providerBadge);
+  createActions.appendChild(generateButton);
+  createControls.appendChild(createInput);
+  createControls.appendChild(createActions);
   createRow.appendChild(createLabel);
-  createRow.appendChild(createInput);
+  createRow.appendChild(createControls);
   editor.appendChild(createRow);
 
   const activeIndex = supportTemplates.findIndex(template => template.id === activeTemplateId);
@@ -1344,6 +1377,119 @@ function renderTemplatesView(workspace) {
   library.appendChild(list);
   library.appendChild(editor);
   workspace.appendChild(library);
+}
+
+function getGeneratedTemplateFallbackTitle(sourceText) {
+  const compactText = String(sourceText || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 48);
+
+  return cleanMarkdownTitle(compactText) || 'Generated template';
+}
+
+function ensureGeneratedTemplateTitle(body, sourceText) {
+  const trimmedBody = String(body || '').trim();
+  const firstContentLine = trimmedBody
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .find(Boolean);
+
+  if (firstContentLine && /^#{1,6}\s+\S/.test(firstContentLine)) {
+    return trimmedBody;
+  }
+
+  return `# ${getGeneratedTemplateFallbackTitle(sourceText)}\n\n${trimmedBody}`;
+}
+
+async function requestTemplateGeneration(payload) {
+  const networkAPI = getNetworkAPI();
+  if (networkAPI && typeof networkAPI.generateSupportTemplate === 'function') {
+    return networkAPI.generateSupportTemplate(payload);
+  }
+
+  if (window.location && /^https?:$/.test(window.location.protocol)) {
+    const response = await fetch('/api/generate-template', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json().catch(() => null);
+    if (result) {
+      return result;
+    }
+    return { success: false, error: `Request failed with ${response.status}` };
+  }
+
+  return {
+    success: false,
+    error: 'Template generation requires the desktop app or local server'
+  };
+}
+
+async function handleTemplateGeneration(createInput, generateButton) {
+  const sourceText = createInput.value.trim();
+  if (!sourceText) {
+    showNotification('Paste text first');
+    return;
+  }
+
+  const providerConfig = getPreferredProviderConfig();
+  if (!providerConfig.hasApiKey) {
+    showNotification(`Add ${providerConfig.label} key in Settings`);
+    return;
+  }
+
+  const agentSkill = getAgentSkill().content.trim();
+  if (!agentSkill) {
+    showNotification('Save an agent skill first');
+    return;
+  }
+
+  const originalButtonText = generateButton.textContent;
+  createInput.disabled = true;
+  generateButton.disabled = true;
+  generateButton.textContent = 'Generating...';
+  showNotification(`Generating with ${providerConfig.label}`);
+
+  try {
+    const result = await requestTemplateGeneration({
+      provider: providerConfig.provider,
+      apiKey: providerConfig.apiKey,
+      skill: agentSkill,
+      sourceText
+    });
+
+    if (!result || !result.success) {
+      throw new Error(result?.error || 'Could not generate template');
+    }
+
+    const body = ensureGeneratedTemplateTitle(result.template, sourceText);
+    const title = extractMarkdownTemplateTitle(body, getGeneratedTemplateFallbackTitle(sourceText));
+    const template = {
+      id: createTemplateId(title, supportTemplates.length),
+      title,
+      body,
+      hidden: false,
+      sourceName: `${providerConfig.label} generated`
+    };
+
+    supportTemplates.push(template);
+    activeTemplateId = template.id;
+    saveSupportTemplates();
+    createInput.value = '';
+    showNotification('Template generated');
+    renderProductApp();
+  } catch (error) {
+    console.error('Error generating template:', error);
+    showNotification(error.message || 'Could not generate template');
+  } finally {
+    createInput.disabled = false;
+    generateButton.disabled = createInput.value.trim().length === 0;
+    generateButton.textContent = originalButtonText;
+  }
 }
 
 function createTemplateListItem(template) {
@@ -2760,6 +2906,9 @@ function handlePreferredProviderChange(event) {
   const provider = normalizePreferredProvider(event.target?.value);
   setPreferredProvider(provider);
   showNotification(`Preferred provider: ${getProviderLabel(provider)}`);
+  if (activeLineId === TEMPLATES_VIEW_ID) {
+    renderProductApp();
+  }
 }
 
 function saveAgentSkill(sourceName = '') {
