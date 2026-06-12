@@ -1411,6 +1411,65 @@ body {
   font-size: 0.86rem;
 }
 
+.provider-preference-group {
+  margin-bottom: 18px;
+}
+
+.provider-preference-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #fff;
+}
+
+.provider-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.provider-toggle-option {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 42px;
+  cursor: pointer;
+}
+
+.provider-toggle-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.provider-toggle-option span {
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 12px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #1b1b1b;
+  color: #cfcfcf;
+  font-size: 0.9rem;
+  font-weight: 700;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.provider-toggle-option:hover span,
+.provider-toggle-option input:focus-visible + span {
+  border-color: rgba(76, 175, 80, 0.58);
+  color: #fff;
+}
+
+.provider-toggle-option input:checked + span {
+  border-color: rgba(76, 175, 80, 0.9);
+  background: rgba(76, 175, 80, 0.18);
+  color: #d6ffe0;
+  box-shadow: inset 0 0 0 1px rgba(76, 175, 80, 0.24);
+}
+
 .agent-skill-source {
   align-self: center;
   min-width: 0;

@@ -7,9 +7,12 @@ const LEGACY_MONITOR_STORAGE_KEY = 'monitor_vm_cards';
 const ACTIVE_LINE_STORAGE_KEY = 'active_product_line';
 const OPENAI_KEY_STORAGE_KEY = 'openAiKey';
 const CLAUDE_KEY_STORAGE_KEY = 'claudeKey';
+const PREFERRED_PROVIDER_STORAGE_KEY = 'preferredProvider';
 const AGENT_SKILL_STORAGE_KEY = 'agentSkill';
 const AGENT_SKILL_SOURCE_STORAGE_KEY = 'agentSkillSource';
 const TEMPLATES_VIEW_ID = '__templates__';
+const AI_PROVIDERS = ['openai', 'claude'];
+const DEFAULT_AI_PROVIDER = 'openai';
 const DEFAULT_LINE_NAMES = ['IX', 'TX', 'EX'];
 const NEXT_LINE_NAMES = ['AX', 'BX', 'CX', 'DX', 'GX', 'HX', 'MX', 'PX', 'RX', 'ZX'];
 const PORT_POLL_INTERVAL = 2000;
@@ -2637,9 +2640,40 @@ function setupItemConfigModal() {
   refreshPortsUI();
 }
 
+function normalizePreferredProvider(provider) {
+  const normalizedProvider = String(provider || '').trim().toLowerCase();
+  return AI_PROVIDERS.includes(normalizedProvider) ? normalizedProvider : DEFAULT_AI_PROVIDER;
+}
+
+function getPreferredProvider() {
+  return normalizePreferredProvider(localStorage.getItem(PREFERRED_PROVIDER_STORAGE_KEY));
+}
+
+function setPreferredProvider(provider) {
+  localStorage.setItem(PREFERRED_PROVIDER_STORAGE_KEY, normalizePreferredProvider(provider));
+}
+
+function getSelectedProviderInputValue() {
+  const selectedInput = document.querySelector('input[name="preferred-provider"]:checked');
+  return normalizePreferredProvider(selectedInput?.value);
+}
+
+function getProviderLabel(provider) {
+  return normalizePreferredProvider(provider) === 'claude' ? 'Claude' : 'OpenAI';
+}
+
+function populatePreferredProviderInputs() {
+  const preferredProvider = getPreferredProvider();
+  document.querySelectorAll('input[name="preferred-provider"]').forEach((input) => {
+    input.checked = normalizePreferredProvider(input.value) === preferredProvider;
+  });
+}
+
 function populateProviderKeyInputs() {
   const openAiInput = document.getElementById('openai-key');
   const claudeInput = document.getElementById('claude-key');
+
+  populatePreferredProviderInputs();
 
   if (openAiInput) {
     openAiInput.value = localStorage.getItem(OPENAI_KEY_STORAGE_KEY) || '';
@@ -2680,8 +2714,11 @@ function closeSettingsModal() {
 function saveProviderKeys() {
   const openAiInput = document.getElementById('openai-key');
   const claudeInput = document.getElementById('claude-key');
+  const preferredProvider = getSelectedProviderInputValue();
   const openAiKey = openAiInput ? openAiInput.value.trim() : '';
   const claudeKey = claudeInput ? claudeInput.value.trim() : '';
+
+  setPreferredProvider(preferredProvider);
 
   if (openAiKey) {
     localStorage.setItem(OPENAI_KEY_STORAGE_KEY, openAiKey);
@@ -2695,14 +2732,34 @@ function saveProviderKeys() {
     localStorage.removeItem(CLAUDE_KEY_STORAGE_KEY);
   }
 
-  showNotification('Provider keys saved');
+  showNotification('Provider settings saved');
 }
 
 function getProviderKeys() {
   return {
+    preferredProvider: getPreferredProvider(),
     openAiKey: localStorage.getItem(OPENAI_KEY_STORAGE_KEY) || '',
     claudeKey: localStorage.getItem(CLAUDE_KEY_STORAGE_KEY) || ''
   };
+}
+
+function getPreferredProviderConfig() {
+  const providerKeys = getProviderKeys();
+  const provider = providerKeys.preferredProvider;
+  const apiKey = provider === 'claude' ? providerKeys.claudeKey : providerKeys.openAiKey;
+
+  return {
+    provider,
+    label: getProviderLabel(provider),
+    apiKey,
+    hasApiKey: apiKey.length > 0
+  };
+}
+
+function handlePreferredProviderChange(event) {
+  const provider = normalizePreferredProvider(event.target?.value);
+  setPreferredProvider(provider);
+  showNotification(`Preferred provider: ${getProviderLabel(provider)}`);
 }
 
 function saveAgentSkill(sourceName = '') {
@@ -2782,6 +2839,7 @@ function setupSettingsModal() {
   const openButton = document.getElementById('settings-button');
   const closeButton = document.getElementById('close-settings');
   const keysForm = document.getElementById('api-keys-form');
+  const providerInputs = document.querySelectorAll('input[name="preferred-provider"]');
   const skillForm = document.getElementById('agent-skill-form');
   const loadSkillButton = document.getElementById('load-agent-skill-btn');
   const skillFileInput = document.getElementById('agent-skill-input');
@@ -2801,6 +2859,9 @@ function setupSettingsModal() {
       saveProviderKeys();
     });
   }
+  providerInputs.forEach((input) => {
+    input.addEventListener('change', handlePreferredProviderChange);
+  });
   if (skillForm) {
     skillForm.addEventListener('submit', (event) => {
       event.preventDefault();
