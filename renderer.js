@@ -3,6 +3,7 @@ import { FitAddon } from './node_modules/@xterm/addon-fit/lib/addon-fit.mjs';
 
 const PRODUCT_LINES_STORAGE_KEY = 'product_lines';
 const TEMPLATES_STORAGE_KEY = 'support_templates';
+const TEMPLATE_DRAFTS_STORAGE_KEY = 'support_template_drafts';
 const LEGACY_MONITOR_STORAGE_KEY = 'monitor_vm_cards';
 const ACTIVE_LINE_STORAGE_KEY = 'active_product_line';
 const OPENAI_KEY_STORAGE_KEY = 'openAiKey';
@@ -766,6 +767,7 @@ const LEGACY_SUPPORT_TEMPLATE_IDS = new Set([
 
 let productLines = [];
 let supportTemplates = [];
+let templateDrafts = [];
 let activeLineId = '';
 let activeTemplateId = '';
 let itemCounter = 0;
@@ -1036,6 +1038,29 @@ function saveSupportTemplates() {
   }
 }
 
+function loadTemplateDrafts() {
+  try {
+    const storedDrafts = sessionStorage.getItem(TEMPLATE_DRAFTS_STORAGE_KEY);
+    if (storedDrafts) {
+      const parsed = JSON.parse(storedDrafts);
+      templateDrafts = normalizeSupportTemplates(parsed);
+      return;
+    }
+  } catch (error) {
+    console.error('Error loading temporary templates:', error);
+  }
+
+  templateDrafts = [];
+}
+
+function saveTemplateDrafts() {
+  try {
+    sessionStorage.setItem(TEMPLATE_DRAFTS_STORAGE_KEY, JSON.stringify(templateDrafts));
+  } catch (error) {
+    console.error('Error saving temporary templates:', error);
+  }
+}
+
 function createDefaultProductLines(legacyItems = []) {
   return DEFAULT_LINE_NAMES.map((name, index) => {
     const line = createProductLine(name, { items: [] });
@@ -1087,6 +1112,7 @@ function recalculateCounters() {
 
 function initializeProductLines() {
   loadSupportTemplates();
+  loadTemplateDrafts();
 
   try {
     const storedLines = localStorage.getItem(PRODUCT_LINES_STORAGE_KEY);
@@ -1293,7 +1319,9 @@ function renderTemplatesView(workspace) {
   header.appendChild(headerText);
   workspace.appendChild(header);
 
-  if (activeTemplateId && !supportTemplates.some(template => template.id === activeTemplateId)) {
+  if (activeTemplateId
+    && !templateDrafts.some(template => template.id === activeTemplateId)
+    && !supportTemplates.some(template => template.id === activeTemplateId)) {
     activeTemplateId = '';
   }
 
@@ -1305,15 +1333,18 @@ function renderTemplatesView(workspace) {
 
   const listTitle = document.createElement('h3');
   listTitle.className = 'template-list-title';
-  listTitle.textContent = 'Loaded templates';
+  listTitle.textContent = 'Templates';
   list.appendChild(listTitle);
 
-  if (supportTemplates.length === 0) {
+  if (templateDrafts.length === 0 && supportTemplates.length === 0) {
     const emptyState = document.createElement('div');
     emptyState.className = 'template-empty-state';
     emptyState.textContent = 'No templates loaded';
     list.appendChild(emptyState);
   } else {
+    templateDrafts.forEach((template, index) => {
+      list.appendChild(createTemplateListItem(template, index, { isDraft: true }));
+    });
     supportTemplates.forEach((template, index) => {
       list.appendChild(createTemplateListItem(template, index));
     });
@@ -1374,12 +1405,15 @@ function renderTemplatesView(workspace) {
   editor.appendChild(createRow);
 
   const activeIndex = supportTemplates.findIndex(template => template.id === activeTemplateId);
-  if (activeIndex >= 0) {
+  const activeDraftIndex = templateDrafts.findIndex(template => template.id === activeTemplateId);
+  if (activeDraftIndex >= 0) {
+    editor.appendChild(createTemplateEditor(templateDrafts[activeDraftIndex], activeDraftIndex, { isDraft: true }));
+  } else if (activeIndex >= 0) {
     editor.appendChild(createTemplateEditor(supportTemplates[activeIndex], activeIndex));
   } else {
     const placeholder = document.createElement('div');
     placeholder.className = 'template-editor-placeholder';
-    placeholder.textContent = supportTemplates.length > 0 ? 'Select a template' : 'Load .md files';
+    placeholder.textContent = templateDrafts.length > 0 || supportTemplates.length > 0 ? 'Select a template' : 'Load .md files';
     editor.appendChild(placeholder);
   }
 
@@ -1478,18 +1512,18 @@ async function handleTemplateGeneration(createInput, generateButton) {
     const body = ensureGeneratedTemplateTitle(result.template, sourceText);
     const title = extractMarkdownTemplateTitle(body, getGeneratedTemplateFallbackTitle(sourceText));
     const template = {
-      id: createTemplateId(title, supportTemplates.length),
+      id: createTemplateId(title, supportTemplates.length + templateDrafts.length),
       title,
       body,
       hidden: false,
       sourceName: `${providerConfig.label} generated`
     };
 
-    supportTemplates.push(template);
+    templateDrafts.push(template);
     activeTemplateId = template.id;
-    saveSupportTemplates();
+    saveTemplateDrafts();
     createInput.value = '';
-    showNotification('Template generated');
+    showNotification('Template generated (unsaved)');
     renderProductApp();
   } catch (error) {
     console.error('Error generating template:', error);
@@ -1501,7 +1535,8 @@ async function handleTemplateGeneration(createInput, generateButton) {
   }
 }
 
-function createTemplateListItem(template) {
+function createTemplateListItem(template, index, options = {}) {
+  const isDraft = Boolean(options.isDraft);
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'template-list-button';
@@ -1517,7 +1552,9 @@ function createTemplateListItem(template) {
 
   const status = document.createElement('span');
   status.className = 'template-list-button-status';
-  status.textContent = template.id === activeTemplateId ? 'Editing' : 'Show';
+  status.textContent = template.id === activeTemplateId
+    ? 'Editing'
+    : (isDraft ? 'Unsaved' : 'Show');
 
   button.appendChild(title);
   button.appendChild(status);
@@ -1525,7 +1562,8 @@ function createTemplateListItem(template) {
   return button;
 }
 
-function createTemplateEditor(template, index) {
+function createTemplateEditor(template, index, options = {}) {
+  const isDraft = Boolean(options.isDraft);
   const editor = document.createElement('section');
   editor.className = 'template-editor-card';
 
@@ -1541,6 +1579,20 @@ function createTemplateEditor(template, index) {
   bodyInput.rows = 14;
   bodyInput.setAttribute('aria-label', `${template.title} body`);
 
+  if (isDraft) {
+    const syncDraft = () => {
+      if (!templateDrafts[index]) return;
+      templateDrafts[index] = {
+        ...templateDrafts[index],
+        title: titleInput.value.trim() || template.title,
+        body: bodyInput.value
+      };
+      saveTemplateDrafts();
+    };
+    titleInput.addEventListener('input', syncDraft);
+    bodyInput.addEventListener('input', syncDraft);
+  }
+
   const actions = document.createElement('div');
   actions.className = 'template-actions';
 
@@ -1549,13 +1601,22 @@ function createTemplateEditor(template, index) {
   saveButton.className = 'save-button template-action-button';
   saveButton.textContent = 'Save';
   saveButton.addEventListener('click', () => {
-    supportTemplates[index] = {
+    const savedTemplate = {
       ...template,
       title: titleInput.value.trim() || `Template ${index + 1}`,
       body: bodyInput.value
     };
+    if (isDraft) {
+      savedTemplate.title = titleInput.value.trim() || `Template ${supportTemplates.length + 1}`;
+      supportTemplates.push(savedTemplate);
+      templateDrafts.splice(index, 1);
+      saveTemplateDrafts();
+      activeTemplateId = savedTemplate.id;
+    } else {
+      supportTemplates[index] = savedTemplate;
+      activeTemplateId = supportTemplates[index].id;
+    }
     saveSupportTemplates();
-    activeTemplateId = supportTemplates[index].id;
     showNotification('Template saved');
     renderProductApp();
   });
@@ -1571,8 +1632,17 @@ function createTemplateEditor(template, index) {
   const deleteButton = document.createElement('button');
   deleteButton.type = 'button';
   deleteButton.className = 'delete-button template-action-button';
-  deleteButton.textContent = 'Delete';
+  deleteButton.textContent = isDraft ? 'Discard' : 'Delete';
   deleteButton.addEventListener('click', () => {
+    if (isDraft) {
+      templateDrafts.splice(index, 1);
+      saveTemplateDrafts();
+      activeTemplateId = templateDrafts[index]?.id || templateDrafts[index - 1]?.id || supportTemplates[0]?.id || '';
+      showNotification('Template discarded');
+      renderProductApp();
+      return;
+    }
+
     const templateTitle = titleInput.value.trim() || template.title || `Template ${index + 1}`;
     const shouldDelete = window.confirm(`Delete "${templateTitle}" permanently?`);
     if (!shouldDelete) return;
