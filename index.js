@@ -12,6 +12,133 @@ const sshSessions = new Map();
 const SSH_ADMIN_PASSWORD_FILE = 'ssh-admin-password.json';
 let mainWindow = null;
 
+function isPrivateOrLocalHost(hostname) {
+  const host = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
+  if (!host) return false;
+  if (host === 'localhost' || host.endsWith('.local')) return true;
+
+  if (net.isIPv4(host)) {
+    const parts = host.split('.').map(part => Number(part));
+    const [first, second] = parts;
+    return first === 10
+      || first === 127
+      || first === 169 && second === 254
+      || first === 172 && second >= 16 && second <= 31
+      || first === 192 && second === 168
+      || first === 100 && second >= 64 && second <= 127;
+  }
+
+  if (net.isIPv6(host)) {
+    return host === '::1'
+      || host.startsWith('fe80:')
+      || host.startsWith('fc')
+      || host.startsWith('fd');
+  }
+
+  return false;
+}
+
+function isRouterCertificateURL(url) {
+  try {
+    const parsedURL = new URL(url);
+    return parsedURL.protocol === 'https:' && isPrivateOrLocalHost(parsedURL.hostname);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function getSavedAdminPassword() {
+  try {
+    const result = readSSHAdminPassword();
+    if (!result || !result.success || !result.hasPassword) return '';
+    return result.password || '';
+  } catch (error) {
+    console.error('Could not read saved admin password:', error);
+    return '';
+  }
+}
+
+function getRouterWebLoginAutofillScript() {
+  return `
+    (() => {
+      const defaultUsername = 'admin';
+      const savedPassword = ${JSON.stringify(getSavedAdminPassword())};
+
+      const isVisible = (element) => {
+        if (!element || element.disabled || element.readOnly) return false;
+        const style = window.getComputedStyle(element);
+        if (style.display === 'none' || style.visibility === 'hidden') return false;
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      };
+
+      const notifyChange = (element) => {
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+
+      const setValue = (element, value) => {
+        if (!element || element.value) return;
+        element.focus();
+        element.value = value;
+        notifyChange(element);
+      };
+
+      const scoreUsernameInput = (input) => {
+        const type = (input.getAttribute('type') || 'text').toLowerCase();
+        if (type === 'password' || type === 'hidden' || type === 'submit' || type === 'button') return -1;
+
+        const text = [
+          input.name,
+          input.id,
+          input.autocomplete,
+          input.placeholder,
+          input.getAttribute('aria-label')
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        let score = type === 'text' || type === 'email' || type === 'search' || !type ? 1 : 0;
+        if (/user|username|login|admin|account|name|email/.test(text)) score += 5;
+        if (/pass|token|search|filter/.test(text)) score -= 5;
+        return score;
+      };
+
+      const inputs = Array.from(document.querySelectorAll('input')).filter(isVisible);
+      const passwordInput = inputs.find(input => (input.getAttribute('type') || '').toLowerCase() === 'password');
+      const usernameInput = inputs
+        .map(input => ({ input, score: scoreUsernameInput(input) }))
+        .filter(entry => entry.score >= 0)
+        .sort((a, b) => b.score - a.score)[0]?.input;
+
+      setValue(usernameInput, defaultUsername);
+      if (savedPassword) {
+        setValue(passwordInput, savedPassword);
+      }
+    })();
+  `;
+}
+
+function autofillRouterWebLogin(webContents) {
+  if (!webContents || webContents.isDestroyed()) return;
+  const url = webContents.getURL();
+  if (!isRouterCertificateURL(url)) return;
+
+  webContents.executeJavaScript(getRouterWebLoginAutofillScript(), true).catch(error => {
+    console.error('Could not autofill router web login:', error);
+  });
+}
+
+function configureRouterWebWindow(webContents) {
+  if (!webContents) return;
+
+  webContents.on('did-finish-load', () => {
+    autofillRouterWebLogin(webContents);
+  });
+
+  webContents.on('did-navigate', () => {
+    autofillRouterWebLogin(webContents);
+  });
+}
+
 function getSSHAdminPasswordPath() {
   return path.join(app.getPath('userData'), SSH_ADMIN_PASSWORD_FILE);
 }
@@ -366,6 +493,11 @@ function createWindow() {
     mainWindow = null;
   });
 
+  mainWindow.webContents.on('did-create-window', (childWindow, details) => {
+    if (!details || !isRouterCertificateURL(details.url)) return;
+    configureRouterWebWindow(childWindow.webContents);
+  });
+
   mainWindow.loadFile('index.html').then(() => {
     if (!mainWindow) return;
     mainWindow.show();
@@ -376,6 +508,16 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  app.on('certificate-error', (event, _webContents, url, error, _certificate, callback) => {
+    if (error === 'net::ERR_CERT_AUTHORITY_INVALID' && isRouterCertificateURL(url)) {
+      event.preventDefault();
+      callback(true);
+      return;
+    }
+
+    callback(false);
+  });
+
   setupIPCHandlers();
   if (process.platform === 'darwin' && app.dock) {
     app.dock.setIcon(APP_ICON_PATH);
