@@ -30,7 +30,8 @@ const redactArgs = (name, args) => {
         provider: arg.provider,
         apiKey: arg.apiKey ? '[redacted]' : '',
         skill: typeof arg.skill === 'string' ? `[${arg.skill.length} chars]` : '',
-        sourceText: typeof arg.sourceText === 'string' ? `[${arg.sourceText.length} chars]` : ''
+        sourceText: typeof arg.sourceText === 'string' ? `[${arg.sourceText.length} chars]` : '',
+        templates: Array.isArray(arg.templates) ? `[${arg.templates.length} templates]` : ''
       };
     });
   }

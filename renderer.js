@@ -105,6 +105,12 @@ const LOCKED_ITEM_IMAGE_VARIANTS = {
     'img/digi-ix30-right.png',
     'img/digi-ix30-with-din.png'
   ],
+  'Digi IX40 5G Edge Computing Industrial IoT Solution': [
+    'img/digi-ix40.png',
+    'img/digi-ix40-front.png',
+    'img/digi-ix40-back.png',
+    'img/digi-ix40-left.png'
+  ],
   'Digi EX12 Cellular Extender': [
     'img/digi-ex12.png',
     'img/digi-ex12-left.png',
@@ -2398,7 +2404,8 @@ async function handleTemplateGeneration(createInput, generateButton) {
       provider: providerConfig.provider,
       apiKey: providerConfig.apiKey,
       skill: agentSkill,
-      sourceText
+      sourceText,
+      templates: supportTemplates.map((template, index) => normalizeSupportTemplate(template, index))
     });
 
     if (!result || !result.success) {
