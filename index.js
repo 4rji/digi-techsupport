@@ -1,16 +1,29 @@
-const { app, BrowserWindow, ipcMain, safeStorage } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const path = require('path');
 const net = require('net');
 const fs = require('fs');
+const zlib = require('zlib');
+const { promisify } = require('util');
 const { execFile } = require('child_process');
 const crypto = require('crypto');
 const { Client } = require('ssh2');
+const tar = require('tar-stream');
 const { generateSupportTemplate } = require('./template-generator');
 
 const APP_ICON_PATH = path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const sshSessions = new Map();
+const supportArchiveSessions = new Map();
 const SSH_ADMIN_PASSWORD_FILE = 'ssh-admin-password.json';
+const MAX_SUPPORT_FILE_BYTES = 512 * 1024 * 1024;
+const MAX_UNCOMPRESSED_ARCHIVE_BYTES = 1024 * 1024 * 1024;
+const MAX_TEXT_PREVIEW_BYTES = 5 * 1024 * 1024;
+const MAX_SUPPORT_ARCHIVE_SESSIONS = 3;
+const gunzipBuffer = promisify(zlib.gunzip);
 let mainWindow = null;
+
+if (process.platform === 'darwin') {
+  app.commandLine.appendSwitch('use-mock-keychain');
+}
 
 function isPrivateOrLocalHost(hostname) {
   const host = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
@@ -156,11 +169,10 @@ function readSSHAdminPassword() {
   }
 
   if (saved.encoding === 'safeStorage') {
-    if (!safeStorage.isEncryptionAvailable()) {
-      return { success: false, error: 'Saved SSH password cannot be decrypted on this device' };
-    }
-    const password = safeStorage.decryptString(Buffer.from(value, 'base64'));
-    return { success: true, password, hasPassword: Boolean(password) };
+    return {
+      success: false,
+      error: 'Saved SSH password uses macOS Keychain encryption. Re-enter and save it to migrate.'
+    };
   }
 
   return { success: true, password: value, hasPassword: Boolean(value) };
@@ -177,15 +189,10 @@ function writeSSHAdminPassword(password) {
     return { success: true, hasPassword: false };
   }
 
-  const payload = safeStorage.isEncryptionAvailable()
-    ? {
-        encoding: 'safeStorage',
-        value: safeStorage.encryptString(sanitizedPassword).toString('base64')
-      }
-    : {
-        encoding: 'plain',
-        value: sanitizedPassword
-      };
+  const payload = {
+    encoding: 'plain',
+    value: sanitizedPassword
+  };
 
   fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), { mode: 0o600 });
   return { success: true, hasPassword: true };
@@ -262,6 +269,407 @@ function pingHost(host, timeout = 3000) {
   });
 }
 
+const TEXT_FILE_EXTENSIONS = new Set([
+  '.cfg',
+  '.conf',
+  '.config',
+  '.csv',
+  '.env',
+  '.html',
+  '.ini',
+  '.js',
+  '.json',
+  '.log',
+  '.md',
+  '.properties',
+  '.rc',
+  '.service',
+  '.sh',
+  '.status',
+  '.txt',
+  '.xml',
+  '.yaml',
+  '.yml'
+]);
+
+const TEXT_FILE_NAMES = new Set([
+  'config',
+  'dmesg',
+  'hostname',
+  'hosts',
+  'interfaces',
+  'messages',
+  'profile',
+  'resolv.conf',
+  'syslog',
+  'version'
+]);
+
+function createSupportFileFailure(errorType, error) {
+  return {
+    success: false,
+    errorType,
+    error: error instanceof Error ? error.message : String(error || 'Unknown error')
+  };
+}
+
+function normalizeSupportEntryPath(entryName) {
+  let normalizedPath = String(entryName || '')
+    .replace(/\0/g, '')
+    .replace(/\\/g, '/')
+    .replace(/^\/+/, '');
+
+  while (normalizedPath.startsWith('./')) {
+    normalizedPath = normalizedPath.slice(2);
+  }
+
+  const parts = normalizedPath
+    .split('/')
+    .filter(part => part && part !== '.');
+
+  if (parts.some(part => part === '..')) {
+    return '';
+  }
+
+  return parts.join('/');
+}
+
+function isKnownTextPath(entryPath) {
+  const fileName = path.posix.basename(entryPath).toLowerCase();
+  return TEXT_FILE_NAMES.has(fileName) || TEXT_FILE_EXTENSIONS.has(path.posix.extname(fileName));
+}
+
+function bufferLooksLikeText(buffer, entryPath) {
+  if (!buffer || buffer.length === 0) return true;
+
+  const knownTextPath = isKnownTextPath(entryPath);
+  const sample = buffer.subarray(0, Math.min(buffer.length, 4096));
+  let controlBytes = 0;
+
+  for (const byte of sample) {
+    if (byte === 0) return false;
+    const isAllowedControl = byte === 7 || byte === 8 || byte === 9 || byte === 10 || byte === 12 || byte === 13 || byte === 27;
+    if (byte < 32 && !isAllowedControl) {
+      controlBytes++;
+    }
+  }
+
+  const decodedSample = sample.toString('utf8');
+  if (!knownTextPath && decodedSample.includes('\uFFFD')) {
+    return false;
+  }
+
+  return knownTextPath || controlBytes / sample.length < 0.08;
+}
+
+function formatSupportFileSize(bytes) {
+  if (!Number.isFinite(bytes)) return 'unknown size';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+  return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function compareSupportNodes(a, b) {
+  if (a.type !== b.type) {
+    return a.type === 'directory' ? -1 : 1;
+  }
+  return a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
+}
+
+function buildSupportArchiveTree(entries) {
+  const root = {
+    id: 'support-root',
+    name: '/',
+    path: '',
+    type: 'directory',
+    children: []
+  };
+  const directoriesByPath = new Map([['', root]]);
+
+  const getOrCreateDirectory = (directoryPath) => {
+    const normalizedDirectoryPath = normalizeSupportEntryPath(directoryPath);
+    if (directoriesByPath.has(normalizedDirectoryPath)) {
+      return directoriesByPath.get(normalizedDirectoryPath);
+    }
+
+    const parentPath = normalizedDirectoryPath.split('/').slice(0, -1).join('/');
+    const parent = getOrCreateDirectory(parentPath);
+    const directory = {
+      id: `support-dir-${normalizedDirectoryPath}`,
+      name: path.posix.basename(normalizedDirectoryPath),
+      path: normalizedDirectoryPath,
+      type: 'directory',
+      implicit: true,
+      children: []
+    };
+
+    directoriesByPath.set(normalizedDirectoryPath, directory);
+    parent.children.push(directory);
+    return directory;
+  };
+
+  [...entries]
+    .sort((a, b) => a.path.localeCompare(b.path, undefined, { sensitivity: 'base', numeric: true }))
+    .forEach(entry => {
+      if (entry.type === 'directory') {
+        const directory = getOrCreateDirectory(entry.path);
+        Object.assign(directory, entry, { children: directory.children });
+        return;
+      }
+
+      const parentPath = entry.path.split('/').slice(0, -1).join('/');
+      const parent = getOrCreateDirectory(parentPath);
+      parent.children.push({ ...entry });
+    });
+
+  const sortChildren = (node) => {
+    if (!Array.isArray(node.children)) return;
+    node.children.sort(compareSupportNodes);
+    node.children.forEach(sortChildren);
+  };
+  sortChildren(root);
+
+  return root.children;
+}
+
+function countSupportTreeNodes(nodes, type) {
+  return nodes.reduce((total, node) => {
+    const current = node.type === type ? 1 : 0;
+    return total + current + (Array.isArray(node.children) ? countSupportTreeNodes(node.children, type) : 0);
+  }, 0);
+}
+
+function parseSupportTarArchive(tarBuffer) {
+  return new Promise((resolve, reject) => {
+    const extract = tar.extract();
+    const entries = [];
+    const filesById = new Map();
+    const contentById = new Map();
+    let entryIndex = 0;
+    let failed = false;
+
+    const fail = (error) => {
+      if (failed) return;
+      failed = true;
+      reject(error);
+    };
+
+    extract.on('entry', (header, stream, next) => {
+      const entryPath = normalizeSupportEntryPath(header.name);
+      const rawType = String(header.type || 'file');
+
+      if (!entryPath || rawType === 'pax-header' || rawType === 'global-pax-header') {
+        stream.resume();
+        stream.once('end', next);
+        stream.once('error', fail);
+        return;
+      }
+
+      const isDirectory = rawType === 'directory' || String(header.name || '').endsWith('/');
+      const isRegularFile = rawType === 'file' || rawType === 'contiguous-file' || rawType === 'old-file';
+      const id = `support-entry-${entryIndex++}`;
+      const metadata = {
+        id,
+        name: path.posix.basename(entryPath),
+        path: entryPath,
+        type: isDirectory ? 'directory' : 'file',
+        kind: isDirectory ? 'directory' : rawType,
+        size: Math.max(0, Number(header.size) || 0),
+        mode: typeof header.mode === 'number' ? header.mode : null,
+        mtime: header.mtime instanceof Date ? header.mtime.toISOString() : null
+      };
+
+      if (isDirectory) {
+        stream.resume();
+        stream.once('end', () => {
+          entries.push(metadata);
+          next();
+        });
+        stream.once('error', fail);
+        return;
+      }
+
+      if (!isRegularFile) {
+        metadata.isText = false;
+        metadata.textAvailable = false;
+        metadata.previewMessage = `${rawType} entries cannot be previewed as text.`;
+        stream.resume();
+        stream.once('end', () => {
+          entries.push(metadata);
+          filesById.set(id, metadata);
+          next();
+        });
+        stream.once('error', fail);
+        return;
+      }
+
+      const chunks = [];
+      let collectedBytes = 0;
+      let streamedBytes = 0;
+
+      stream.on('data', chunk => {
+        streamedBytes += chunk.length;
+
+        if (collectedBytes >= MAX_TEXT_PREVIEW_BYTES) {
+          return;
+        }
+
+        const remainingBytes = MAX_TEXT_PREVIEW_BYTES - collectedBytes;
+        const chunkToStore = chunk.length > remainingBytes ? chunk.subarray(0, remainingBytes) : chunk;
+        chunks.push(chunkToStore);
+        collectedBytes += chunkToStore.length;
+      });
+
+      stream.once('end', () => {
+        const previewBuffer = Buffer.concat(chunks, collectedBytes);
+        const isText = bufferLooksLikeText(previewBuffer, entryPath);
+        const actualSize = metadata.size || streamedBytes;
+        const truncated = actualSize > collectedBytes;
+
+        metadata.size = actualSize;
+        metadata.isText = isText;
+        metadata.textAvailable = isText;
+        metadata.truncated = isText && truncated;
+
+        if (isText) {
+          const text = previewBuffer.toString('utf8').replace(/^\uFEFF/, '');
+          contentById.set(id, {
+            text,
+            truncated: metadata.truncated
+          });
+        } else {
+          metadata.previewMessage = 'Binary file preview is not available.';
+        }
+
+        entries.push(metadata);
+        filesById.set(id, metadata);
+        next();
+      });
+      stream.once('error', fail);
+    });
+
+    extract.once('finish', () => {
+      if (failed) return;
+      const tree = buildSupportArchiveTree(entries);
+      resolve({
+        entries,
+        tree,
+        filesById,
+        contentById,
+        stats: {
+          entryCount: entries.length,
+          fileCount: countSupportTreeNodes(tree, 'file'),
+          directoryCount: countSupportTreeNodes(tree, 'directory'),
+          textFileCount: entries.filter(entry => entry.type === 'file' && entry.textAvailable).length
+        }
+      });
+    });
+    extract.once('error', fail);
+
+    try {
+      extract.end(tarBuffer);
+    } catch (error) {
+      fail(error);
+    }
+  });
+}
+
+function pruneSupportArchiveSessions() {
+  const sessions = [...supportArchiveSessions.entries()]
+    .sort((a, b) => b[1].createdAt - a[1].createdAt);
+
+  sessions.slice(MAX_SUPPORT_ARCHIVE_SESSIONS).forEach(([sessionId]) => {
+    supportArchiveSessions.delete(sessionId);
+  });
+}
+
+async function importSupportFileFromDialog(webContents) {
+  const browserWindow = BrowserWindow.fromWebContents(webContents);
+  const dialogResult = await dialog.showOpenDialog(browserWindow || undefined, {
+    title: 'Import Digi Support File',
+    buttonLabel: 'Import Support File',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Digi support files', extensions: ['bin'] },
+      { name: 'All files', extensions: ['*'] }
+    ]
+  });
+
+  if (dialogResult.canceled || !dialogResult.filePaths.length) {
+    return { success: false, canceled: true };
+  }
+
+  const filePath = dialogResult.filePaths[0];
+  if (path.extname(filePath).toLowerCase() !== '.bin') {
+    return createSupportFileFailure('invalid-file', 'Select a .bin support file.');
+  }
+
+  let stats;
+  try {
+    stats = await fs.promises.stat(filePath);
+  } catch (error) {
+    return createSupportFileFailure('unreadable-file', error);
+  }
+
+  if (!stats.isFile()) {
+    return createSupportFileFailure('invalid-file', 'Selected path is not a file.');
+  }
+  if (stats.size > MAX_SUPPORT_FILE_BYTES) {
+    return createSupportFileFailure('invalid-file', `Support file is too large (${formatSupportFileSize(stats.size)}).`);
+  }
+
+  let compressedFile;
+  try {
+    compressedFile = await fs.promises.readFile(filePath);
+  } catch (error) {
+    return createSupportFileFailure('unreadable-file', error);
+  }
+
+  let tarBuffer;
+  try {
+    tarBuffer = await gunzipBuffer(compressedFile, {
+      maxOutputLength: MAX_UNCOMPRESSED_ARCHIVE_BYTES
+    });
+  } catch (error) {
+    return createSupportFileFailure('gzip-failure', error);
+  }
+
+  let archive;
+  try {
+    archive = await parseSupportTarArchive(tarBuffer);
+  } catch (error) {
+    return createSupportFileFailure('tar-parsing-failure', error);
+  }
+
+  if (!archive.entries.length) {
+    return createSupportFileFailure('tar-parsing-failure', 'The tar archive did not contain any readable entries.');
+  }
+
+  const sessionId = crypto.randomUUID();
+  supportArchiveSessions.set(sessionId, {
+    ownerId: webContents.id,
+    fileName: path.basename(filePath),
+    tree: archive.tree,
+    filesById: archive.filesById,
+    contentById: archive.contentById,
+    createdAt: Date.now()
+  });
+  pruneSupportArchiveSessions();
+
+  return {
+    success: true,
+    sessionId,
+    fileName: path.basename(filePath),
+    tree: archive.tree,
+    stats: archive.stats
+  };
+}
+
 function setupIPCHandlers() {
   ipcMain.handle('ping-host', async (_event, host, timeout = 3000) => {
     return pingHost(host, timeout);
@@ -269,6 +677,39 @@ function setupIPCHandlers() {
 
   ipcMain.handle('generate-support-template', async (_event, options) => {
     return generateSupportTemplate(options);
+  });
+
+  ipcMain.handle('import-support-file', async (event) => {
+    try {
+      return await importSupportFileFromDialog(event.sender);
+    } catch (error) {
+      return createSupportFileFailure('invalid-file', error);
+    }
+  });
+
+  ipcMain.handle('get-support-file-entry-content', async (event, sessionId, entryId) => {
+    const session = supportArchiveSessions.get(sessionId);
+    if (!session || session.ownerId !== event.sender.id) {
+      return createSupportFileFailure('invalid-file', 'Support file session is no longer available.');
+    }
+
+    const fileEntry = session.filesById.get(entryId);
+    if (!fileEntry) {
+      return createSupportFileFailure('invalid-file', 'File entry was not found.');
+    }
+
+    const content = session.contentById.get(entryId);
+    if (!content) {
+      return createSupportFileFailure('unreadable-file', fileEntry.previewMessage || 'File content is not available.');
+    }
+
+    return {
+      success: true,
+      path: fileEntry.path,
+      size: fileEntry.size,
+      text: content.text,
+      truncated: content.truncated
+    };
   });
 
   ipcMain.handle('test-tcp-port', async (_event, host, port, timeout = 3000) => {

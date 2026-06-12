@@ -12,6 +12,7 @@ const PREFERRED_PROVIDER_STORAGE_KEY = 'preferredProvider';
 const AGENT_SKILL_STORAGE_KEY = 'agentSkill';
 const AGENT_SKILL_SOURCE_STORAGE_KEY = 'agentSkillSource';
 const THEME_STYLESHEET_STORAGE_KEY = 'themeStylesheet';
+const FILE_SUPPORT_TREE_WIDTH_STORAGE_KEY = 'fileSupportTreeWidth';
 const TEMPLATES_VIEW_ID = '__templates__';
 const AI_PROVIDERS = ['openai', 'claude'];
 const DEFAULT_AI_PROVIDER = 'openai';
@@ -23,8 +24,14 @@ const THEME_STYLESHEETS = [
   { href: 'styles_grey.css', label: 'Grey' }
 ];
 const DEFAULT_LINE_NAMES = ['IX', 'TX', 'EX'];
+const FILE_SUPPORT_VIEW_ID = '__file_support__';
+const BUILT_IN_VIEW_IDS = new Set([TEMPLATES_VIEW_ID, FILE_SUPPORT_VIEW_ID]);
+const DEFAULT_FILE_SUPPORT_TREE_WIDTH = 220;
+const MIN_FILE_SUPPORT_TREE_WIDTH = 120;
+const MAX_FILE_SUPPORT_TREE_WIDTH = 640;
 const NEXT_LINE_NAMES = ['AX', 'BX', 'CX', 'DX', 'GX', 'HX', 'MX', 'PX', 'RX', 'ZX'];
 const PORT_POLL_INTERVAL = 2000;
+const MAX_HIGHLIGHTED_CONTENT_CHARS = 2 * 1024 * 1024;
 const LOCKED_LINE_ITEMS = {
   IX: [
     'Digi IX10 Industrial Cellular Router',
@@ -794,6 +801,24 @@ let removeSSHDataListener = null;
 let removeSSHCloseListener = null;
 let removeSSHErrorListener = null;
 let sshPasswordSaveTimer = null;
+let supportFileState = {
+  sessionId: '',
+  fileName: '',
+  tree: [],
+  stats: null,
+  selectedFileId: '',
+  selectedPath: '',
+  selectedContent: '',
+  selectedError: '',
+  selectedTruncated: false,
+  selectedLoading: false,
+  importError: '',
+  importing: false
+};
+let supportFileTreeWidth = getSavedSupportTreeWidth();
+let supportTreeSearchQuery = '';
+let supportContentSearchQuery = '';
+let expandedSupportFolders = new Set();
 
 const portStatuses = new Map();
 const hostStatuses = new Map();
@@ -810,6 +835,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupItemConfigModal();
   setupSettingsModal();
   setupConfigTransferControls();
+  setupFileSupportKeyboardShortcuts();
 });
 
 window.addEventListener('beforeunload', () => {
@@ -1158,8 +1184,8 @@ function initializeProductLines() {
   recalculateCounters();
 
   const savedActiveLineId = localStorage.getItem(ACTIVE_LINE_STORAGE_KEY);
-  activeLineId = savedActiveLineId === TEMPLATES_VIEW_ID
-    ? TEMPLATES_VIEW_ID
+  activeLineId = BUILT_IN_VIEW_IDS.has(savedActiveLineId)
+    ? savedActiveLineId
     : (productLines.some(line => line.id === savedActiveLineId)
       ? savedActiveLineId
       : productLines[0]?.id || '');
@@ -1182,7 +1208,7 @@ function saveProductLines() {
 }
 
 function getActiveLine() {
-  if (activeLineId === TEMPLATES_VIEW_ID) return null;
+  if (BUILT_IN_VIEW_IDS.has(activeLineId)) return null;
   return productLines.find(line => line.id === activeLineId) || productLines[0] || null;
 }
 
@@ -1207,18 +1233,23 @@ function renderProductTabs() {
   if (!tabs) return;
 
   tabs.innerHTML = '';
-  const templatesButton = document.createElement('button');
-  templatesButton.type = 'button';
-  templatesButton.className = 'tab-button';
-  templatesButton.dataset.lineId = TEMPLATES_VIEW_ID;
-  templatesButton.textContent = 'Templates';
-  templatesButton.classList.toggle('active', activeLineId === TEMPLATES_VIEW_ID);
-  templatesButton.addEventListener('click', () => {
-    activeLineId = TEMPLATES_VIEW_ID;
-    saveProductLines();
-    renderProductApp();
-  });
-  tabs.appendChild(templatesButton);
+  const createBuiltInTabButton = (viewId, label) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'tab-button';
+    button.dataset.lineId = viewId;
+    button.textContent = label;
+    button.classList.toggle('active', activeLineId === viewId);
+    button.addEventListener('click', () => {
+      activeLineId = viewId;
+      saveProductLines();
+      renderProductApp();
+    });
+    tabs.appendChild(button);
+  };
+
+  createBuiltInTabButton(TEMPLATES_VIEW_ID, 'Templates');
+  createBuiltInTabButton(FILE_SUPPORT_VIEW_ID, 'File Support');
 
   productLines.forEach(line => {
     const button = document.createElement('button');
@@ -1244,6 +1275,11 @@ function renderActiveLine() {
 
   if (activeLineId === TEMPLATES_VIEW_ID) {
     renderTemplatesView(workspace);
+    return;
+  }
+
+  if (activeLineId === FILE_SUPPORT_VIEW_ID) {
+    renderFileSupportView(workspace);
     return;
   }
 
@@ -1464,6 +1500,810 @@ function renderTemplatesView(workspace) {
   library.appendChild(list);
   library.appendChild(editor);
   workspace.appendChild(library);
+}
+
+function formatSupportFileBytes(bytes) {
+  const numericBytes = Number(bytes);
+  if (!Number.isFinite(numericBytes) || numericBytes < 0) return '';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = numericBytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+  return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function clampSupportTreeWidth(width, layoutWidth = 0) {
+  const numericWidth = Number(width);
+  const fallbackWidth = Number.isFinite(numericWidth) ? numericWidth : DEFAULT_FILE_SUPPORT_TREE_WIDTH;
+  const maxForLayout = layoutWidth > 0
+    ? Math.max(MIN_FILE_SUPPORT_TREE_WIDTH, Math.min(MAX_FILE_SUPPORT_TREE_WIDTH, layoutWidth - 360))
+    : MAX_FILE_SUPPORT_TREE_WIDTH;
+
+  return Math.round(Math.min(maxForLayout, Math.max(MIN_FILE_SUPPORT_TREE_WIDTH, fallbackWidth)));
+}
+
+function getSavedSupportTreeWidth() {
+  try {
+    return clampSupportTreeWidth(parseInt(localStorage.getItem(FILE_SUPPORT_TREE_WIDTH_STORAGE_KEY), 10));
+  } catch (_error) {
+    return DEFAULT_FILE_SUPPORT_TREE_WIDTH;
+  }
+}
+
+function setSupportTreeWidth(width, layout) {
+  const layoutWidth = layout ? layout.getBoundingClientRect().width : 0;
+  supportFileTreeWidth = clampSupportTreeWidth(width, layoutWidth);
+  if (layout) {
+    layout.style.setProperty('--file-support-tree-width', `${supportFileTreeWidth}px`);
+  }
+  try {
+    localStorage.setItem(FILE_SUPPORT_TREE_WIDTH_STORAGE_KEY, String(supportFileTreeWidth));
+  } catch (_error) {
+    // Ignore storage failures; resizing still works for the current session.
+  }
+}
+
+function startSupportTreeResize(event, layout) {
+  if (!layout || (event.pointerType === 'mouse' && event.button !== 0)) return;
+
+  event.preventDefault();
+  const startX = event.clientX;
+  const startWidth = supportFileTreeWidth;
+
+  layout.classList.add('is-resizing');
+  document.body.classList.add('is-file-support-resizing');
+
+  const handlePointerMove = (moveEvent) => {
+    setSupportTreeWidth(startWidth + moveEvent.clientX - startX, layout);
+  };
+
+  const finishResize = () => {
+    window.removeEventListener('pointermove', handlePointerMove);
+    window.removeEventListener('pointerup', finishResize);
+    window.removeEventListener('pointercancel', finishResize);
+    layout.classList.remove('is-resizing');
+    document.body.classList.remove('is-file-support-resizing');
+  };
+
+  window.addEventListener('pointermove', handlePointerMove);
+  window.addEventListener('pointerup', finishResize);
+  window.addEventListener('pointercancel', finishResize);
+}
+
+function handleSupportTreeResizerKeydown(event, layout) {
+  if (!layout) return;
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+    event.preventDefault();
+    setSupportTreeWidth(supportFileTreeWidth + (event.key === 'ArrowRight' ? 24 : -24), layout);
+  }
+  if (event.key === 'Home') {
+    event.preventDefault();
+    setSupportTreeWidth(MIN_FILE_SUPPORT_TREE_WIDTH, layout);
+  }
+  if (event.key === 'End') {
+    event.preventDefault();
+    setSupportTreeWidth(MAX_FILE_SUPPORT_TREE_WIDTH, layout);
+  }
+}
+
+function focusSupportSearchInput(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return false;
+
+  if (input.disabled) {
+    input.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    return false;
+  }
+
+  input.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  input.focus();
+  input.select();
+  return true;
+}
+
+function handleFileSupportSearchShortcut(event) {
+  const key = String(event.key || '').toLowerCase();
+  const isFindShortcut = key === 'f' && (event.ctrlKey || event.metaKey) && !event.altKey;
+  if (!isFindShortcut || activeLineId !== FILE_SUPPORT_VIEW_ID) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const inputId = event.shiftKey
+    ? 'file-support-tree-search'
+    : 'file-support-content-search';
+  const focused = focusSupportSearchInput(inputId);
+
+  if (!focused && inputId === 'file-support-content-search') {
+    showNotification('Select a file first');
+  }
+}
+
+function setupFileSupportKeyboardShortcuts() {
+  document.addEventListener('keydown', handleFileSupportSearchShortcut);
+}
+
+function normalizeSearchQuery(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function fuzzyMatchIndexes(text, query) {
+  const source = String(text || '');
+  const normalizedSource = source.toLowerCase();
+  const normalizedQuery = String(query || '').toLowerCase().replace(/\s+/g, '');
+  if (!normalizedQuery) {
+    return { matched: true, indexes: [] };
+  }
+
+  const indexes = [];
+  let sourceIndex = 0;
+  for (const character of normalizedQuery) {
+    const matchIndex = normalizedSource.indexOf(character, sourceIndex);
+    if (matchIndex === -1) {
+      return { matched: false, indexes: [] };
+    }
+    indexes.push(matchIndex);
+    sourceIndex = matchIndex + 1;
+  }
+
+  return { matched: true, indexes };
+}
+
+function fuzzySearchMatches(text, query) {
+  const terms = normalizeSearchQuery(query).split(' ').filter(Boolean);
+  if (terms.length === 0) return true;
+  return terms.every(term => fuzzyMatchIndexes(text, term).matched);
+}
+
+function highlightFuzzyLabel(label, query) {
+  const text = String(label || '');
+  const terms = normalizeSearchQuery(query).split(' ').filter(Boolean);
+  if (terms.length === 0) return escapeHTML(text);
+
+  const matchedIndexes = new Set();
+  terms.forEach(term => {
+    const result = fuzzyMatchIndexes(text, term);
+    if (result.matched) {
+      result.indexes.forEach(index => matchedIndexes.add(index));
+    }
+  });
+
+  if (matchedIndexes.size === 0) return escapeHTML(text);
+
+  return Array.from(text).map((character, index) => {
+    const escapedCharacter = escapeHTML(character);
+    return matchedIndexes.has(index)
+      ? `<span class="support-search-char">${escapedCharacter}</span>`
+      : escapedCharacter;
+  }).join('');
+}
+
+function filterSupportTreeNodes(nodes, query) {
+  const normalizedQuery = normalizeSearchQuery(query);
+  if (!normalizedQuery) {
+    return {
+      nodes,
+      matchCount: 0
+    };
+  }
+
+  let matchCount = 0;
+  const filteredNodes = nodes.reduce((matches, node) => {
+    const childResult = Array.isArray(node.children)
+      ? filterSupportTreeNodes(node.children, normalizedQuery)
+      : { nodes: [], matchCount: 0 };
+    const selfMatches = fuzzySearchMatches(`${node.path || ''} ${node.name || ''}`, normalizedQuery);
+    matchCount += childResult.matchCount + (selfMatches ? 1 : 0);
+
+    if (selfMatches || childResult.nodes.length > 0) {
+      matches.push({
+        ...node,
+        children: childResult.nodes,
+        searchMatched: selfMatches
+      });
+    }
+
+    return matches;
+  }, []);
+
+  return {
+    nodes: filteredNodes,
+    matchCount
+  };
+}
+
+function escapeHTML(value) {
+  return String(value || '').replace(/[&<>"']/g, (character) => {
+    if (character === '&') return '&amp;';
+    if (character === '<') return '&lt;';
+    if (character === '>') return '&gt;';
+    if (character === '"') return '&quot;';
+    return '&#39;';
+  });
+}
+
+function highlightJSONContent(text) {
+  return String(text || '').replace(
+    /("(?:\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"\s*:)|("(?:\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*")|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g,
+    (match) => {
+      const escapedMatch = escapeHTML(match);
+      if (/^"/.test(match) && /:\s*$/.test(match)) {
+        return `<span class="support-token-key">${escapedMatch}</span>`;
+      }
+      if (/^"/.test(match)) {
+        return `<span class="support-token-string">${escapedMatch}</span>`;
+      }
+      if (/true|false/.test(match)) {
+        return `<span class="support-token-boolean">${escapedMatch}</span>`;
+      }
+      if (/null/.test(match)) {
+        return `<span class="support-token-null">${escapedMatch}</span>`;
+      }
+      return `<span class="support-token-number">${escapedMatch}</span>`;
+    }
+  );
+}
+
+function highlightXMLContent(text) {
+  return escapeHTML(text).replace(
+    /(&lt;\/?)([A-Za-z_][\w:.-]*)(.*?)(\/?&gt;)/g,
+    (_match, open, tagName, attributes, close) => {
+      const highlightedAttributes = attributes.replace(
+        /([A-Za-z_][\w:.-]*)(=)(&quot;.*?&quot;|&#39;.*?&#39;)/g,
+        '<span class="support-token-key">$1</span>$2<span class="support-token-string">$3</span>'
+      );
+      return `<span class="support-token-punctuation">${open}</span><span class="support-token-tag">${tagName}</span>${highlightedAttributes}<span class="support-token-punctuation">${close}</span>`;
+    }
+  );
+}
+
+function highlightGenericTextContent(text) {
+  return String(text || '').split('\n').map((line) => {
+    const escapedLine = escapeHTML(line);
+
+    if (/^\s*(#|;|\/\/)/.test(line)) {
+      return `<span class="support-token-comment">${escapedLine}</span>`;
+    }
+
+    return escapedLine
+      .replace(/^(\s*)([A-Za-z0-9_.-]+)(\s*[:=])/, '$1<span class="support-token-key">$2</span>$3')
+      .replace(/(&quot;[^&]*?&quot;|&#39;[^&]*?&#39;)/g, '<span class="support-token-string">$1</span>')
+      .replace(/\b(true|false|enabled|disabled|up|down|running|stopped)\b/gi, '<span class="support-token-boolean">$1</span>')
+      .replace(/\b(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b/g, '<span class="support-token-number">$1</span>');
+  }).join('\n');
+}
+
+function getSupportContentPresentation(filePath, content) {
+  const rawContent = String(content || '');
+  const trimmedContent = rawContent.trim();
+  const extension = filePath.split('.').pop()?.toLowerCase() || '';
+  const canHighlight = rawContent.length <= MAX_HIGHLIGHTED_CONTENT_CHARS;
+
+  if (!canHighlight) {
+    return {
+      mode: 'plain',
+      text: rawContent,
+      html: escapeHTML(rawContent)
+    };
+  }
+
+  const couldBeJSON = extension === 'json' || /^[\[{]/.test(trimmedContent);
+  if (couldBeJSON) {
+    try {
+      const formattedJSON = JSON.stringify(JSON.parse(trimmedContent), null, 2);
+      return {
+        mode: 'json',
+        text: formattedJSON,
+        html: highlightJSONContent(formattedJSON)
+      };
+    } catch (_error) {
+      // Fall through to generic highlighting for malformed JSON-like files.
+    }
+  }
+
+  if (extension === 'xml' || /^<\?xml|^<[A-Za-z]/.test(trimmedContent)) {
+    return {
+      mode: 'xml',
+      text: rawContent,
+      html: highlightXMLContent(rawContent)
+    };
+  }
+
+  return {
+    mode: 'generic',
+    text: rawContent,
+    html: highlightGenericTextContent(rawContent)
+  };
+}
+
+function highlightSupportContentSegment(text, mode) {
+  if (mode === 'json') return highlightJSONContent(text);
+  if (mode === 'xml') return highlightXMLContent(text);
+  if (mode === 'generic') return highlightGenericTextContent(text);
+  return escapeHTML(text);
+}
+
+function findContentSearchRanges(text, query) {
+  const source = String(text || '');
+  const normalizedSource = source.toLowerCase();
+  const terms = normalizeSearchQuery(query).split(' ').filter(Boolean);
+  if (terms.length === 0 || source.length === 0) {
+    return [];
+  }
+
+  const ranges = [];
+  terms.forEach(term => {
+    const normalizedTerm = term.toLowerCase();
+    let index = normalizedSource.indexOf(normalizedTerm);
+    while (index !== -1) {
+      ranges.push({
+        start: index,
+        end: index + normalizedTerm.length
+      });
+      index = normalizedSource.indexOf(normalizedTerm, index + Math.max(1, normalizedTerm.length));
+    }
+  });
+
+  return ranges
+    .sort((a, b) => a.start - b.start || b.end - a.end)
+    .reduce((mergedRanges, range) => {
+      const previous = mergedRanges[mergedRanges.length - 1];
+      if (!previous || range.start > previous.end) {
+        mergedRanges.push({ ...range });
+        return mergedRanges;
+      }
+      previous.end = Math.max(previous.end, range.end);
+      return mergedRanges;
+    }, []);
+}
+
+function getSupportContentSearchPresentation(filePath, content, query) {
+  const presentation = getSupportContentPresentation(filePath, content);
+  const normalizedQuery = normalizeSearchQuery(query);
+
+  if (!normalizedQuery || presentation.text.length > MAX_HIGHLIGHTED_CONTENT_CHARS) {
+    return {
+      ...presentation,
+      matchCount: 0
+    };
+  }
+
+  const ranges = findContentSearchRanges(presentation.text, normalizedQuery);
+  if (ranges.length === 0) {
+    return {
+      ...presentation,
+      matchCount: 0
+    };
+  }
+
+  let cursor = 0;
+  let html = '';
+  ranges.forEach(range => {
+    html += highlightSupportContentSegment(presentation.text.slice(cursor, range.start), presentation.mode);
+    html += `<mark class="support-content-match">${highlightSupportContentSegment(presentation.text.slice(range.start, range.end), presentation.mode)}</mark>`;
+    cursor = range.end;
+  });
+  html += highlightSupportContentSegment(presentation.text.slice(cursor), presentation.mode);
+
+  return {
+    ...presentation,
+    html,
+    matchCount: ranges.length
+  };
+}
+
+function renderFileSupportView(workspace) {
+  const treeSearchResult = filterSupportTreeNodes(supportFileState.tree, supportTreeSearchQuery);
+  const treeSearchActive = normalizeSearchQuery(supportTreeSearchQuery).length > 0;
+  const selectedContentPresentation = supportFileState.selectedFileId
+    && !supportFileState.selectedLoading
+    && !supportFileState.selectedError
+    ? getSupportContentSearchPresentation(
+        supportFileState.selectedPath,
+        supportFileState.selectedContent,
+        supportContentSearchQuery
+      )
+    : null;
+
+  const header = document.createElement('div');
+  header.className = 'vm-header monitor-header product-line-header file-support-header';
+
+  const headerText = document.createElement('div');
+  headerText.className = 'monitor-header-text';
+  const headerRow = document.createElement('div');
+  headerRow.className = 'monitor-header-row';
+
+  const title = document.createElement('h2');
+  title.id = 'product-line-header-title';
+  title.textContent = 'File Support';
+  headerRow.appendChild(title);
+
+  if (supportFileState.fileName) {
+    const summary = document.createElement('div');
+    summary.className = 'file-support-summary';
+    const stats = supportFileState.stats || {};
+    summary.textContent = [
+      supportFileState.fileName,
+      `${stats.fileCount || 0} files`,
+      `${stats.directoryCount || 0} folders`
+    ].join(' | ');
+    headerRow.appendChild(summary);
+  }
+
+  const controls = document.createElement('div');
+  controls.className = 'template-top-controls file-support-controls';
+  const importButton = document.createElement('button');
+  importButton.type = 'button';
+  importButton.className = 'config-transfer-button file-support-import-button';
+  importButton.textContent = supportFileState.importing ? 'Importing...' : 'Import Support File';
+  importButton.disabled = supportFileState.importing;
+  importButton.addEventListener('click', handleSupportFileImport);
+  controls.appendChild(importButton);
+  headerRow.appendChild(controls);
+
+  headerText.appendChild(headerRow);
+  header.appendChild(headerText);
+  workspace.appendChild(header);
+
+  if (supportFileState.importError) {
+    const error = document.createElement('div');
+    error.className = 'file-support-alert';
+    error.textContent = supportFileState.importError;
+    workspace.appendChild(error);
+  }
+
+  const layout = document.createElement('section');
+  layout.className = 'file-support-layout';
+  layout.style.setProperty('--file-support-tree-width', `${supportFileTreeWidth}px`);
+
+  const treePanel = document.createElement('div');
+  treePanel.className = 'file-support-panel file-support-tree-panel';
+  const treeTitle = document.createElement('h3');
+  treeTitle.className = 'file-support-panel-title';
+  treeTitle.textContent = 'Archive Tree';
+  treePanel.appendChild(treeTitle);
+
+  const treeSearch = document.createElement('div');
+  treeSearch.className = 'file-support-search';
+  const treeSearchInput = document.createElement('input');
+  treeSearchInput.type = 'search';
+  treeSearchInput.id = 'file-support-tree-search';
+  treeSearchInput.className = 'file-support-search-input';
+  treeSearchInput.placeholder = 'Search files and folders';
+  treeSearchInput.value = supportTreeSearchQuery;
+  treeSearchInput.disabled = supportFileState.tree.length === 0;
+  treeSearchInput.setAttribute('aria-label', 'Search archive tree');
+  treeSearchInput.addEventListener('input', () => {
+    supportTreeSearchQuery = treeSearchInput.value;
+    renderProductApp();
+    requestAnimationFrame(() => {
+      const nextInput = document.getElementById('file-support-tree-search');
+      if (!nextInput) return;
+      nextInput.focus();
+      nextInput.setSelectionRange(nextInput.value.length, nextInput.value.length);
+    });
+  });
+  treeSearch.appendChild(treeSearchInput);
+  if (treeSearchActive) {
+    const treeSearchStatus = document.createElement('span');
+    treeSearchStatus.className = 'file-support-search-status';
+    treeSearchStatus.textContent = treeSearchResult.matchCount === 1
+      ? '1 match'
+      : `${treeSearchResult.matchCount} matches`;
+    treeSearch.appendChild(treeSearchStatus);
+  }
+  treePanel.appendChild(treeSearch);
+
+  if (supportFileState.tree.length === 0) {
+    const emptyState = document.createElement('div');
+    emptyState.className = 'file-support-empty-state';
+    emptyState.textContent = supportFileState.importing ? 'Importing support file' : 'No support file imported';
+    treePanel.appendChild(emptyState);
+  } else if (treeSearchActive && treeSearchResult.nodes.length === 0) {
+    const emptyState = document.createElement('div');
+    emptyState.className = 'file-support-empty-state';
+    emptyState.textContent = 'No matching paths';
+    treePanel.appendChild(emptyState);
+  } else {
+    const tree = document.createElement('div');
+    tree.className = 'file-support-tree';
+    renderSupportTreeNodes(treeSearchActive ? treeSearchResult.nodes : supportFileState.tree, tree);
+    treePanel.appendChild(tree);
+  }
+
+  const resizer = document.createElement('div');
+  resizer.className = 'file-support-resizer';
+  resizer.setAttribute('role', 'separator');
+  resizer.setAttribute('aria-orientation', 'vertical');
+  resizer.setAttribute('aria-label', 'Resize archive tree');
+  resizer.tabIndex = 0;
+  resizer.title = 'Resize archive tree';
+  resizer.addEventListener('pointerdown', (event) => startSupportTreeResize(event, layout));
+  resizer.addEventListener('keydown', (event) => handleSupportTreeResizerKeydown(event, layout));
+
+  const viewerPanel = document.createElement('div');
+  viewerPanel.className = 'file-support-panel file-support-viewer-panel';
+  const viewerHeader = document.createElement('div');
+  viewerHeader.className = 'file-support-viewer-header';
+  const viewerTitle = document.createElement('h3');
+  viewerTitle.className = 'file-support-panel-title';
+  viewerTitle.textContent = supportFileState.selectedPath || 'Viewer';
+  viewerHeader.appendChild(viewerTitle);
+  const contentSearch = document.createElement('div');
+  contentSearch.className = 'file-support-search';
+  const contentSearchInput = document.createElement('input');
+  contentSearchInput.type = 'search';
+  contentSearchInput.id = 'file-support-content-search';
+  contentSearchInput.className = 'file-support-search-input';
+  contentSearchInput.placeholder = 'Search in selected file';
+  contentSearchInput.value = supportContentSearchQuery;
+  contentSearchInput.disabled = !supportFileState.selectedFileId || supportFileState.selectedLoading || Boolean(supportFileState.selectedError);
+  contentSearchInput.setAttribute('aria-label', 'Search selected file content');
+  contentSearchInput.addEventListener('input', () => {
+    supportContentSearchQuery = contentSearchInput.value;
+    renderProductApp();
+    requestAnimationFrame(() => {
+      const nextInput = document.getElementById('file-support-content-search');
+      if (!nextInput) return;
+      nextInput.focus();
+      nextInput.setSelectionRange(nextInput.value.length, nextInput.value.length);
+    });
+  });
+  contentSearch.appendChild(contentSearchInput);
+  if (normalizeSearchQuery(supportContentSearchQuery) && selectedContentPresentation) {
+    const contentSearchStatus = document.createElement('span');
+    contentSearchStatus.className = 'file-support-search-status';
+    contentSearchStatus.textContent = selectedContentPresentation.matchCount === 1
+      ? '1 match'
+      : `${selectedContentPresentation.matchCount} matches`;
+    contentSearch.appendChild(contentSearchStatus);
+  }
+  viewerHeader.appendChild(contentSearch);
+  viewerPanel.appendChild(viewerHeader);
+
+  const viewerBody = document.createElement('div');
+  viewerBody.className = 'file-support-viewer-body';
+
+  if (supportFileState.selectedLoading) {
+    const loading = document.createElement('div');
+    loading.className = 'file-support-empty-state';
+    loading.textContent = 'Loading file';
+    viewerBody.appendChild(loading);
+  } else if (supportFileState.selectedError) {
+    const error = document.createElement('div');
+    error.className = 'file-support-alert';
+    error.textContent = supportFileState.selectedError;
+    viewerBody.appendChild(error);
+  } else if (supportFileState.selectedFileId) {
+    if (supportFileState.selectedTruncated) {
+      const truncated = document.createElement('div');
+      truncated.className = 'file-support-warning';
+      truncated.textContent = 'Preview truncated';
+      viewerBody.appendChild(truncated);
+    }
+    const pre = document.createElement('pre');
+    const presentation = selectedContentPresentation || getSupportContentPresentation(supportFileState.selectedPath, supportFileState.selectedContent);
+    pre.className = `file-support-content mode-${presentation.mode}`;
+    pre.innerHTML = presentation.html;
+    viewerBody.appendChild(pre);
+  } else {
+    const emptyViewer = document.createElement('div');
+    emptyViewer.className = 'file-support-empty-state';
+    emptyViewer.textContent = supportFileState.tree.length === 0 ? 'Import a file' : 'Select a file';
+    viewerBody.appendChild(emptyViewer);
+  }
+
+  viewerPanel.appendChild(viewerBody);
+  layout.appendChild(treePanel);
+  layout.appendChild(resizer);
+  layout.appendChild(viewerPanel);
+  workspace.appendChild(layout);
+}
+
+function renderSupportTreeNodes(nodes, parent) {
+  const list = document.createElement('ul');
+  list.className = 'file-support-tree-list';
+  nodes.forEach(node => {
+    list.appendChild(createSupportTreeNode(node));
+  });
+  parent.appendChild(list);
+}
+
+function createSupportTreeNode(node) {
+  const treeSearchActive = normalizeSearchQuery(supportTreeSearchQuery).length > 0;
+  const hasChildren = Array.isArray(node.children) && node.children.length > 0;
+  const item = document.createElement('li');
+  item.className = `file-support-tree-item ${node.type === 'directory' ? 'is-directory' : 'is-file'}`;
+
+  const row = document.createElement('button');
+  row.type = 'button';
+  row.className = 'file-support-tree-row';
+  row.classList.toggle('search-match', Boolean(node.searchMatched));
+
+  const marker = document.createElement('span');
+  marker.className = 'file-support-tree-marker';
+
+  const label = document.createElement('span');
+  label.className = 'file-support-tree-label';
+  label.innerHTML = treeSearchActive
+    ? highlightFuzzyLabel(node.name || node.path || '/', supportTreeSearchQuery)
+    : escapeHTML(node.name || node.path || '/');
+
+  const meta = document.createElement('span');
+  meta.className = 'file-support-tree-meta';
+
+  if (node.type === 'directory') {
+    const expanded = treeSearchActive || expandedSupportFolders.has(node.id);
+    marker.textContent = hasChildren ? (expanded ? '-' : '+') : '';
+    row.setAttribute('aria-expanded', String(expanded));
+    row.addEventListener('click', () => {
+      if (treeSearchActive) return;
+      if (expandedSupportFolders.has(node.id)) {
+        expandedSupportFolders.delete(node.id);
+      } else {
+        expandedSupportFolders.add(node.id);
+      }
+      renderProductApp();
+    });
+    row.appendChild(marker);
+    row.appendChild(label);
+    item.appendChild(row);
+
+    if (expanded && hasChildren) {
+      renderSupportTreeNodes(node.children, item);
+    }
+    return item;
+  }
+
+  marker.textContent = '';
+  row.classList.toggle('active', supportFileState.selectedFileId === node.id);
+  row.addEventListener('click', () => {
+    handleSupportFileSelection(node);
+  });
+  if (Number.isFinite(Number(node.size))) {
+    meta.textContent = formatSupportFileBytes(node.size);
+  }
+  row.appendChild(marker);
+  row.appendChild(label);
+  row.appendChild(meta);
+  item.appendChild(row);
+  return item;
+}
+
+async function handleSupportFileImport() {
+  const supportAPI = getNetworkAPI();
+  if (!supportAPI || typeof supportAPI.importSupportFile !== 'function') {
+    showNotification('File import is not available');
+    return;
+  }
+
+  supportFileState = {
+    ...supportFileState,
+    importing: true,
+    importError: ''
+  };
+  renderProductApp();
+
+  try {
+    const result = await supportAPI.importSupportFile();
+    if (result?.canceled) {
+      supportFileState = {
+        ...supportFileState,
+        importing: false
+      };
+      renderProductApp();
+      return;
+    }
+
+    if (!result || !result.success) {
+      const message = result?.error || 'Could not import support file';
+      supportFileState = {
+        ...supportFileState,
+        importing: false,
+        importError: message
+      };
+      showNotification(message);
+      renderProductApp();
+      return;
+    }
+
+    expandedSupportFolders = new Set();
+    if (Array.isArray(result.tree) && result.tree.length === 1 && result.tree[0].type === 'directory') {
+      expandedSupportFolders.add(result.tree[0].id);
+    }
+    supportTreeSearchQuery = '';
+    supportContentSearchQuery = '';
+
+    supportFileState = {
+      sessionId: result.sessionId,
+      fileName: result.fileName || '',
+      tree: Array.isArray(result.tree) ? result.tree : [],
+      stats: result.stats || null,
+      selectedFileId: '',
+      selectedPath: '',
+      selectedContent: '',
+      selectedError: '',
+      selectedTruncated: false,
+      selectedLoading: false,
+      importError: '',
+      importing: false
+    };
+    showNotification('Support file imported');
+  } catch (error) {
+    console.error('Error importing support file:', error);
+    supportFileState = {
+      ...supportFileState,
+      importing: false,
+      importError: error.message || 'Could not import support file'
+    };
+    showNotification('Could not import support file');
+  }
+
+  renderProductApp();
+}
+
+async function handleSupportFileSelection(node) {
+  if (!node || node.type !== 'file' || !supportFileState.sessionId) return;
+  const supportAPI = getNetworkAPI();
+  if (!supportAPI || typeof supportAPI.getSupportFileEntryContent !== 'function') {
+    showNotification('File viewer is not available');
+    return;
+  }
+
+  const sessionId = supportFileState.sessionId;
+  const selectedFileId = node.id;
+  supportFileState = {
+    ...supportFileState,
+    selectedFileId,
+    selectedPath: node.path,
+    selectedContent: '',
+    selectedError: '',
+    selectedTruncated: false,
+    selectedLoading: true
+  };
+  renderProductApp();
+
+  try {
+    const result = await supportAPI.getSupportFileEntryContent(sessionId, selectedFileId);
+    if (supportFileState.sessionId !== sessionId || supportFileState.selectedFileId !== selectedFileId) {
+      return;
+    }
+
+    if (!result || !result.success) {
+      supportFileState = {
+        ...supportFileState,
+        selectedContent: '',
+        selectedError: result?.error || 'File content is not available',
+        selectedTruncated: false,
+        selectedLoading: false
+      };
+      renderProductApp();
+      return;
+    }
+
+    supportFileState = {
+      ...supportFileState,
+      selectedPath: result.path || node.path,
+      selectedContent: String(result.text || ''),
+      selectedError: '',
+      selectedTruncated: Boolean(result.truncated),
+      selectedLoading: false
+    };
+  } catch (error) {
+    console.error('Error loading support file entry:', error);
+    supportFileState = {
+      ...supportFileState,
+      selectedContent: '',
+      selectedError: error.message || 'File content is not available',
+      selectedTruncated: false,
+      selectedLoading: false
+    };
+  }
+
+  renderProductApp();
 }
 
 function getGeneratedTemplateFallbackTitle(sourceText) {
@@ -3680,7 +4520,7 @@ function applyImportedConfiguration(configData) {
   recalculateCounters();
   activeLineId = (
     productLines.some(line => line.id === configData.activeLineId)
-    || configData.activeLineId === TEMPLATES_VIEW_ID
+    || BUILT_IN_VIEW_IDS.has(configData.activeLineId)
   )
     ? configData.activeLineId
     : productLines[0].id;

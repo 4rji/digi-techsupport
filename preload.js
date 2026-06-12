@@ -87,6 +87,12 @@ contextBridge.exposeInMainWorld('appAPI', {
   generateSupportTemplate: logWrapper('generateSupportTemplate', (options) => {
     return ipcRenderer.invoke('generate-support-template', options);
   }),
+  importSupportFile: logWrapper('importSupportFile', () => {
+    return ipcRenderer.invoke('import-support-file');
+  }),
+  getSupportFileEntryContent: logWrapper('getSupportFileEntryContent', (sessionId, entryId) => {
+    return ipcRenderer.invoke('get-support-file-entry-content', sessionId, entryId);
+  }),
   onSSHData: (callback) => {
     const listener = (_event, payload) => callback(payload);
     ipcRenderer.on('ssh-data', listener);
