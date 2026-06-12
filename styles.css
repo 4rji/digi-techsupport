@@ -1443,6 +1443,15 @@ body {
   padding: 10px 18px;
 }
 
+.settings-danger-section {
+  margin-top: 18px;
+  border-color: rgba(244, 67, 54, 0.28);
+}
+
+.settings-danger-button {
+  width: 100%;
+}
+
 .monitor-config-form {
   display: flex;
   flex-direction: column;
@@ -2316,11 +2325,13 @@ body {
 
 .app-logo {
   flex: 0 0 auto;
-  width: clamp(132px, 18vw, 230px);
+  align-self: flex-start;
+  width: clamp(99px, 13.5vw, 173px);
   height: auto;
   display: block;
   border-radius: 6px;
   background: #fff;
+  transform: translateY(-4px);
 }
 
 .settings-button {
@@ -2551,7 +2562,7 @@ body {
   grid-template-columns: 160px minmax(0, 1fr);
   gap: 14px;
   align-items: start;
-  margin-bottom: 28px;
+  margin-bottom: 16px;
   padding: 14px 16px;
 }
 
@@ -2664,7 +2675,7 @@ body {
   }
 
   .app-logo {
-    width: 152px;
+    width: 114px;
   }
 
   .settings-button {

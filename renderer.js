@@ -1309,19 +1309,6 @@ function renderTemplatesView(workspace) {
 
   const editor = document.createElement('div');
   editor.className = 'template-editor';
-  const activeIndex = supportTemplates.findIndex(template => template.id === activeTemplateId);
-  if (activeIndex >= 0) {
-    editor.appendChild(createTemplateEditor(supportTemplates[activeIndex], activeIndex));
-  } else {
-    const placeholder = document.createElement('div');
-    placeholder.className = 'template-editor-placeholder';
-    placeholder.textContent = supportTemplates.length > 0 ? 'Select a template' : 'Load .md files';
-    editor.appendChild(placeholder);
-  }
-
-  library.appendChild(list);
-  library.appendChild(editor);
-  workspace.appendChild(library);
 
   const createRow = document.createElement('section');
   createRow.className = 'template-create-row';
@@ -1339,7 +1326,21 @@ function renderTemplatesView(workspace) {
 
   createRow.appendChild(createLabel);
   createRow.appendChild(createInput);
-  workspace.appendChild(createRow);
+  editor.appendChild(createRow);
+
+  const activeIndex = supportTemplates.findIndex(template => template.id === activeTemplateId);
+  if (activeIndex >= 0) {
+    editor.appendChild(createTemplateEditor(supportTemplates[activeIndex], activeIndex));
+  } else {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'template-editor-placeholder';
+    placeholder.textContent = supportTemplates.length > 0 ? 'Select a template' : 'Load .md files';
+    editor.appendChild(placeholder);
+  }
+
+  library.appendChild(list);
+  library.appendChild(editor);
+  workspace.appendChild(library);
 }
 
 function createTemplateListItem(template) {
@@ -2736,6 +2737,22 @@ function getAgentSkill() {
   };
 }
 
+function deleteAllTemplates() {
+  if (supportTemplates.length === 0) {
+    showNotification('No templates to delete');
+    return;
+  }
+
+  const shouldDelete = window.confirm('Delete all templates permanently?');
+  if (!shouldDelete) return;
+
+  supportTemplates = [];
+  activeTemplateId = '';
+  saveSupportTemplates();
+  renderProductApp();
+  showNotification('All templates deleted');
+}
+
 async function handleAgentSkillFileSelection(event) {
   const input = event.target;
   const file = input.files && input.files[0];
@@ -2768,6 +2785,7 @@ function setupSettingsModal() {
   const skillForm = document.getElementById('agent-skill-form');
   const loadSkillButton = document.getElementById('load-agent-skill-btn');
   const skillFileInput = document.getElementById('agent-skill-input');
+  const deleteAllTemplatesButton = document.getElementById('delete-all-templates-btn');
 
   if (!modal) return;
 
@@ -2795,6 +2813,9 @@ function setupSettingsModal() {
       skillFileInput.click();
     });
     skillFileInput.addEventListener('change', handleAgentSkillFileSelection);
+  }
+  if (deleteAllTemplatesButton) {
+    deleteAllTemplatesButton.addEventListener('click', deleteAllTemplates);
   }
 
   modal.addEventListener('click', (event) => {
