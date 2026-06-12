@@ -839,6 +839,8 @@ let supportFileState = {
   selectedError: '',
   selectedTruncated: false,
   selectedLoading: false,
+  summary: null,
+  summaryVisible: false,
   importError: '',
   importing: false
 };
@@ -2059,6 +2061,195 @@ function getSupportContentSearchPresentation(filePath, content, query, viewMode 
   };
 }
 
+function findSupportNodeById(nodes, entryId) {
+  if (!entryId) return null;
+  for (const node of nodes || []) {
+    if (node.id === entryId) return node;
+    const childMatch = findSupportNodeById(node.children, entryId);
+    if (childMatch) return childMatch;
+  }
+  return null;
+}
+
+function selectSupportSummaryFile(entryId) {
+  const node = findSupportNodeById(supportFileState.tree, entryId);
+  if (!node || node.type !== 'file') {
+    showNotification('File is not available in this support archive');
+    return;
+  }
+  handleSupportFileSelection(node);
+}
+
+function renderSupportSummaryDashboard() {
+  const summary = supportFileState.summary;
+  if (!summary || !supportFileState.summaryVisible) return;
+
+  const dashboard = document.createElement('section');
+  dashboard.className = 'file-support-summary-dashboard';
+  dashboard.setAttribute('aria-label', 'Digi support troubleshooting summary');
+
+  const header = document.createElement('div');
+  header.className = 'file-support-summary-dashboard-header';
+  const titleGroup = document.createElement('div');
+  const eyebrow = document.createElement('p');
+  eyebrow.className = 'file-support-summary-dashboard-eyebrow';
+  eyebrow.textContent = 'Imported Support File';
+  const title = document.createElement('h3');
+  title.textContent = summary.title || 'Digi Support Troubleshooting Summary';
+  titleGroup.appendChild(eyebrow);
+  titleGroup.appendChild(title);
+
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.className = 'file-support-summary-close';
+  closeButton.textContent = 'x';
+  closeButton.setAttribute('aria-label', 'Close troubleshooting summary');
+  closeButton.addEventListener('click', () => {
+    supportFileState = {
+      ...supportFileState,
+      summaryVisible: false
+    };
+    renderProductApp();
+  });
+
+  header.appendChild(titleGroup);
+  header.appendChild(closeButton);
+  dashboard.appendChild(header);
+
+  if (summary.overview) {
+    const overview = document.createElement('p');
+    overview.className = 'file-support-summary-dashboard-overview';
+    overview.textContent = summary.overview;
+    dashboard.appendChild(overview);
+  }
+
+  const statsGrid = document.createElement('div');
+  statsGrid.className = 'file-support-dashboard-stats';
+
+  const findings = Array.isArray(summary.findings) ? summary.findings : [];
+  const warningCount = findings.filter(finding => finding.severity === 'warning').length;
+  const infoCount = findings.filter(finding => finding.severity !== 'warning').length;
+  const keyFiles = Array.isArray(summary.keyFiles) ? summary.keyFiles : [];
+  const checks = Array.isArray(summary.recommendedChecks) ? summary.recommendedChecks : [];
+
+  [
+    { label: 'Key files', value: String(keyFiles.length) },
+    { label: 'Warnings', value: String(warningCount) },
+    { label: 'Context notes', value: String(infoCount) },
+    { label: 'Checklist items', value: String(checks.length) }
+  ].forEach(stat => {
+    const card = document.createElement('article');
+    card.className = 'file-support-dashboard-stat';
+    const value = document.createElement('strong');
+    value.textContent = stat.value;
+    const label = document.createElement('span');
+    label.textContent = stat.label;
+    card.appendChild(value);
+    card.appendChild(label);
+    statsGrid.appendChild(card);
+  });
+  dashboard.appendChild(statsGrid);
+
+  const body = document.createElement('div');
+  body.className = 'file-support-summary-dashboard-body';
+
+  if (findings.length > 0) {
+    const section = document.createElement('section');
+    section.className = 'file-support-summary-section';
+    const sectionTitle = document.createElement('h4');
+    sectionTitle.textContent = 'Initial findings';
+    section.appendChild(sectionTitle);
+
+    const list = document.createElement('div');
+    list.className = 'file-support-finding-list';
+    findings.forEach(finding => {
+      const item = document.createElement('article');
+      item.className = `file-support-finding severity-${finding.severity || 'info'}`;
+      const findingTitle = document.createElement('strong');
+      findingTitle.textContent = finding.title || 'Finding';
+      const detail = document.createElement('p');
+      detail.textContent = finding.detail || '';
+      item.appendChild(findingTitle);
+      item.appendChild(detail);
+
+      if (Array.isArray(finding.samples) && finding.samples.length > 0) {
+        const sampleList = document.createElement('ul');
+        sampleList.className = 'file-support-finding-samples';
+        finding.samples.forEach(sample => {
+          const sampleItem = document.createElement('li');
+          sampleItem.textContent = sample;
+          sampleList.appendChild(sampleItem);
+        });
+        item.appendChild(sampleList);
+      }
+
+      if (finding.entryId) {
+        const linkButton = document.createElement('button');
+        linkButton.type = 'button';
+        linkButton.className = 'file-support-summary-link';
+        linkButton.textContent = finding.path || 'Open source file';
+        linkButton.addEventListener('click', () => selectSupportSummaryFile(finding.entryId));
+        item.appendChild(linkButton);
+      }
+      list.appendChild(item);
+    });
+    section.appendChild(list);
+    body.appendChild(section);
+  }
+
+  if (keyFiles.length > 0) {
+    const section = document.createElement('section');
+    section.className = 'file-support-summary-section';
+    const sectionTitle = document.createElement('h4');
+    sectionTitle.textContent = 'Most relevant files';
+    section.appendChild(sectionTitle);
+
+    const list = document.createElement('div');
+    list.className = 'file-support-key-file-list';
+    keyFiles.forEach(file => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'file-support-key-file';
+      item.addEventListener('click', () => selectSupportSummaryFile(file.entryId));
+
+      const fileTitle = document.createElement('strong');
+      fileTitle.textContent = file.title || file.path || 'Support file';
+      const reason = document.createElement('span');
+      reason.textContent = file.reason || '';
+      const pathLabel = document.createElement('code');
+      pathLabel.textContent = file.path || '';
+
+      item.appendChild(fileTitle);
+      item.appendChild(reason);
+      item.appendChild(pathLabel);
+      list.appendChild(item);
+    });
+    section.appendChild(list);
+    body.appendChild(section);
+  }
+
+  if (checks.length > 0) {
+    const section = document.createElement('section');
+    section.className = 'file-support-summary-section';
+    const sectionTitle = document.createElement('h4');
+    sectionTitle.textContent = 'Troubleshooting order';
+    section.appendChild(sectionTitle);
+
+    const list = document.createElement('ol');
+    list.className = 'file-support-check-list';
+    checks.forEach(check => {
+      const item = document.createElement('li');
+      item.textContent = check;
+      list.appendChild(item);
+    });
+    section.appendChild(list);
+    body.appendChild(section);
+  }
+
+  dashboard.appendChild(body);
+  return dashboard;
+}
+
 function renderFileSupportView(workspace) {
   const treeSearchResult = filterSupportTreeNodes(supportFileState.tree, supportTreeSearchQuery);
   const treeSearchActive = normalizeSearchQuery(supportTreeSearchQuery).length > 0;
@@ -2258,6 +2449,21 @@ function renderFileSupportView(workspace) {
     renderProductApp();
   });
   viewerTitleRow.appendChild(fullscreenButton);
+  const summaryButton = document.createElement('button');
+  summaryButton.type = 'button';
+  summaryButton.className = 'file-support-fullscreen-button file-support-summary-toggle';
+  summaryButton.textContent = 'Summary';
+  summaryButton.disabled = !supportFileState.summary;
+  summaryButton.setAttribute('aria-pressed', supportFileState.summaryVisible ? 'true' : 'false');
+  summaryButton.setAttribute('aria-label', 'Open troubleshooting summary');
+  summaryButton.addEventListener('click', () => {
+    supportFileState = {
+      ...supportFileState,
+      summaryVisible: true
+    };
+    renderProductApp();
+  });
+  viewerTitleRow.appendChild(summaryButton);
   viewerHeader.appendChild(viewerTitleRow);
   const contentSearch = document.createElement('div');
   contentSearch.className = 'file-support-search';
@@ -2293,6 +2499,10 @@ function renderFileSupportView(workspace) {
 
   const viewerBody = document.createElement('div');
   viewerBody.className = 'file-support-viewer-body';
+  const dashboard = renderSupportSummaryDashboard();
+  if (dashboard) {
+    viewerBody.appendChild(dashboard);
+  }
 
   if (supportFileState.selectedLoading) {
     const loading = document.createElement('div');
@@ -2461,6 +2671,8 @@ async function handleSupportFileImport() {
       selectedError: '',
       selectedTruncated: false,
       selectedLoading: false,
+      summary: result.summary || null,
+      summaryVisible: Boolean(result.summary),
       importError: '',
       importing: false
     };

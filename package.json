@@ -21,7 +21,9 @@
     "npmRebuild": false,
     "files": [
       "**/*",
-      "!node_modules/cpu-features/**"
+      "!node_modules/cpu-features/**",
+      "!digi-support-*",
+      "!digi-support-*/**"
     ],
     "directories": {
       "buildResources": "build"

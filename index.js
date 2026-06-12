@@ -444,6 +444,188 @@ function countSupportTreeNodes(nodes, type) {
   }, 0);
 }
 
+function getSupportEntryText(entry, contentById, maxLength = 200000) {
+  if (!entry || entry.type !== 'file') return '';
+  const content = contentById.get(entry.id);
+  if (!content || typeof content.text !== 'string') return '';
+  return content.text.slice(0, maxLength);
+}
+
+function findSupportEntry(entries, pattern) {
+  return entries.find(entry => entry.type === 'file' && pattern.test(entry.path));
+}
+
+function findSupportEntries(entries, pattern, limit = 8) {
+  return entries
+    .filter(entry => entry.type === 'file' && pattern.test(entry.path))
+    .slice(0, limit);
+}
+
+function addSupportKeyFile(keyFiles, entry, title, reason, priority) {
+  if (!entry || keyFiles.some(file => file.entryId === entry.id)) return;
+  keyFiles.push({
+    entryId: entry.id,
+    path: entry.path,
+    title,
+    reason,
+    priority
+  });
+}
+
+function parseVersionSummary(text) {
+  const product = /NETWORK_PRODUCT=([^\n]+)/.exec(text)?.[1]?.trim();
+  const version = /PRODUCT_VERSION=([^\n]+)/.exec(text)?.[1]?.trim();
+  const build = /PRODUCT_BUILDSTRING=([^\n]+)/.exec(text)?.[1]?.trim();
+  if (!product && !version && !build) return '';
+  return [
+    product ? `Product: ${product}` : '',
+    version ? `Firmware: ${version}` : '',
+    build ? `Build: ${build}` : ''
+  ].filter(Boolean).join(' | ');
+}
+
+function parseInterfaceSummary(text) {
+  const interfaces = [];
+  const blocks = String(text || '').split(/\n(?=\d+:\s+\S+:)/);
+  blocks.forEach(block => {
+    const header = /^(\d+):\s+([^:]+):\s+<([^>]*)>/.exec(block);
+    if (!header) return;
+    const name = header[2].replace(/@.*$/, '');
+    if (name === 'lo') return;
+    const flags = header[3].split(',');
+    const ipv4 = [...block.matchAll(/\binet\s+([0-9.]+\/\d+)/g)].map(match => match[1]);
+    interfaces.push(`${name} ${flags.includes('UP') ? 'UP' : 'DOWN'}${ipv4.length ? ` (${ipv4.join(', ')})` : ''}`);
+  });
+  return interfaces.slice(0, 5).join('; ');
+}
+
+function parseDefaultRoute(text) {
+  const route = String(text || '').split('\n').find(line => /^default\s+/.test(line.trim()));
+  return route ? route.trim().replace(/\s+/g, ' ') : '';
+}
+
+function parseNetstatIssue(text) {
+  const lines = String(text || '').split('\n');
+  const issues = [];
+  lines.forEach(line => {
+    const columns = line.trim().split(/\s+/);
+    if (columns.length < 9 || columns[0] === 'Iface' || columns[0] === 'Kernel') return;
+    const [iface, , , rxErr, rxDrp, , , txErr, txDrp] = columns;
+    const rxErrors = Number(rxErr) || 0;
+    const rxDrops = Number(rxDrp) || 0;
+    const txErrors = Number(txErr) || 0;
+    const txDrops = Number(txDrp) || 0;
+    if (rxErrors || rxDrops || txErrors || txDrops) {
+      issues.push(`${iface}: RX errors ${rxErrors}, RX drops ${rxDrops}, TX errors ${txErrors}, TX drops ${txDrops}`);
+    }
+  });
+  return issues.slice(0, 4).join('; ');
+}
+
+function summarizeLogIssues(text) {
+  const issueLines = String(text || '')
+    .split('\n')
+    .filter(line => /\b(error|failed|failure|unable|refused|timeout|terminated|critical|fatal|warn)\b/i.test(line));
+  const counts = {
+    dns: issueLines.filter(line => /resolve|dns|lookup/i.test(line)).length,
+    cloud: issueLines.filter(line => /cloud|edp|telemetry|metrics/i.test(line)).length,
+    service: issueLines.filter(line => /refused|terminated|failed to connect/i.test(line)).length,
+    interface: issueLines.filter(line => /link|interface|carrier|disconnect/i.test(line)).length
+  };
+  const sample = issueLines.slice(0, 3).map(line => line.trim().replace(/\s+/g, ' '));
+  return {
+    total: issueLines.length,
+    counts,
+    sample
+  };
+}
+
+function createSupportTroubleshootingSummary(entries, contentById) {
+  const keyFiles = [];
+  const findings = [];
+  const recommendedChecks = [
+    'Start with firmware/version, uptime, and recent logs to establish context and timing.',
+    'Confirm IP addresses, default route, DNS behavior, and interface errors before changing configuration.',
+    'For cellular or cloud cases, inspect modem output, SureLink state, and log entries around registration or DNS failures.',
+    'Compare running configuration with the intended customer setup, especially WAN, firewall, VPN, and remote management settings.'
+  ];
+
+  const versionEntry = findSupportEntry(entries, /(^|\/)etc\/version\.info$/);
+  const uptimeEntry = findSupportEntry(entries, /(^|\/)tmp\/\d+\/uptime$/);
+  const configEntry = findSupportEntry(entries, /(^|\/)tmp\/\d+\/config_json$/);
+  const publicConfigEntry = findSupportEntry(entries, /(^|\/)tmp\/\d+\/config_dump-public$/);
+  const ipAddrEntry = findSupportEntry(entries, /(^|\/)tmp\/\d+\/ip_addr_list$/);
+  const routeEntry = findSupportEntry(entries, /(^|\/)tmp\/\d+\/ip_route_show_table_all$/);
+  const netstatEntry = findSupportEntry(entries, /(^|\/)tmp\/\d+\/netstat_-i$/);
+  const mmcliEntry = findSupportEntry(entries, /(^|\/)tmp\/\d+\/mmcli-dump$/);
+  const surelinkEntry = findSupportEntry(entries, /(^|\/)tmp\/\d+\/surelink_dump$/);
+  const iptablesEntry = findSupportEntry(entries, /(^|\/)tmp\/\d+\/iptables_-nv_-L$/);
+  const eventEntry = findSupportEntry(entries, /(^|\/)tmp\/\d+\/event_list$/);
+  const messagesEntry = findSupportEntry(entries, /(^|\/)var\/log\/messages$/);
+
+  addSupportKeyFile(keyFiles, messagesEntry, 'Recent system log', 'Best first stop for errors, cloud/DNS failures, interface changes, and service restarts.', 1);
+  addSupportKeyFile(keyFiles, versionEntry, 'Firmware and product version', 'Identifies product family, firmware release, and build date.', 2);
+  addSupportKeyFile(keyFiles, configEntry || publicConfigEntry, 'Running configuration', 'Shows the active service, network, WAN, VPN, firewall, and management settings.', 3);
+  addSupportKeyFile(keyFiles, ipAddrEntry, 'Interface addresses', 'Shows which interfaces are up and what IPv4/IPv6 addresses are assigned.', 4);
+  addSupportKeyFile(keyFiles, routeEntry, 'Routing table', 'Confirms default gateway, source networks, and policy tables.', 5);
+  addSupportKeyFile(keyFiles, netstatEntry, 'Interface counters', 'Highlights RX/TX errors or drops that point to link or congestion problems.', 6);
+  addSupportKeyFile(keyFiles, mmcliEntry, 'Modem manager dump', 'Critical for cellular troubleshooting: modem presence, SIM, registration, signal, and bearer state.', 7);
+  addSupportKeyFile(keyFiles, surelinkEntry, 'SureLink state', 'Useful for WAN health checks and recovery behavior.', 8);
+  addSupportKeyFile(keyFiles, iptablesEntry, 'Firewall rules', 'Checks packet filtering, NAT, and traffic counters.', 9);
+  addSupportKeyFile(keyFiles, eventEntry, 'Event list', 'Condensed event history for alarms, configuration changes, and service transitions.', 10);
+
+  findSupportEntries(entries, /(^|\/)var\/log\/messages\.\d+(\.gz)?$/).forEach((entry, index) => {
+    addSupportKeyFile(keyFiles, entry, `Rotated log ${index + 1}`, 'Older log history for recurring or intermittent failures.', 20 + index);
+  });
+
+  const versionSummary = parseVersionSummary(getSupportEntryText(versionEntry, contentById));
+  if (versionSummary) findings.push({ severity: 'info', title: 'Device identity', detail: versionSummary, entryId: versionEntry.id, path: versionEntry.path });
+
+  const uptime = getSupportEntryText(uptimeEntry, contentById, 1000).trim().replace(/\s+/g, ' ');
+  if (uptime) findings.push({ severity: 'info', title: 'Uptime and load', detail: uptime, entryId: uptimeEntry.id, path: uptimeEntry.path });
+
+  const interfaceSummary = parseInterfaceSummary(getSupportEntryText(ipAddrEntry, contentById));
+  if (interfaceSummary) findings.push({ severity: 'info', title: 'Active interfaces', detail: interfaceSummary, entryId: ipAddrEntry.id, path: ipAddrEntry.path });
+
+  const defaultRoute = parseDefaultRoute(getSupportEntryText(routeEntry, contentById));
+  if (defaultRoute) findings.push({ severity: 'info', title: 'Default route', detail: defaultRoute, entryId: routeEntry.id, path: routeEntry.path });
+
+  const netstatIssue = parseNetstatIssue(getSupportEntryText(netstatEntry, contentById));
+  if (netstatIssue) findings.push({ severity: 'warning', title: 'Interface drops/errors detected', detail: netstatIssue, entryId: netstatEntry.id, path: netstatEntry.path });
+
+  const mmcliText = getSupportEntryText(mmcliEntry, contentById, 4000);
+  if (/not found|No such file|command not/i.test(mmcliText)) {
+    findings.push({ severity: 'warning', title: 'Modem dump unavailable', detail: 'The mmcli dump command failed or is missing, so cellular state may need to be verified from logs, config, or live CLI.', entryId: mmcliEntry.id, path: mmcliEntry.path });
+  }
+
+  const logSummary = summarizeLogIssues(getSupportEntryText(messagesEntry, contentById));
+  if (logSummary.total > 0) {
+    const parts = [
+      `${logSummary.total} warning/error-like log lines`,
+      logSummary.counts.dns ? `${logSummary.counts.dns} DNS/lookup related` : '',
+      logSummary.counts.cloud ? `${logSummary.counts.cloud} cloud/telemetry related` : '',
+      logSummary.counts.service ? `${logSummary.counts.service} service connection related` : ''
+    ].filter(Boolean);
+    findings.push({
+      severity: 'warning',
+      title: 'Recent log issues',
+      detail: parts.join('; '),
+      samples: logSummary.sample,
+      entryId: messagesEntry?.id || '',
+      path: messagesEntry?.path || ''
+    });
+  }
+
+  return {
+    title: 'Digi Support Troubleshooting Summary',
+    generatedAt: new Date().toISOString(),
+    overview: 'These are the most useful files and first checks for router or Digi IoT device troubleshooting.',
+    keyFiles: keyFiles.sort((a, b) => a.priority - b.priority).slice(0, 14),
+    findings,
+    recommendedChecks
+  };
+}
+
 function parseSupportTarArchive(tarBuffer) {
   return new Promise((resolve, reject) => {
     const extract = tar.extract();
@@ -556,11 +738,13 @@ function parseSupportTarArchive(tarBuffer) {
     extract.once('finish', () => {
       if (failed) return;
       const tree = buildSupportArchiveTree(entries);
+      const summary = createSupportTroubleshootingSummary(entries, contentById);
       resolve({
         entries,
         tree,
         filesById,
         contentById,
+        summary,
         stats: {
           entryCount: entries.length,
           fileCount: countSupportTreeNodes(tree, 'file'),
@@ -657,6 +841,7 @@ async function importSupportFileFromDialog(webContents) {
     tree: archive.tree,
     filesById: archive.filesById,
     contentById: archive.contentById,
+    summary: archive.summary,
     createdAt: Date.now()
   });
   pruneSupportArchiveSessions();
@@ -666,7 +851,8 @@ async function importSupportFileFromDialog(webContents) {
     sessionId,
     fileName: path.basename(filePath),
     tree: archive.tree,
-    stats: archive.stats
+    stats: archive.stats,
+    summary: archive.summary
   };
 }
 
