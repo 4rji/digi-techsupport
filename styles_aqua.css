@@ -3553,9 +3553,16 @@ body.is-file-support-resizing {
   border-bottom: 0;
 }
 
-.file-support-fullscreen-button {
+.file-support-view-mode-controls {
   flex: 0 0 auto;
-  margin-right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.file-support-fullscreen-button,
+.file-support-view-mode-button {
+  flex: 0 0 auto;
   padding: 8px 12px;
   border: 1px solid rgba(var(--app-primary-rgb, 132, 195, 97), 0.48);
   border-radius: 6px;
@@ -3566,14 +3573,22 @@ body.is-file-support-resizing {
   cursor: pointer;
 }
 
+.file-support-fullscreen-button {
+  margin-right: 12px;
+}
+
 .file-support-fullscreen-button:hover:not(:disabled),
-.file-support-fullscreen-button:focus-visible {
+.file-support-fullscreen-button:focus-visible,
+.file-support-view-mode-button:hover:not(:disabled),
+.file-support-view-mode-button:focus-visible,
+.file-support-view-mode-button[aria-pressed="true"] {
   border-color: var(--app-primary, #84c361);
   background: rgba(var(--app-primary-rgb, 132, 195, 97), 0.2);
   outline: none;
 }
 
-.file-support-fullscreen-button:disabled {
+.file-support-fullscreen-button:disabled,
+.file-support-view-mode-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -3615,6 +3630,17 @@ body.is-file-support-resizing {
 
 .support-token-tag {
   color: var(--app-primary, #84c361);
+}
+
+.support-token-variable,
+.support-token-function,
+.support-token-path {
+  color: #dcdcaa;
+}
+
+.support-token-log-level {
+  color: var(--app-warning, #c9653d);
+  font-weight: 700;
 }
 
 .support-token-punctuation {
@@ -3687,6 +3713,21 @@ body.is-file-support-resizing {
   .file-support-layout.is-viewer-fullscreen .file-support-viewer-panel {
     height: 100%;
     min-height: 0;
+  }
+
+  .file-support-viewer-title-row {
+    flex-wrap: wrap;
+    padding-bottom: 10px;
+  }
+
+  .file-support-viewer-title-row .file-support-panel-title {
+    flex-basis: 100%;
+  }
+
+  .file-support-view-mode-controls {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    padding-left: 12px;
   }
 
   .file-support-controls,

@@ -837,6 +837,7 @@ let supportFileTreeWidth = getSavedSupportTreeWidth();
 let supportTreeSearchQuery = '';
 let supportContentSearchQuery = '';
 let supportFileViewerFullscreen = false;
+let supportContentViewMode = 'ruby';
 let expandedSupportFolders = new Set();
 
 const portStatuses = new Map();
@@ -1786,6 +1787,97 @@ function highlightXMLContent(text) {
   );
 }
 
+function highlightContentLine(line, patterns) {
+  const ranges = [];
+  patterns.forEach(pattern => {
+    const regex = new RegExp(pattern.regex.source, pattern.regex.flags.includes('g') ? pattern.regex.flags : `${pattern.regex.flags}g`);
+    let match = regex.exec(line);
+    while (match) {
+      if (match[0].length === 0) {
+        regex.lastIndex += 1;
+      } else {
+        ranges.push({
+          start: match.index,
+          end: match.index + match[0].length,
+          className: pattern.className
+        });
+      }
+      match = regex.exec(line);
+    }
+  });
+
+  const selectedRanges = ranges
+    .sort((a, b) => a.start - b.start || b.end - a.end)
+    .reduce((accepted, range) => {
+      const previous = accepted[accepted.length - 1];
+      if (!previous || range.start >= previous.end) {
+        accepted.push(range);
+      }
+      return accepted;
+    }, []);
+
+  let cursor = 0;
+  let html = '';
+  selectedRanges.forEach(range => {
+    html += escapeHTML(line.slice(cursor, range.start));
+    html += `<span class="${range.className}">${escapeHTML(line.slice(range.start, range.end))}</span>`;
+    cursor = range.end;
+  });
+  html += escapeHTML(line.slice(cursor));
+  return html;
+}
+
+function highlightLinesWithPatterns(text, patterns) {
+  return String(text || '').split('\n').map(line => highlightContentLine(line, patterns)).join('\n');
+}
+
+function highlightBashContent(text) {
+  return highlightLinesWithPatterns(text, [
+    { regex: /^\s*#.*/, className: 'support-token-comment' },
+    { regex: /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, className: 'support-token-string' },
+    { regex: /\$\{?[A-Za-z_][\w]*\}?|\$[0-9@#?*!]/g, className: 'support-token-variable' },
+    { regex: /\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|select|until|in|return|exit|export|local|readonly|source|sudo|systemctl|journalctl|grep|awk|sed|cat|tail|head|chmod|chown|mkdir|rm|cp|mv)\b/g, className: 'support-token-key' },
+    { regex: /(^|[\s;|&])--?[A-Za-z0-9][\w-]*/g, className: 'support-token-boolean' },
+    { regex: /\/(?:[\w.-]+\/?)+/g, className: 'support-token-path' },
+    { regex: /\b-?\d+(?:\.\d+)?\b/g, className: 'support-token-number' }
+  ]);
+}
+
+function highlightPythonContent(text) {
+  return highlightLinesWithPatterns(text, [
+    { regex: /#.*/, className: 'support-token-comment' },
+    { regex: /("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g, className: 'support-token-string' },
+    { regex: /\b(def|class|import|from|as|if|elif|else|for|while|try|except|finally|with|return|yield|raise|pass|break|continue|lambda|global|nonlocal|assert|async|await|in|is|not|and|or)\b/g, className: 'support-token-key' },
+    { regex: /\b(True|False|None)\b/g, className: 'support-token-boolean' },
+    { regex: /\b[A-Za-z_][\w]*(?=\s*\()/g, className: 'support-token-function' },
+    { regex: /\/(?:[\w.-]+\/?)+/g, className: 'support-token-path' },
+    { regex: /\b-?\d+(?:\.\d+)?\b/g, className: 'support-token-number' }
+  ]);
+}
+
+function highlightRubyContent(text) {
+  return highlightLinesWithPatterns(text, [
+    { regex: /#.*/, className: 'support-token-comment' },
+    { regex: /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|%[qQ]?\{[^}]*\})/g, className: 'support-token-string' },
+    { regex: /\b(BEGIN|END|alias|and|begin|break|case|class|def|defined\?|do|else|elsif|end|ensure|false|for|if|in|module|next|nil|not|or|redo|rescue|retry|return|self|super|then|true|undef|unless|until|when|while|yield|require|include|extend|attr_reader|attr_writer|attr_accessor)\b/g, className: 'support-token-key' },
+    { regex: /[@$]{1,2}[A-Za-z_][\w]*|:[A-Za-z_][\w!?=]*/g, className: 'support-token-variable' },
+    { regex: /\b[A-Za-z_][\w!?=]*(?=\s*(?:\(|\{|\bdo\b))/g, className: 'support-token-function' },
+    { regex: /\/(?:[\w.-]+\/?)+/g, className: 'support-token-path' },
+    { regex: /\b-?\d+(?:\.\d+)?\b/g, className: 'support-token-number' }
+  ]);
+}
+
+function highlightLogContent(text) {
+  return highlightLinesWithPatterns(text, [
+    { regex: /\b(?:\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?Z?|\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\b/g, className: 'support-token-number' },
+    { regex: /\b(ERROR|ERR|FAIL|FAILED|CRITICAL|FATAL|WARN|WARNING|NOTICE|INFO|DEBUG|TRACE)\b/gi, className: 'support-token-log-level' },
+    { regex: /\/(?:[\w.-]+\/?)+/g, className: 'support-token-path' },
+    { regex: /\b(?:pid|uid|gid|status|code|port|addr|host|interface|device)=?[\w.:-]+\b/gi, className: 'support-token-key' },
+    { regex: /\b(?:true|false|enabled|disabled|up|down|running|stopped|active|inactive|failed)\b/gi, className: 'support-token-boolean' },
+    { regex: /\b-?\d+(?:\.\d+)?\b/g, className: 'support-token-number' }
+  ]);
+}
+
 function highlightGenericTextContent(text) {
   return String(text || '').split('\n').map((line) => {
     const escapedLine = escapeHTML(line);
@@ -1802,17 +1894,50 @@ function highlightGenericTextContent(text) {
   }).join('\n');
 }
 
-function getSupportContentPresentation(filePath, content) {
+function getSupportContentPresentation(filePath, content, viewMode = 'auto') {
   const rawContent = String(content || '');
   const trimmedContent = rawContent.trim();
   const extension = filePath.split('.').pop()?.toLowerCase() || '';
   const canHighlight = rawContent.length <= MAX_HIGHLIGHTED_CONTENT_CHARS;
+  const requestedMode = ['ruby', 'bash', 'python', 'log'].includes(viewMode) ? viewMode : 'auto';
 
   if (!canHighlight) {
     return {
       mode: 'plain',
       text: rawContent,
       html: escapeHTML(rawContent)
+    };
+  }
+
+  if (requestedMode === 'bash') {
+    return {
+      mode: 'bash',
+      text: rawContent,
+      html: highlightBashContent(rawContent)
+    };
+  }
+
+  if (requestedMode === 'python') {
+    return {
+      mode: 'python',
+      text: rawContent,
+      html: highlightPythonContent(rawContent)
+    };
+  }
+
+  if (requestedMode === 'ruby') {
+    return {
+      mode: 'ruby',
+      text: rawContent,
+      html: highlightRubyContent(rawContent)
+    };
+  }
+
+  if (requestedMode === 'log') {
+    return {
+      mode: 'log',
+      text: rawContent,
+      html: highlightLogContent(rawContent)
     };
   }
 
@@ -1848,6 +1973,10 @@ function getSupportContentPresentation(filePath, content) {
 function highlightSupportContentSegment(text, mode) {
   if (mode === 'json') return highlightJSONContent(text);
   if (mode === 'xml') return highlightXMLContent(text);
+  if (mode === 'bash') return highlightBashContent(text);
+  if (mode === 'python') return highlightPythonContent(text);
+  if (mode === 'ruby') return highlightRubyContent(text);
+  if (mode === 'log') return highlightLogContent(text);
   if (mode === 'generic') return highlightGenericTextContent(text);
   return escapeHTML(text);
 }
@@ -1886,8 +2015,8 @@ function findContentSearchRanges(text, query) {
     }, []);
 }
 
-function getSupportContentSearchPresentation(filePath, content, query) {
-  const presentation = getSupportContentPresentation(filePath, content);
+function getSupportContentSearchPresentation(filePath, content, query, viewMode = 'auto') {
+  const presentation = getSupportContentPresentation(filePath, content, viewMode);
   const normalizedQuery = normalizeSearchQuery(query);
 
   if (!normalizedQuery || presentation.text.length > MAX_HIGHLIGHTED_CONTENT_CHARS) {
@@ -1931,7 +2060,8 @@ function renderFileSupportView(workspace) {
     ? getSupportContentSearchPresentation(
         supportFileState.selectedPath,
         supportFileState.selectedContent,
-        supportContentSearchQuery
+        supportContentSearchQuery,
+        supportContentViewMode
       )
     : null;
 
@@ -2061,6 +2191,27 @@ function renderFileSupportView(workspace) {
   viewerTitle.className = 'file-support-panel-title';
   viewerTitle.textContent = supportFileState.selectedPath || 'Viewer';
   viewerTitleRow.appendChild(viewerTitle);
+  const viewModeControls = document.createElement('div');
+  viewModeControls.className = 'file-support-view-mode-controls';
+  [
+    { id: 'ruby', label: 'Ruby' },
+    { id: 'bash', label: 'Bash' },
+    { id: 'python', label: 'Python' },
+    { id: 'log', label: 'Log' }
+  ].forEach(mode => {
+    const modeButton = document.createElement('button');
+    modeButton.type = 'button';
+    modeButton.className = 'file-support-view-mode-button';
+    modeButton.textContent = mode.label;
+    modeButton.disabled = !supportFileState.selectedFileId;
+    modeButton.setAttribute('aria-pressed', supportContentViewMode === mode.id ? 'true' : 'false');
+    modeButton.addEventListener('click', () => {
+      supportContentViewMode = supportContentViewMode === mode.id ? 'auto' : mode.id;
+      renderProductApp();
+    });
+    viewModeControls.appendChild(modeButton);
+  });
+  viewerTitleRow.appendChild(viewModeControls);
   const fullscreenButton = document.createElement('button');
   fullscreenButton.type = 'button';
   fullscreenButton.className = 'file-support-fullscreen-button';
@@ -2127,7 +2278,11 @@ function renderFileSupportView(workspace) {
       viewerBody.appendChild(truncated);
     }
     const pre = document.createElement('pre');
-    const presentation = selectedContentPresentation || getSupportContentPresentation(supportFileState.selectedPath, supportFileState.selectedContent);
+    const presentation = selectedContentPresentation || getSupportContentPresentation(
+      supportFileState.selectedPath,
+      supportFileState.selectedContent,
+      supportContentViewMode
+    );
     pre.className = `file-support-content mode-${presentation.mode}`;
     pre.innerHTML = presentation.html;
     viewerBody.appendChild(pre);
@@ -2259,6 +2414,7 @@ async function handleSupportFileImport() {
     supportTreeSearchQuery = '';
     supportContentSearchQuery = '';
     supportFileViewerFullscreen = false;
+    supportContentViewMode = 'ruby';
 
     supportFileState = {
       sessionId: result.sessionId,
