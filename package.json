@@ -12,8 +12,8 @@
     "serve-http": "node server-http.js"
   },
   "devDependencies": {
-    "electron": "^34.5.6",
-    "electron-builder": "^25.1.8"
+    "electron": "^42.4.0",
+    "electron-builder": "^26.15.2"
   },
   "build": {
     "appId": "com.digitechsupport.app",
