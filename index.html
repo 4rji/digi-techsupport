@@ -197,6 +197,21 @@
           <button type="submit" class="save-button">Save skill</button>
         </div>
       </form>
+      <form id="file-support-skill-form" class="settings-section settings-form">
+        <h3>File Support skill</h3>
+        <div class="settings-actions">
+          <button type="button" class="config-transfer-button settings-action-button" id="load-file-support-skill-btn">Load skill</button>
+          <input type="file" id="file-support-skill-input" accept=".md,.markdown,.txt,.json,text/markdown,text/plain,application/json" style="display:none;">
+          <span id="file-support-skill-source" class="agent-skill-source">Default File Support skill</span>
+        </div>
+        <div class="form-group">
+          <label for="file-support-skill-body">Skill content</label>
+          <textarea id="file-support-skill-body" rows="8" spellcheck="false"></textarea>
+        </div>
+        <div class="form-buttons settings-form-buttons">
+          <button type="submit" class="save-button">Save skill</button>
+        </div>
+      </form>
       <div class="settings-section settings-danger-section">
         <h3>Templates</h3>
         <button type="button" class="delete-button settings-danger-button" id="delete-all-templates-btn">Delete all templates</button>

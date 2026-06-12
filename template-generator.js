@@ -6,6 +6,10 @@ const TEMPLATE_MAX_OUTPUT_TOKENS = 1800;
 const TEMPLATE_CONTEXT_MAX_TEMPLATES = 12;
 const TEMPLATE_CONTEXT_MAX_CHARS = 24000;
 const TEMPLATE_CONTEXT_MAX_BODY_CHARS = 3000;
+const FILE_SUPPORT_MAX_OUTPUT_TOKENS = 2200;
+const FILE_SUPPORT_CONTEXT_MAX_FILES = 10;
+const FILE_SUPPORT_CONTEXT_MAX_CHARS = 52000;
+const FILE_SUPPORT_CONTEXT_MAX_FILE_CHARS = 7000;
 
 function normalizeAIProvider(provider) {
   const normalizedProvider = String(provider || '').trim().toLowerCase();
@@ -24,6 +28,21 @@ function buildTemplateInstructions(skill) {
     'Start with one H1 title, then the template body.',
     '',
     'Agent skill:',
+    trimmedSkill
+  ].join('\n');
+}
+
+function buildFileSupportInstructions(skill) {
+  const trimmedSkill = String(skill || '').trim();
+  return [
+    'You are a senior Digi device support engineer analyzing an imported Digi support archive.',
+    'Use only the archive excerpts and dashboard summary provided by the user.',
+    'Prioritize troubleshooting value: identity, firmware, uptime, WAN, routes, DNS, cellular, modem, VPN/tunnels, bonding, firewall, logs, and interface counters.',
+    'Call out uncertainty when the archive does not include enough evidence.',
+    'Cite source file paths inline for important claims.',
+    'Return concise markdown with: Findings, Evidence, Recommended next checks.',
+    '',
+    'File Support skill:',
     trimmedSkill
   ].join('\n');
 }
@@ -89,6 +108,61 @@ function buildTemplateUserPrompt(sourceText, templates) {
     '',
     'Pasted text:',
     String(sourceText || '').trim()
+  ].join('\n');
+}
+
+function normalizeAnalysisFile(file, index) {
+  const path = String(file?.path || `support-file-${index + 1}`).trim();
+  const text = String(file?.text || '').trim();
+  if (!path || !text) return null;
+
+  return {
+    path,
+    reason: String(file?.reason || '').trim(),
+    truncated: Boolean(file?.truncated),
+    text: truncateText(text, FILE_SUPPORT_CONTEXT_MAX_FILE_CHARS)
+  };
+}
+
+function buildFileSupportContext(files) {
+  if (!Array.isArray(files) || files.length === 0) {
+    return 'No support file excerpts were provided.';
+  }
+
+  let context = '';
+  for (const [index, rawFile] of files.entries()) {
+    if (index >= FILE_SUPPORT_CONTEXT_MAX_FILES) break;
+    const file = normalizeAnalysisFile(rawFile, index);
+    if (!file) continue;
+
+    const nextBlock = [
+      `Source ${index + 1}: ${file.path}`,
+      file.reason ? `Why included: ${file.reason}` : '',
+      file.truncated ? 'Note: excerpt was truncated before analysis.' : '',
+      file.text
+    ].filter(Boolean).join('\n\n');
+
+    const separator = context ? '\n\n---\n\n' : '';
+    if ((context + separator + nextBlock).length > FILE_SUPPORT_CONTEXT_MAX_CHARS) {
+      break;
+    }
+    context += separator + nextBlock;
+  }
+
+  return context || 'No support file excerpts were provided.';
+}
+
+function buildFileSupportUserPrompt({ query, files, summary }) {
+  const question = String(query || '').trim() || 'Run a first-pass troubleshooting scan of this support archive.';
+  return [
+    'Analyze the imported Digi support archive for this request:',
+    question,
+    '',
+    'Dashboard summary JSON:',
+    JSON.stringify(summary || {}, null, 2),
+    '',
+    'Relevant archive excerpts:',
+    buildFileSupportContext(files)
   ].join('\n');
 }
 
@@ -161,6 +235,25 @@ async function callOpenAITemplateAPI({ apiKey, skill, sourceText, templates }) {
   return extractOpenAIText(payload);
 }
 
+async function callOpenAIFileSupportAPI({ apiKey, skill, query, files, summary }) {
+  const response = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: OPENAI_TEMPLATE_MODEL,
+      instructions: buildFileSupportInstructions(skill),
+      input: buildFileSupportUserPrompt({ query, files, summary }),
+      max_output_tokens: FILE_SUPPORT_MAX_OUTPUT_TOKENS
+    })
+  });
+
+  const payload = await parseAPIResponse(response);
+  return extractOpenAIText(payload);
+}
+
 async function callClaudeTemplateAPI({ apiKey, skill, sourceText, templates }) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -177,6 +270,31 @@ async function callClaudeTemplateAPI({ apiKey, skill, sourceText, templates }) {
         {
           role: 'user',
           content: buildTemplateUserPrompt(sourceText, templates)
+        }
+      ]
+    })
+  });
+
+  const payload = await parseAPIResponse(response);
+  return extractClaudeText(payload);
+}
+
+async function callClaudeFileSupportAPI({ apiKey, skill, query, files, summary }) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: CLAUDE_TEMPLATE_MODEL,
+      max_tokens: FILE_SUPPORT_MAX_OUTPUT_TOKENS,
+      system: buildFileSupportInstructions(skill),
+      messages: [
+        {
+          role: 'user',
+          content: buildFileSupportUserPrompt({ query, files, summary })
         }
       ]
     })
@@ -222,6 +340,45 @@ async function generateSupportTemplate(options = {}) {
   }
 }
 
+async function analyzeSupportFiles(options = {}) {
+  const provider = normalizeAIProvider(options.provider);
+  const apiKey = String(options.apiKey || '').trim();
+  const skill = String(options.skill || '').trim();
+  const query = String(options.query || '').trim();
+  const files = Array.isArray(options.files) ? options.files : [];
+  const summary = options.summary && typeof options.summary === 'object' ? options.summary : {};
+
+  if (!apiKey) {
+    return { success: false, error: 'Provider key is required' };
+  }
+  if (!skill) {
+    return { success: false, error: 'File Support skill is required' };
+  }
+  if (files.length === 0) {
+    return { success: false, error: 'No support file excerpts were available for analysis' };
+  }
+
+  try {
+    const answer = provider === 'claude'
+      ? await callClaudeFileSupportAPI({ apiKey, skill, query, files, summary })
+      : await callOpenAIFileSupportAPI({ apiKey, skill, query, files, summary });
+
+    if (!answer) {
+      return { success: false, error: 'The provider returned an empty analysis' };
+    }
+
+    return {
+      success: true,
+      provider,
+      answer: stripMarkdownFence(answer),
+      sources: files.map(file => file.path).filter(Boolean)
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
 module.exports = {
-  generateSupportTemplate
+  generateSupportTemplate,
+  analyzeSupportFiles
 };

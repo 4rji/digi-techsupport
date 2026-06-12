@@ -23,13 +23,15 @@ const redactArgs = (name, args) => {
   if (name === 'sshSaveAdminPassword') {
     return ['[redacted]'];
   }
-  if (name === 'generateSupportTemplate') {
+  if (name === 'generateSupportTemplate' || name === 'analyzeSupportFile') {
     return args.map((arg) => {
       if (!arg || typeof arg !== 'object') return arg;
       return {
         provider: arg.provider,
         apiKey: arg.apiKey ? '[redacted]' : '',
         skill: typeof arg.skill === 'string' ? `[${arg.skill.length} chars]` : '',
+        query: typeof arg.query === 'string' ? `[${arg.query.length} chars]` : '',
+        selectedFileId: arg.selectedFileId || '',
         sourceText: typeof arg.sourceText === 'string' ? `[${arg.sourceText.length} chars]` : '',
         templates: Array.isArray(arg.templates) ? `[${arg.templates.length} templates]` : ''
       };
@@ -87,6 +89,9 @@ contextBridge.exposeInMainWorld('appAPI', {
   }),
   generateSupportTemplate: logWrapper('generateSupportTemplate', (options) => {
     return ipcRenderer.invoke('generate-support-template', options);
+  }),
+  analyzeSupportFile: logWrapper('analyzeSupportFile', (sessionId, options) => {
+    return ipcRenderer.invoke('analyze-support-file', sessionId, options);
   }),
   importSupportFile: logWrapper('importSupportFile', () => {
     return ipcRenderer.invoke('import-support-file');

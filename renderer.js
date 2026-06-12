@@ -11,6 +11,8 @@ const CLAUDE_KEY_STORAGE_KEY = 'claudeKey';
 const PREFERRED_PROVIDER_STORAGE_KEY = 'preferredProvider';
 const AGENT_SKILL_STORAGE_KEY = 'agentSkill';
 const AGENT_SKILL_SOURCE_STORAGE_KEY = 'agentSkillSource';
+const FILE_SUPPORT_SKILL_STORAGE_KEY = 'fileSupportSkill';
+const FILE_SUPPORT_SKILL_SOURCE_STORAGE_KEY = 'fileSupportSkillSource';
 const THEME_STYLESHEET_STORAGE_KEY = 'themeStylesheet';
 const FILE_SUPPORT_TREE_WIDTH_STORAGE_KEY = 'fileSupportTreeWidth';
 const TEMPLATES_VIEW_ID = '__templates__';
@@ -32,6 +34,14 @@ const MAX_FILE_SUPPORT_TREE_WIDTH = 640;
 const NEXT_LINE_NAMES = ['AX', 'BX', 'CX', 'DX', 'GX', 'HX', 'MX', 'PX', 'RX', 'ZX'];
 const PORT_POLL_INTERVAL = 2000;
 const MAX_HIGHLIGHTED_CONTENT_CHARS = 2 * 1024 * 1024;
+const DEFAULT_FILE_SUPPORT_SKILL = [
+  '# Digi File Support Analyst',
+  '',
+  'Analyze Digi support archives for technical support troubleshooting.',
+  'Prioritize facts from runtime state, firmware/version, configuration, routes, interface counters, logs, modem/cellular state, WAN bonding, VPN/tunnel status, firewall rules, and service status.',
+  'Start with likely root causes and evidence. Include exact source paths for important claims.',
+  'Keep recommendations concrete and suitable for a support engineer to validate next.'
+].join('\n');
 const LOCKED_LINE_ITEMS = {
   IX: [
     'Digi IX10 Industrial Cellular Router',
@@ -843,6 +853,14 @@ let supportFileState = {
   summaryVisible: false,
   importError: '',
   importing: false
+};
+let supportSmartScanState = {
+  query: '',
+  visible: false,
+  loading: false,
+  answer: '',
+  error: '',
+  sources: []
 };
 let supportFileTreeWidth = getSavedSupportTreeWidth();
 let supportTreeSearchQuery = '';
@@ -2080,6 +2098,106 @@ function selectSupportSummaryFile(entryId) {
   handleSupportFileSelection(node);
 }
 
+function getSupportDashboardTone(value, explicitTone = '') {
+  if (explicitTone) return explicitTone;
+  const normalizedValue = String(value || '').toLowerCase();
+  if (/\b(warn|error|fail|failed|down|inactive|not connected|unavailable|missing|untested)\b/.test(normalizedValue)) return 'warning';
+  if (/\b(up|connected|active|passing|present|enabled|true|ok|ready)\b/.test(normalizedValue)) return 'good';
+  return 'neutral';
+}
+
+function createSupportSummarySourceButton(entryId, path, fallbackLabel = 'Open source file') {
+  if (!entryId) return null;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'file-support-summary-link';
+  button.textContent = path || fallbackLabel;
+  button.addEventListener('click', () => selectSupportSummaryFile(entryId));
+  return button;
+}
+
+function appendSupportDashboardFields(parent, items) {
+  if (!Array.isArray(items) || items.length === 0) return;
+  const grid = document.createElement('div');
+  grid.className = 'file-support-dashboard-fields';
+
+  items.forEach(item => {
+    const field = document.createElement('article');
+    field.className = `file-support-dashboard-field tone-${getSupportDashboardTone(item.value, item.tone)}`;
+
+    const label = document.createElement('span');
+    label.textContent = item.label || 'Field';
+    const value = document.createElement('strong');
+    value.textContent = item.value || '-';
+
+    field.appendChild(label);
+    field.appendChild(value);
+    grid.appendChild(field);
+  });
+
+  parent.appendChild(grid);
+}
+
+function appendSupportDashboardTable(parent, columns, rows) {
+  if (!Array.isArray(columns) || columns.length === 0 || !Array.isArray(rows) || rows.length === 0) return;
+
+  const table = document.createElement('div');
+  table.className = 'file-support-dashboard-table';
+  table.style.setProperty('--support-dashboard-columns', String(columns.length));
+
+  const header = document.createElement('div');
+  header.className = 'file-support-dashboard-table-row is-header';
+  columns.forEach(column => {
+    const cell = document.createElement('span');
+    cell.textContent = column;
+    header.appendChild(cell);
+  });
+  table.appendChild(header);
+
+  rows.forEach(row => {
+    const rowElement = document.createElement('div');
+    rowElement.className = 'file-support-dashboard-table-row';
+    columns.forEach(column => {
+      const cell = document.createElement('span');
+      cell.textContent = row?.[column] || '-';
+      rowElement.appendChild(cell);
+    });
+    table.appendChild(rowElement);
+  });
+
+  parent.appendChild(table);
+}
+
+function appendSupportDashboardSection(parent, summarySection) {
+  if (!summarySection || typeof summarySection !== 'object') return;
+
+  const section = document.createElement('section');
+  section.className = `file-support-summary-section file-support-dashboard-section section-${summarySection.id || 'generic'}`;
+
+  const header = document.createElement('div');
+  header.className = 'file-support-dashboard-section-header';
+  const sectionTitle = document.createElement('h4');
+  sectionTitle.textContent = summarySection.title || 'Dashboard Section';
+  header.appendChild(sectionTitle);
+
+  const sourceButton = createSupportSummarySourceButton(summarySection.entryId, summarySection.path);
+  if (sourceButton) {
+    header.appendChild(sourceButton);
+  }
+  section.appendChild(header);
+
+  if (summarySection.summary) {
+    const summary = document.createElement('p');
+    summary.className = 'file-support-dashboard-section-summary';
+    summary.textContent = summarySection.summary;
+    section.appendChild(summary);
+  }
+
+  appendSupportDashboardFields(section, summarySection.items);
+  appendSupportDashboardTable(section, summarySection.columns, summarySection.rows);
+  parent.appendChild(section);
+}
+
 function renderSupportSummaryDashboard() {
   const summary = supportFileState.summary;
   if (!summary || !supportFileState.summaryVisible) return;
@@ -2131,15 +2249,18 @@ function renderSupportSummaryDashboard() {
   const infoCount = findings.filter(finding => finding.severity !== 'warning').length;
   const keyFiles = Array.isArray(summary.keyFiles) ? summary.keyFiles : [];
   const checks = Array.isArray(summary.recommendedChecks) ? summary.recommendedChecks : [];
+  const metrics = Array.isArray(summary.metrics) && summary.metrics.length > 0
+    ? summary.metrics
+    : [
+        { label: 'Key files', value: String(keyFiles.length) },
+        { label: 'Warnings', value: String(warningCount), tone: warningCount > 0 ? 'warning' : 'good' },
+        { label: 'Context notes', value: String(infoCount) },
+        { label: 'Checklist items', value: String(checks.length) }
+      ];
 
-  [
-    { label: 'Key files', value: String(keyFiles.length) },
-    { label: 'Warnings', value: String(warningCount) },
-    { label: 'Context notes', value: String(infoCount) },
-    { label: 'Checklist items', value: String(checks.length) }
-  ].forEach(stat => {
+  metrics.slice(0, 6).forEach(stat => {
     const card = document.createElement('article');
-    card.className = 'file-support-dashboard-stat';
+    card.className = `file-support-dashboard-stat tone-${getSupportDashboardTone(stat.value, stat.tone)}`;
     const value = document.createElement('strong');
     value.textContent = stat.value;
     const label = document.createElement('span');
@@ -2152,6 +2273,9 @@ function renderSupportSummaryDashboard() {
 
   const body = document.createElement('div');
   body.className = 'file-support-summary-dashboard-body';
+
+  const dashboardSections = Array.isArray(summary.sections) ? summary.sections : [];
+  dashboardSections.forEach(section => appendSupportDashboardSection(body, section));
 
   if (findings.length > 0) {
     const section = document.createElement('section');
@@ -2248,6 +2372,87 @@ function renderSupportSummaryDashboard() {
 
   dashboard.appendChild(body);
   return dashboard;
+}
+
+function createSupportSmartScanControls() {
+  const form = document.createElement('form');
+  form.className = 'file-support-smart-scan';
+
+  const input = document.createElement('input');
+  input.type = 'search';
+  input.id = 'file-support-smart-scan-query';
+  input.className = 'file-support-search-input file-support-smart-scan-input';
+  input.placeholder = 'Ask AI to scan this support file';
+  input.value = supportSmartScanState.query;
+  input.disabled = !supportFileState.sessionId || supportSmartScanState.loading;
+  input.setAttribute('aria-label', 'Ask AI to scan this support file');
+  input.addEventListener('input', () => {
+    supportSmartScanState = {
+      ...supportSmartScanState,
+      query: input.value
+    };
+  });
+
+  const scanButton = document.createElement('button');
+  scanButton.type = 'submit';
+  scanButton.className = 'file-support-smart-scan-button';
+  scanButton.disabled = !supportFileState.sessionId || supportSmartScanState.loading;
+  scanButton.textContent = supportSmartScanState.loading
+    ? 'Scanning...'
+    : `AI Scan (${getProviderLabel(getPreferredProvider())})`;
+  scanButton.title = 'Analyze selected support file excerpts using the configured provider';
+
+  form.appendChild(input);
+  form.appendChild(scanButton);
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    handleSupportSmartScan();
+  });
+
+  return form;
+}
+
+function renderSupportSmartScanResult(parent) {
+  if (!supportSmartScanState.loading && !supportSmartScanState.answer && !supportSmartScanState.error) {
+    return;
+  }
+
+  const panel = document.createElement('section');
+  panel.className = 'file-support-smart-result';
+
+  const title = document.createElement('h4');
+  title.textContent = supportSmartScanState.loading ? 'Smart scan running' : 'Smart scan result';
+  panel.appendChild(title);
+
+  if (supportSmartScanState.loading) {
+    const loading = document.createElement('p');
+    loading.textContent = 'Analyzing relevant support archive excerpts.';
+    panel.appendChild(loading);
+  } else if (supportSmartScanState.error) {
+    const error = document.createElement('p');
+    error.className = 'file-support-smart-error';
+    error.textContent = supportSmartScanState.error;
+    panel.appendChild(error);
+  } else {
+    const answer = document.createElement('pre');
+    answer.className = 'file-support-smart-answer';
+    answer.textContent = supportSmartScanState.answer;
+    panel.appendChild(answer);
+
+    if (Array.isArray(supportSmartScanState.sources) && supportSmartScanState.sources.length > 0) {
+      const sourceList = document.createElement('div');
+      sourceList.className = 'file-support-smart-sources';
+      supportSmartScanState.sources.forEach(source => {
+        const sourceButton = createSupportSummarySourceButton(source.entryId, source.path, 'Open source file');
+        if (!sourceButton) return;
+        sourceButton.title = source.reason || source.path || 'Open source file';
+        sourceList.appendChild(sourceButton);
+      });
+      panel.appendChild(sourceList);
+    }
+  }
+
+  parent.appendChild(panel);
 }
 
 function renderFileSupportView(workspace) {
@@ -2455,15 +2660,31 @@ function renderFileSupportView(workspace) {
   summaryButton.textContent = 'Summary';
   summaryButton.disabled = !supportFileState.summary;
   summaryButton.setAttribute('aria-pressed', supportFileState.summaryVisible ? 'true' : 'false');
-  summaryButton.setAttribute('aria-label', 'Open troubleshooting summary');
+  summaryButton.setAttribute('aria-label', supportFileState.summaryVisible ? 'Hide troubleshooting summary' : 'Show troubleshooting summary');
   summaryButton.addEventListener('click', () => {
     supportFileState = {
       ...supportFileState,
-      summaryVisible: true
+      summaryVisible: !supportFileState.summaryVisible
     };
     renderProductApp();
   });
   viewerTitleRow.appendChild(summaryButton);
+
+  const aiScanButton = document.createElement('button');
+  aiScanButton.type = 'button';
+  aiScanButton.className = 'file-support-fullscreen-button file-support-summary-toggle';
+  aiScanButton.textContent = 'AI Scan';
+  aiScanButton.disabled = !supportFileState.sessionId;
+  aiScanButton.setAttribute('aria-pressed', supportSmartScanState.visible ? 'true' : 'false');
+  aiScanButton.setAttribute('aria-label', supportSmartScanState.visible ? 'Hide AI scan' : 'Show AI scan');
+  aiScanButton.addEventListener('click', () => {
+    supportSmartScanState = {
+      ...supportSmartScanState,
+      visible: !supportSmartScanState.visible
+    };
+    renderProductApp();
+  });
+  viewerTitleRow.appendChild(aiScanButton);
   viewerHeader.appendChild(viewerTitleRow);
   const contentSearch = document.createElement('div');
   contentSearch.className = 'file-support-search';
@@ -2495,6 +2716,9 @@ function renderFileSupportView(workspace) {
     contentSearch.appendChild(contentSearchStatus);
   }
   viewerHeader.appendChild(contentSearch);
+  if (supportSmartScanState.visible) {
+    viewerHeader.appendChild(createSupportSmartScanControls());
+  }
   viewerPanel.appendChild(viewerHeader);
 
   const viewerBody = document.createElement('div');
@@ -2502,6 +2726,9 @@ function renderFileSupportView(workspace) {
   const dashboard = renderSupportSummaryDashboard();
   if (dashboard) {
     viewerBody.appendChild(dashboard);
+  }
+  if (supportSmartScanState.visible) {
+    renderSupportSmartScanResult(viewerBody);
   }
 
   if (supportFileState.selectedLoading) {
@@ -2659,6 +2886,14 @@ async function handleSupportFileImport() {
     supportContentSearchQuery = '';
     supportFileViewerFullscreen = false;
     supportContentViewMode = 'ruby';
+    supportSmartScanState = {
+      query: '',
+      visible: false,
+      loading: false,
+      answer: '',
+      error: '',
+      sources: []
+    };
 
     supportFileState = {
       sessionId: result.sessionId,
@@ -2799,6 +3034,84 @@ async function requestTemplateGeneration(payload) {
     success: false,
     error: 'Template generation requires the desktop app or local server'
   };
+}
+
+async function requestFileSupportAnalysis(payload) {
+  const networkAPI = getNetworkAPI();
+  if (networkAPI && typeof networkAPI.analyzeSupportFile === 'function') {
+    return networkAPI.analyzeSupportFile(supportFileState.sessionId, payload);
+  }
+
+  return {
+    success: false,
+    error: 'Smart scan requires the desktop app'
+  };
+}
+
+async function handleSupportSmartScan() {
+  if (!supportFileState.sessionId) {
+    showNotification('Import a support file first');
+    return;
+  }
+  if (supportSmartScanState.loading) return;
+
+  const providerConfig = getPreferredProviderConfig();
+  if (!providerConfig.hasApiKey) {
+    showNotification(`Add ${providerConfig.label} key in Settings`);
+    return;
+  }
+
+  const fileSupportSkill = getFileSupportSkill().content.trim();
+  if (!fileSupportSkill) {
+    showNotification('Save a File Support skill first');
+    return;
+  }
+
+  supportSmartScanState = {
+    ...supportSmartScanState,
+    visible: true,
+    loading: true,
+    answer: '',
+    error: '',
+    sources: []
+  };
+  renderProductApp();
+  showNotification(`Scanning support file with ${providerConfig.label}`);
+
+  try {
+    const result = await requestFileSupportAnalysis({
+      provider: providerConfig.provider,
+      apiKey: providerConfig.apiKey,
+      skill: fileSupportSkill,
+      query: supportSmartScanState.query,
+      selectedFileId: supportFileState.selectedFileId
+    });
+
+    if (!result || !result.success) {
+      throw new Error(result?.error || 'Smart scan failed');
+    }
+
+    supportSmartScanState = {
+      ...supportSmartScanState,
+      loading: false,
+      answer: result.answer || '',
+      error: '',
+      sources: Array.isArray(result.sources) ? result.sources : []
+    };
+    showNotification('Smart scan complete');
+  } catch (error) {
+    console.error('Error running File Support smart scan:', error);
+    supportSmartScanState = {
+      ...supportSmartScanState,
+      loading: false,
+      answer: '',
+      error: error.message || 'Smart scan failed',
+      sources: []
+    };
+    showNotification('Smart scan failed');
+  }
+
+  renderProductApp();
 }
 
 async function handleTemplateGeneration(createInput, generateButton) {
@@ -4297,12 +4610,26 @@ function populateAgentSkillInputs() {
   }
 }
 
+function populateFileSupportSkillInputs() {
+  const skillInput = document.getElementById('file-support-skill-body');
+  const sourceLabel = document.getElementById('file-support-skill-source');
+  const sourceName = localStorage.getItem(FILE_SUPPORT_SKILL_SOURCE_STORAGE_KEY) || '';
+
+  if (skillInput) {
+    skillInput.value = localStorage.getItem(FILE_SUPPORT_SKILL_STORAGE_KEY) || DEFAULT_FILE_SUPPORT_SKILL;
+  }
+  if (sourceLabel) {
+    sourceLabel.textContent = sourceName || 'Default File Support skill';
+  }
+}
+
 function openSettingsModal() {
   const modal = document.getElementById('settings-modal');
   if (!modal) return;
   populateThemeStylesheetInputs();
   populateProviderKeyInputs();
   populateAgentSkillInputs();
+  populateFileSupportSkillInputs();
   modal.style.display = 'flex';
 }
 
@@ -4399,6 +4726,38 @@ function getAgentSkill() {
   };
 }
 
+function saveFileSupportSkill(sourceName = '') {
+  const skillInput = document.getElementById('file-support-skill-body');
+  const sourceLabel = document.getElementById('file-support-skill-source');
+  const skill = skillInput ? skillInput.value : '';
+  const trimmedSkill = skill.trim();
+  const existingSourceName = localStorage.getItem(FILE_SUPPORT_SKILL_SOURCE_STORAGE_KEY) || '';
+  const nextSourceName = sourceName || existingSourceName || 'Manual File Support skill';
+
+  if (trimmedSkill && trimmedSkill !== DEFAULT_FILE_SUPPORT_SKILL.trim()) {
+    localStorage.setItem(FILE_SUPPORT_SKILL_STORAGE_KEY, skill);
+    localStorage.setItem(FILE_SUPPORT_SKILL_SOURCE_STORAGE_KEY, nextSourceName);
+  } else {
+    localStorage.removeItem(FILE_SUPPORT_SKILL_STORAGE_KEY);
+    localStorage.removeItem(FILE_SUPPORT_SKILL_SOURCE_STORAGE_KEY);
+  }
+
+  if (sourceLabel) {
+    sourceLabel.textContent = trimmedSkill && trimmedSkill !== DEFAULT_FILE_SUPPORT_SKILL.trim()
+      ? nextSourceName
+      : 'Default File Support skill';
+  }
+
+  showNotification('File Support skill saved');
+}
+
+function getFileSupportSkill() {
+  return {
+    sourceName: localStorage.getItem(FILE_SUPPORT_SKILL_SOURCE_STORAGE_KEY) || 'Default File Support skill',
+    content: localStorage.getItem(FILE_SUPPORT_SKILL_STORAGE_KEY) || DEFAULT_FILE_SUPPORT_SKILL
+  };
+}
+
 function deleteAllTemplates() {
   if (supportTemplates.length === 0) {
     showNotification('No templates to delete');
@@ -4439,6 +4798,30 @@ async function handleAgentSkillFileSelection(event) {
   }
 }
 
+async function handleFileSupportSkillFileSelection(event) {
+  const input = event.target;
+  const file = input.files && input.files[0];
+  if (!file) return;
+
+  try {
+    const body = await readTemplateFileText(file);
+    const skillInput = document.getElementById('file-support-skill-body');
+    const sourceLabel = document.getElementById('file-support-skill-source');
+    if (skillInput) {
+      skillInput.value = body;
+    }
+    if (sourceLabel) {
+      sourceLabel.textContent = file.name;
+    }
+    saveFileSupportSkill(file.name);
+  } catch (error) {
+    console.error('Error loading File Support skill:', error);
+    showNotification('Could not load File Support skill');
+  } finally {
+    input.value = '';
+  }
+}
+
 function setupSettingsModal() {
   const modal = document.getElementById('settings-modal');
   const openButton = document.getElementById('settings-button');
@@ -4449,6 +4832,9 @@ function setupSettingsModal() {
   const skillForm = document.getElementById('agent-skill-form');
   const loadSkillButton = document.getElementById('load-agent-skill-btn');
   const skillFileInput = document.getElementById('agent-skill-input');
+  const fileSupportSkillForm = document.getElementById('file-support-skill-form');
+  const loadFileSupportSkillButton = document.getElementById('load-file-support-skill-btn');
+  const fileSupportSkillInput = document.getElementById('file-support-skill-input');
   const deleteAllTemplatesButton = document.getElementById('delete-all-templates-btn');
 
   if (!modal) return;
@@ -4483,6 +4869,19 @@ function setupSettingsModal() {
       skillFileInput.click();
     });
     skillFileInput.addEventListener('change', handleAgentSkillFileSelection);
+  }
+  if (fileSupportSkillForm) {
+    fileSupportSkillForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      saveFileSupportSkill();
+    });
+  }
+  if (loadFileSupportSkillButton && fileSupportSkillInput) {
+    loadFileSupportSkillButton.addEventListener('click', () => {
+      fileSupportSkillInput.value = '';
+      fileSupportSkillInput.click();
+    });
+    fileSupportSkillInput.addEventListener('change', handleFileSupportSkillFileSelection);
   }
   if (deleteAllTemplatesButton) {
     deleteAllTemplatesButton.addEventListener('click', deleteAllTemplates);

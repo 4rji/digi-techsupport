@@ -8,7 +8,7 @@ const { execFile } = require('child_process');
 const crypto = require('crypto');
 const { Client } = require('ssh2');
 const tar = require('tar-stream');
-const { generateSupportTemplate } = require('./template-generator');
+const { generateSupportTemplate, analyzeSupportFiles } = require('./template-generator');
 
 const APP_ICON_PATH = path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const sshSessions = new Map();
@@ -18,6 +18,8 @@ const MAX_SUPPORT_FILE_BYTES = 512 * 1024 * 1024;
 const MAX_UNCOMPRESSED_ARCHIVE_BYTES = 1024 * 1024 * 1024;
 const MAX_TEXT_PREVIEW_BYTES = 5 * 1024 * 1024;
 const MAX_SUPPORT_ARCHIVE_SESSIONS = 3;
+const MAX_SUPPORT_AI_FILES = 10;
+const MAX_SUPPORT_AI_FILE_CHARS = 9000;
 const gunzipBuffer = promisify(zlib.gunzip);
 let mainWindow = null;
 
@@ -540,6 +542,440 @@ function summarizeLogIssues(text) {
   };
 }
 
+function parseSupportJSON(text) {
+  const source = String(text || '').trim();
+  if (!source) return null;
+  try {
+    return JSON.parse(source);
+  } catch (_error) {
+    try {
+      return JSON.parse(source.replace(/\t/g, ' '));
+    } catch (_fallbackError) {
+      return null;
+    }
+  }
+}
+
+function parseConfigDumpValues(text) {
+  const values = new Map();
+  String(text || '').split(/\r?\n/).forEach(line => {
+    const match = /^([^=\s]+)=(.*)$/.exec(line.trim());
+    if (!match) return;
+    values.set(match[1], match[2]);
+  });
+  return values;
+}
+
+function normalizeSupportValue(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
+
+function formatSupportValueWithUnits(value, units) {
+  const normalizedValue = normalizeSupportValue(value);
+  const normalizedUnits = normalizeSupportValue(units);
+  if (!normalizedValue) return '';
+  if (!normalizedUnits) return normalizedValue;
+  return normalizedValue.toLowerCase().endsWith(normalizedUnits.toLowerCase())
+    ? normalizedValue
+    : `${normalizedValue} ${normalizedUnits}`;
+}
+
+function getRuntimeValue(runtime, paths) {
+  if (!runtime || typeof runtime !== 'object') return '';
+  for (const runtimePath of paths) {
+    const record = runtime[runtimePath];
+    if (!record || typeof record !== 'object') continue;
+    const displayValue = normalizeSupportValue(record.display_value);
+    const rawValue = normalizeSupportValue(record.value);
+    const value = displayValue || rawValue;
+    if (!value) continue;
+    return formatSupportValueWithUnits(value, record.units);
+  }
+  return '';
+}
+
+function getRuntimeNumericValue(runtime, paths) {
+  if (!runtime || typeof runtime !== 'object') return null;
+  for (const runtimePath of paths) {
+    const record = runtime[runtimePath];
+    if (!record || typeof record !== 'object') continue;
+    const rawValue = normalizeSupportValue(record.value || record.display_value);
+    if (!rawValue) continue;
+    const numericValue = Number(rawValue);
+    if (Number.isFinite(numericValue)) {
+      return numericValue;
+    }
+  }
+  return null;
+}
+
+function findRuntimeRecord(runtime, options = {}) {
+  if (!runtime || typeof runtime !== 'object') return null;
+  const contextRegex = options.contextRegex || /./;
+  const fieldRegex = options.fieldRegex || /./;
+  const excludeRegex = options.excludeRegex || null;
+
+  for (const [pathKey, record] of Object.entries(runtime)) {
+    if (!record || typeof record !== 'object') continue;
+    const contextText = [
+      pathKey,
+      record.path,
+      record.title
+    ].filter(Boolean).join(' ');
+    const fieldText = [
+      String(record.path || pathKey).split('.').pop(),
+      record.title
+    ].filter(Boolean).join(' ');
+    if (!contextRegex.test(contextText) || !fieldRegex.test(fieldText)) continue;
+    if (excludeRegex && excludeRegex.test(contextText)) continue;
+
+    const value = formatSupportValueWithUnits(record.display_value || record.value, record.units);
+    if (!value) continue;
+    return {
+      path: record.path || pathKey,
+      title: record.title || pathKey,
+      value
+    };
+  }
+  return null;
+}
+
+function addDashboardItem(items, label, value, options = {}) {
+  const normalizedValue = normalizeSupportValue(value);
+  if (!normalizedValue) return;
+  items.push({
+    label,
+    value: normalizedValue,
+    tone: options.tone || '',
+    entryId: options.entryId || '',
+    path: options.path || ''
+  });
+}
+
+function createDashboardSection(id, title, items, options = {}) {
+  const rows = Array.isArray(options.rows) ? options.rows.filter(row => row && Object.keys(row).length > 0) : [];
+  if ((!Array.isArray(items) || items.length === 0) && rows.length === 0 && !options.summary) {
+    return null;
+  }
+  return {
+    id,
+    title,
+    summary: options.summary || '',
+    entryId: options.entryId || '',
+    path: options.path || '',
+    columns: Array.isArray(options.columns) ? options.columns : [],
+    rows,
+    items: Array.isArray(items) ? items : []
+  };
+}
+
+function formatSupportDurationFromSeconds(seconds) {
+  const totalSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+  if (!totalSeconds) return '';
+
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+  const parts = [];
+  if (days) parts.push(`${days} ${days === 1 ? 'day' : 'days'}`);
+  if (hours) parts.push(`${hours} ${hours === 1 ? 'hr' : 'hrs'}`);
+  if (minutes) parts.push(`${minutes} ${minutes === 1 ? 'min' : 'mins'}`);
+  if (secs || parts.length === 0) parts.push(`${secs} ${secs === 1 ? 'sec' : 'secs'}`);
+  return parts.join(', ');
+}
+
+function formatRuntimeUptime(runtime) {
+  return getRuntimeValue(runtime, [
+    'system.uptime'
+  ]) || formatSupportDurationFromSeconds(getRuntimeNumericValue(runtime, [
+    'system.uptime.seconds_total',
+    'query_state.system.uptime'
+  ]));
+}
+
+function formatMegabytes(value) {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) return '';
+  return `${numberValue.toFixed(3)} MB`;
+}
+
+function formatRuntimeRamUsage(runtime) {
+  const usedMb = getRuntimeNumericValue(runtime, ['system.ram.used']);
+  const sizeMb = getRuntimeNumericValue(runtime, ['system.ram.size']);
+  if (Number.isFinite(usedMb) && Number.isFinite(sizeMb)) {
+    return `${formatMegabytes(usedMb)} / ${formatMegabytes(sizeMb)}`;
+  }
+
+  const usedBytes = getRuntimeNumericValue(runtime, ['query_state.system.ram.usage']);
+  const sizeBytes = getRuntimeNumericValue(runtime, ['query_state.system.ram.size']);
+  if (Number.isFinite(usedBytes) && Number.isFinite(sizeBytes)) {
+    return `${formatMegabytes(usedBytes / 1024 / 1024)} / ${formatMegabytes(sizeBytes / 1024 / 1024)}`;
+  }
+
+  return getRuntimeValue(runtime, ['system.ram.per', 'query_state.system.ram.percentage']);
+}
+
+function inferSummaryTone(value) {
+  const normalizedValue = String(value || '').toLowerCase();
+  if (/\b(warn|error|fail|failed|down|inactive|not connected|unavailable|missing|untested)\b/.test(normalizedValue)) return 'warning';
+  if (/\b(up|connected|active|passing|present|enabled|true|ok|ready)\b/.test(normalizedValue)) return 'good';
+  return 'neutral';
+}
+
+function parseVersionDetails(text) {
+  const source = String(text || '');
+  return {
+    product: /NETWORK_PRODUCT=([^\n]+)/.exec(source)?.[1]?.trim() || '',
+    version: /PRODUCT_VERSION=([^\n]+)/.exec(source)?.[1]?.trim() || '',
+    build: /PRODUCT_BUILDSTRING=([^\n]+)/.exec(source)?.[1]?.trim() || ''
+  };
+}
+
+function collectRuntimeInterfaceRows(runtime) {
+  if (!runtime || typeof runtime !== 'object') return [];
+  const groups = new Map();
+  const ensureGroup = (name) => {
+    if (!groups.has(name)) groups.set(name, { Interface: name });
+    return groups.get(name);
+  };
+
+  Object.keys(runtime).forEach(runtimePath => {
+    const match = /^query_state\.interface\.([^.]+)\.ipv4\.(address|status|gateway|subnet|mtu|surelink)$/.exec(runtimePath);
+    if (!match) return;
+    const [, name, field] = match;
+    if (name === 'loopback') return;
+    const record = runtime[runtimePath];
+    const value = normalizeSupportValue(record?.display_value || record?.value);
+    if (!value) return;
+
+    const row = ensureGroup(name);
+    if (field === 'address') row.Address = value;
+    if (field === 'subnet' && row.Address && !row.Address.includes('/')) row.Address = `${row.Address}/${value}`;
+    if (field === 'status') row.Status = value;
+    if (field === 'gateway') row.Gateway = value;
+    if (field === 'mtu') row.MTU = value;
+    if (field === 'surelink') row.SureLink = value;
+  });
+
+  return [...groups.values()]
+    .filter(row => row.Address || row.Status || row.Gateway)
+    .sort((a, b) => {
+      const priority = (name) => /wwan|cell|modem/i.test(name) ? 0 : /eth|wan/i.test(name) ? 1 : 2;
+      return priority(a.Interface) - priority(b.Interface) || a.Interface.localeCompare(b.Interface);
+    })
+    .slice(0, 8);
+}
+
+function buildDeviceDashboardSection(runtime, versionDetails, runtimeEntry, versionEntry) {
+  const items = [];
+  const runtimeSource = runtimeEntry ? { entryId: runtimeEntry.id, path: runtimeEntry.path } : {};
+  const versionSource = versionEntry ? { entryId: versionEntry.id, path: versionEntry.path } : {};
+
+  const deviceType = getRuntimeValue(runtime, ['system.device_type'])
+    || [
+      getRuntimeValue(runtime, ['system.manufacturer', 'query_state.system.manufacturer']),
+      getRuntimeValue(runtime, ['system.model', 'query_state.system.model'])
+    ].filter(Boolean).join(' ');
+
+  addDashboardItem(items, 'Device Type', deviceType, runtimeSource);
+  addDashboardItem(items, 'Firmware Version', getRuntimeValue(runtime, ['firmware.version']) || versionDetails.version, runtimeSource.entryId ? runtimeSource : versionSource);
+  addDashboardItem(items, 'Part Number', getRuntimeValue(runtime, ['system.sku', 'query_state.system.sku']), runtimeSource);
+  addDashboardItem(items, 'Serial Number', getRuntimeValue(runtime, ['system.serial', 'system.oem_serial', 'manufacture.serial_number', 'query_state.system.serial_number']), runtimeSource);
+  addDashboardItem(items, 'MAC Address', getRuntimeValue(runtime, ['query_state.system.mac', 'manufacture.ethaddr', 'system.mac']), runtimeSource);
+  addDashboardItem(items, 'Device ID', getRuntimeValue(runtime, ['drm.device_id']), runtimeSource);
+  addDashboardItem(items, 'Product', getRuntimeValue(runtime, ['system.model']) || versionDetails.product, runtimeSource.entryId ? runtimeSource : versionSource);
+  addDashboardItem(items, 'Build', getRuntimeValue(runtime, ['firmware.build_date']) || versionDetails.build, runtimeSource.entryId ? runtimeSource : versionSource);
+
+  return createDashboardSection('device', 'Device Identity', items, runtimeSource);
+}
+
+function buildSystemDashboardSection(runtime, dateText, runtimeEntry, dateEntry) {
+  const items = [];
+  const runtimeSource = runtimeEntry ? { entryId: runtimeEntry.id, path: runtimeEntry.path } : {};
+  const dateSource = dateEntry ? { entryId: dateEntry.id, path: dateEntry.path } : {};
+
+  addDashboardItem(items, 'Uptime', formatRuntimeUptime(runtime), runtimeSource);
+  addDashboardItem(items, 'Local Time', getRuntimeValue(runtime, ['system.local_time', 'query_state.system.current_time']) || dateText.trim(), runtimeSource.entryId ? runtimeSource : dateSource);
+  addDashboardItem(items, 'CPU Usage', getRuntimeValue(runtime, ['system.cpu_usage', 'query_state.system.cpu.usage']), runtimeSource);
+  addDashboardItem(items, 'RAM Usage', formatRuntimeRamUsage(runtime), runtimeSource);
+  addDashboardItem(items, 'CPU Temperature', getRuntimeValue(runtime, ['query_state.system.cpu.temperature', 'system.cpu_temperature', 'system.cpu_temp']), runtimeSource);
+  addDashboardItem(items, 'System Temperature', getRuntimeValue(runtime, ['system.system_temp', 'query_state.system.system_temperature']), runtimeSource);
+  addDashboardItem(items, 'Supply Voltage', getRuntimeValue(runtime, ['query_state.system.power.0.input_voltage', 'system.power.0.input_voltage']), runtimeSource);
+  addDashboardItem(items, 'Supply Current', getRuntimeValue(runtime, ['query_state.system.power.0.input_current', 'system.power.0.input_current']), runtimeSource);
+  addDashboardItem(items, 'Supply Power', getRuntimeValue(runtime, ['query_state.system.power.0.input_power', 'system.power.0.input_power']), runtimeSource);
+  addDashboardItem(items, 'Reboot Reason', getRuntimeValue(runtime, ['query_state.system.reboot_reason', 'system.reboot_reason']), runtimeSource);
+
+  return createDashboardSection('system', 'System Health', items, runtimeSource);
+}
+
+function buildWanDashboardSection(runtime, routeText, netstatText, runtimeEntry, routeEntry, netstatEntry) {
+  const items = [];
+  const runtimeSource = runtimeEntry ? { entryId: runtimeEntry.id, path: runtimeEntry.path } : {};
+  const routeSource = routeEntry ? { entryId: routeEntry.id, path: routeEntry.path } : {};
+  const netstatSource = netstatEntry ? { entryId: netstatEntry.id, path: netstatEntry.path } : {};
+
+  const defaultRoute = parseDefaultRoute(routeText)
+    || [
+      getRuntimeValue(runtime, ['query_state.routing.ipv4.0.gateway']),
+      getRuntimeValue(runtime, ['query_state.routing.ipv4.0.interface'])
+    ].filter(Boolean).join(' via ');
+  const netstatIssue = parseNetstatIssue(netstatText);
+
+  addDashboardItem(items, 'Default Route', defaultRoute, routeSource);
+  addDashboardItem(items, 'DRM Status', getRuntimeValue(runtime, ['drm.connected']), { ...runtimeSource, tone: inferSummaryTone(getRuntimeValue(runtime, ['drm.connected'])) });
+  addDashboardItem(items, 'DRM Interface', getRuntimeValue(runtime, ['drm.connection.ifname', 'drm.connection.type']), runtimeSource);
+  addDashboardItem(items, 'Interface Drops/Errors', netstatIssue || 'No RX/TX errors reported', { ...netstatSource, tone: netstatIssue ? 'warning' : 'good' });
+
+  const rows = collectRuntimeInterfaceRows(runtime);
+  return createDashboardSection('wan', 'WAN & Routing', items, {
+    entryId: runtimeEntry?.id || routeEntry?.id || '',
+    path: runtimeEntry?.path || routeEntry?.path || '',
+    columns: ['Interface', 'Status', 'Address', 'Gateway', 'MTU', 'SureLink'],
+    rows
+  });
+}
+
+function buildWanBondingDashboardSection(runtime, configValues, bondingText, runtimeEntry, configEntry, bondingEntry) {
+  const items = [];
+  const runtimeSource = runtimeEntry ? { entryId: runtimeEntry.id, path: runtimeEntry.path } : {};
+  const configSource = configEntry ? { entryId: configEntry.id, path: configEntry.path } : {};
+  const bondingSource = bondingEntry ? { entryId: bondingEntry.id, path: bondingEntry.path } : {};
+  const routePath = getRuntimeValue(runtime, ['network.route.default.ipv4.interface_eth.path']);
+  const configReferencesBonding = [...configValues.keys()].some(key => /wan[_-]?bond/i.test(key))
+    || [...configValues.values()].some(value => /wan[_-]?bond/i.test(value));
+  const bondingUnavailable = /not found|No such file|command not/i.test(bondingText);
+
+  if (routePath && /wan[_-]?bond/i.test(routePath)) {
+    addDashboardItem(items, 'Default Path', routePath, runtimeSource);
+  }
+  if (configReferencesBonding) {
+    addDashboardItem(items, 'Config', 'WAN bonding references found', configSource);
+  }
+  if (normalizeSupportValue(bondingText)) {
+    addDashboardItem(items, 'Bonding Tool', bondingUnavailable ? 'Unavailable in support report' : bondingText.trim().split(/\r?\n/)[0], { ...bondingSource, tone: bondingUnavailable ? 'warning' : 'neutral' });
+  }
+
+  return createDashboardSection('wan-bonding', 'WAN Bonding', items, {
+    entryId: bondingEntry?.id || runtimeEntry?.id || configEntry?.id || '',
+    path: bondingEntry?.path || runtimeEntry?.path || configEntry?.path || ''
+  });
+}
+
+function buildTunnelDashboardSection(configValues, ipsecText, wireguardText, configEntry, ipsecEntry, wireguardEntry) {
+  const items = [];
+  const enabledVpn = [];
+
+  configValues.forEach((value, key) => {
+    if (!/^true$/i.test(value)) return;
+    const tunnelMatch = /^vpn\.([^.]+)(?:\.(?:tunnel|client|server)\.([^.]+))?.*\.enable$/.exec(key)
+      || /^vpn\.([^.]+)\.enable$/.exec(key);
+    if (!tunnelMatch) return;
+    const type = tunnelMatch[1].toUpperCase();
+    const name = tunnelMatch[2] ? ` ${tunnelMatch[2]}` : '';
+    enabledVpn.push(`${type}${name}`);
+  });
+
+  const source = configEntry ? { entryId: configEntry.id, path: configEntry.path } : {};
+  addDashboardItem(items, 'Enabled VPN Config', [...new Set(enabledVpn)].slice(0, 8).join(', ') || 'No enabled VPN tunnel config found', source);
+
+  if (ipsecEntry) {
+    const ipsecStatus = normalizeSupportValue(ipsecText)
+      ? (/\bESTABLISHED|INSTALLED|up\b/i.test(ipsecText) ? 'IPsec SAs present' : 'No active IPsec SAs detected')
+      : 'No IPsec status output';
+    addDashboardItem(items, 'IPsec Runtime', ipsecStatus, {
+      entryId: ipsecEntry.id,
+      path: ipsecEntry.path,
+      tone: /present|active/i.test(ipsecStatus) ? 'good' : 'neutral'
+    });
+  }
+
+  if (wireguardEntry) {
+    const wireguardStatus = normalizeSupportValue(wireguardText)
+      ? `${wireguardText.split(/\r?\n/).filter(Boolean).length} WireGuard status lines`
+      : 'No WireGuard peers reported';
+    addDashboardItem(items, 'WireGuard Runtime', wireguardStatus, {
+      entryId: wireguardEntry.id,
+      path: wireguardEntry.path
+    });
+  }
+
+  const l2tpPort = configValues.get('vpn.l2tp.port');
+  const l2tpProtocols = [...configValues.entries()]
+    .filter(([key]) => /^vpn\.l2tp\.protocol\.\d+$/.test(key))
+    .map(([, value]) => value)
+    .filter(Boolean)
+    .join(', ');
+  addDashboardItem(items, 'L2TP', [l2tpPort ? `port ${l2tpPort}` : '', l2tpProtocols || ''].filter(Boolean).join(' | '), source);
+
+  return createDashboardSection('tunnels', 'Tunnels & VPN', items, {
+    entryId: configEntry?.id || ipsecEntry?.id || wireguardEntry?.id || '',
+    path: configEntry?.path || ipsecEntry?.path || wireguardEntry?.path || ''
+  });
+}
+
+function buildCellularDashboardSection(runtime, mmcliText, runtimeEntry, mmcliEntry) {
+  const items = [];
+  const runtimeSource = runtimeEntry ? { entryId: runtimeEntry.id, path: runtimeEntry.path } : {};
+  const mmcliSource = mmcliEntry ? { entryId: mmcliEntry.id, path: mmcliEntry.path } : {};
+  const cellularContext = /(^|\.|\b)(modem|cellular|wwan|mobile)(\.|\b)/i;
+  const excludeNonCellular = /(watchdog|location|system\.modem_fw_update)/i;
+  const addRuntimeMatch = (label, fieldRegex) => {
+    const match = findRuntimeRecord(runtime, {
+      contextRegex: cellularContext,
+      fieldRegex,
+      excludeRegex: excludeNonCellular
+    });
+    if (match) {
+      addDashboardItem(items, label, match.value, runtimeSource);
+    }
+  };
+
+  addRuntimeMatch('Status', /(status|connected|connection)/i);
+  addRuntimeMatch('Registration', /(registration|registered|network_registration)/i);
+  addRuntimeMatch('Interface', /(interface|ifname|device)/i);
+  addRuntimeMatch('Carrier', /(carrier|operator|provider|network_name)/i);
+  addRuntimeMatch('Technology', /(access_tech|technology|radio|rat)/i);
+  addRuntimeMatch('Signal', /(signal|rssi|rsrp|rsrq|sinr|ecio)/i);
+  addRuntimeMatch('SIM / ICCID', /(sim|iccid|imsi)/i);
+  addRuntimeMatch('IMEI / MEID', /(imei|meid)/i);
+  addRuntimeMatch('APN', /\bapn\b/i);
+  addRuntimeMatch('IP Address', /(ip_address|ipv4\.address|address)/i);
+  addRuntimeMatch('Uptime', /(uptime|up_time)/i);
+  addRuntimeMatch('Firmware', /(firmware|revision|version)/i);
+
+  const mmcliUnavailable = /not found|No such file|command not/i.test(mmcliText);
+  if (items.length === 0 && mmcliEntry) {
+    addDashboardItem(items, 'Cellular Data', mmcliUnavailable ? 'No modem dump available' : 'No cellular runtime values found', {
+      ...mmcliSource,
+      tone: mmcliUnavailable ? 'warning' : 'neutral'
+    });
+  } else if (mmcliUnavailable) {
+    addDashboardItem(items, 'Modem Dump', 'mmcli dump unavailable', { ...mmcliSource, tone: 'warning' });
+  }
+
+  return createDashboardSection('cellular', 'Cellular Status', items, {
+    entryId: runtimeEntry?.id || mmcliEntry?.id || '',
+    path: runtimeEntry?.path || mmcliEntry?.path || ''
+  });
+}
+
+function buildSummaryMetrics(sections, findings) {
+  const findValue = (sectionId, label) => {
+    const section = sections.find(candidate => candidate && candidate.id === sectionId);
+    return section?.items?.find(item => item.label === label)?.value || '';
+  };
+  const warningCount = findings.filter(finding => finding.severity === 'warning').length;
+
+  return [
+    { label: 'Status', value: findValue('wan', 'DRM Status') || 'Support file imported', tone: inferSummaryTone(findValue('wan', 'DRM Status')) },
+    { label: 'Uptime', value: findValue('system', 'Uptime') || 'Unknown', tone: 'neutral' },
+    { label: 'Firmware', value: findValue('device', 'Firmware Version') || 'Unknown', tone: 'neutral' },
+    { label: 'Warnings', value: String(warningCount), tone: warningCount > 0 ? 'warning' : 'good' }
+  ];
+}
+
 function createSupportTroubleshootingSummary(entries, contentById) {
   const keyFiles = [];
   const findings = [];
@@ -562,8 +998,14 @@ function createSupportTroubleshootingSummary(entries, contentById) {
   const iptablesEntry = findSupportEntry(entries, /(^|\/)tmp\/\d+\/iptables_-nv_-L$/);
   const eventEntry = findSupportEntry(entries, /(^|\/)tmp\/\d+\/event_list$/);
   const messagesEntry = findSupportEntry(entries, /(^|\/)var\/log\/messages$/);
+  const runtimeEntry = findSupportEntry(entries, /(^|\/)tmp\/\d+\/runt_json$/);
+  const dateEntry = findSupportEntry(entries, /(^|\/)tmp\/\d+\/date$/);
+  const bondingEntry = findSupportEntry(entries, /(^|\/)tmp\/\d+\/usrbinwan_bonding\.dbndutil_status$/);
+  const ipsecEntry = findSupportEntry(entries, /(^|\/)tmp\/\d+\/ipsec_statusall$/);
+  const wireguardEntry = findSupportEntry(entries, /(^|\/)tmp\/\d+\/wg_show$/);
 
   addSupportKeyFile(keyFiles, messagesEntry, 'Recent system log', 'Best first stop for errors, cloud/DNS failures, interface changes, and service restarts.', 1);
+  addSupportKeyFile(keyFiles, runtimeEntry, 'Runtime dashboard state', 'Structured live state for device identity, CPU/RAM, WAN, cellular, power, and service status.', 2);
   addSupportKeyFile(keyFiles, versionEntry, 'Firmware and product version', 'Identifies product family, firmware release, and build date.', 2);
   addSupportKeyFile(keyFiles, configEntry || publicConfigEntry, 'Running configuration', 'Shows the active service, network, WAN, VPN, firewall, and management settings.', 3);
   addSupportKeyFile(keyFiles, ipAddrEntry, 'Interface addresses', 'Shows which interfaces are up and what IPv4/IPv6 addresses are assigned.', 4);
@@ -571,6 +1013,9 @@ function createSupportTroubleshootingSummary(entries, contentById) {
   addSupportKeyFile(keyFiles, netstatEntry, 'Interface counters', 'Highlights RX/TX errors or drops that point to link or congestion problems.', 6);
   addSupportKeyFile(keyFiles, mmcliEntry, 'Modem manager dump', 'Critical for cellular troubleshooting: modem presence, SIM, registration, signal, and bearer state.', 7);
   addSupportKeyFile(keyFiles, surelinkEntry, 'SureLink state', 'Useful for WAN health checks and recovery behavior.', 8);
+  addSupportKeyFile(keyFiles, bondingEntry, 'WAN bonding status', 'Shows bonding runtime state or reports when bonding tooling is unavailable in the support file.', 9);
+  addSupportKeyFile(keyFiles, ipsecEntry, 'IPsec status', 'Shows active IPsec security associations and tunnel state.', 10);
+  addSupportKeyFile(keyFiles, wireguardEntry, 'WireGuard status', 'Shows WireGuard interfaces, peers, and handshake state when configured.', 11);
   addSupportKeyFile(keyFiles, iptablesEntry, 'Firewall rules', 'Checks packet filtering, NAT, and traffic counters.', 9);
   addSupportKeyFile(keyFiles, eventEntry, 'Event list', 'Condensed event history for alarms, configuration changes, and service transitions.', 10);
 
@@ -578,7 +1023,23 @@ function createSupportTroubleshootingSummary(entries, contentById) {
     addSupportKeyFile(keyFiles, entry, `Rotated log ${index + 1}`, 'Older log history for recurring or intermittent failures.', 20 + index);
   });
 
-  const versionSummary = parseVersionSummary(getSupportEntryText(versionEntry, contentById));
+  const runtime = parseSupportJSON(getSupportEntryText(runtimeEntry, contentById));
+  const configValues = parseConfigDumpValues(getSupportEntryText(publicConfigEntry || configEntry, contentById, 500000));
+  const versionText = getSupportEntryText(versionEntry, contentById);
+  const versionDetails = parseVersionDetails(versionText);
+  const routeText = getSupportEntryText(routeEntry, contentById);
+  const netstatText = getSupportEntryText(netstatEntry, contentById);
+  const mmcliText = getSupportEntryText(mmcliEntry, contentById, 4000);
+  const sections = [
+    buildDeviceDashboardSection(runtime, versionDetails, runtimeEntry, versionEntry),
+    buildSystemDashboardSection(runtime, getSupportEntryText(dateEntry, contentById, 1000), runtimeEntry, dateEntry),
+    buildWanDashboardSection(runtime, routeText, netstatText, runtimeEntry, routeEntry, netstatEntry),
+    buildWanBondingDashboardSection(runtime, configValues, getSupportEntryText(bondingEntry, contentById, 4000), runtimeEntry, publicConfigEntry || configEntry, bondingEntry),
+    buildTunnelDashboardSection(configValues, getSupportEntryText(ipsecEntry, contentById, 200000), getSupportEntryText(wireguardEntry, contentById, 200000), publicConfigEntry || configEntry, ipsecEntry, wireguardEntry),
+    buildCellularDashboardSection(runtime, mmcliText, runtimeEntry, mmcliEntry)
+  ].filter(Boolean);
+
+  const versionSummary = parseVersionSummary(versionText);
   if (versionSummary) findings.push({ severity: 'info', title: 'Device identity', detail: versionSummary, entryId: versionEntry.id, path: versionEntry.path });
 
   const uptime = getSupportEntryText(uptimeEntry, contentById, 1000).trim().replace(/\s+/g, ' ');
@@ -593,7 +1054,6 @@ function createSupportTroubleshootingSummary(entries, contentById) {
   const netstatIssue = parseNetstatIssue(getSupportEntryText(netstatEntry, contentById));
   if (netstatIssue) findings.push({ severity: 'warning', title: 'Interface drops/errors detected', detail: netstatIssue, entryId: netstatEntry.id, path: netstatEntry.path });
 
-  const mmcliText = getSupportEntryText(mmcliEntry, contentById, 4000);
   if (/not found|No such file|command not/i.test(mmcliText)) {
     findings.push({ severity: 'warning', title: 'Modem dump unavailable', detail: 'The mmcli dump command failed or is missing, so cellular state may need to be verified from logs, config, or live CLI.', entryId: mmcliEntry.id, path: mmcliEntry.path });
   }
@@ -619,7 +1079,9 @@ function createSupportTroubleshootingSummary(entries, contentById) {
   return {
     title: 'Digi Support Troubleshooting Summary',
     generatedAt: new Date().toISOString(),
-    overview: 'These are the most useful files and first checks for router or Digi IoT device troubleshooting.',
+    overview: 'Dashboard extracted from runtime, configuration, routing, VPN, modem, and log files for first-pass troubleshooting.',
+    metrics: buildSummaryMetrics(sections, findings),
+    sections,
     keyFiles: keyFiles.sort((a, b) => a.priority - b.priority).slice(0, 14),
     findings,
     recommendedChecks
@@ -772,6 +1234,112 @@ function pruneSupportArchiveSessions() {
   });
 }
 
+function tokenizeSupportAnalysisQuery(query) {
+  return String(query || '')
+    .toLowerCase()
+    .split(/[^a-z0-9_.:-]+/)
+    .map(term => term.trim())
+    .filter(term => term.length >= 3)
+    .slice(0, 12);
+}
+
+function buildSupportAnalysisExcerpt(text, query, maxChars = MAX_SUPPORT_AI_FILE_CHARS) {
+  const source = String(text || '').trim();
+  if (source.length <= maxChars) return source;
+
+  const terms = tokenizeSupportAnalysisQuery(query);
+  const normalizedSource = source.toLowerCase();
+  const firstHit = terms
+    .map(term => normalizedSource.indexOf(term))
+    .filter(index => index >= 0)
+    .sort((a, b) => a - b)[0];
+
+  if (!Number.isFinite(firstHit)) {
+    return `${source.slice(0, maxChars).trim()}\n\n[truncated]`;
+  }
+
+  const start = Math.max(0, firstHit - Math.floor(maxChars * 0.35));
+  const end = Math.min(source.length, start + maxChars);
+  const prefix = start > 0 ? '[excerpt starts after omitted content]\n' : '';
+  const suffix = end < source.length ? '\n[excerpt truncated]' : '';
+  return `${prefix}${source.slice(start, end).trim()}${suffix}`;
+}
+
+function scoreSupportAnalysisFile(entry, content, options = {}) {
+  const query = options.query || '';
+  const selectedFileId = options.selectedFileId || '';
+  const keyFilePriority = options.keyFilePriority || new Map();
+  const terms = tokenizeSupportAnalysisQuery(query);
+  const pathText = String(entry.path || '').toLowerCase();
+  const contentText = String(content?.text || '').toLowerCase();
+  let score = 0;
+
+  if (selectedFileId && entry.id === selectedFileId) score += 120;
+  if (keyFilePriority.has(entry.id)) score += Math.max(30, 95 - keyFilePriority.get(entry.id) * 4);
+  if (/runt_json|version\.info|config_dump-public|config_json|ip_addr_list|ip_route|netstat_-i|messages|mmcli|surelink|ipsec|wg_show|wan_bonding/i.test(entry.path)) {
+    score += 20;
+  }
+
+  terms.forEach(term => {
+    if (pathText.includes(term)) score += 25;
+    if (contentText.includes(term)) score += 8;
+  });
+
+  return score;
+}
+
+function getSupportAnalysisFiles(session, options = {}) {
+  const keyFilePriority = new Map();
+  (session.summary?.keyFiles || []).forEach((file, index) => {
+    if (file?.entryId) keyFilePriority.set(file.entryId, index);
+  });
+
+  const scoredFiles = [...session.filesById.values()]
+    .map(entry => {
+      const content = session.contentById.get(entry.id);
+      if (!content || typeof content.text !== 'string') return null;
+      if (!content.text.trim()) return null;
+      const score = scoreSupportAnalysisFile(entry, content, {
+        query: options.query,
+        selectedFileId: options.selectedFileId,
+        keyFilePriority
+      });
+      return {
+        entry,
+        content,
+        score
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score || a.entry.path.localeCompare(b.entry.path));
+
+  const selected = scoredFiles
+    .filter(file => file.score > 0)
+    .slice(0, MAX_SUPPORT_AI_FILES);
+
+  if (selected.length < Math.min(6, MAX_SUPPORT_AI_FILES)) {
+    for (const file of scoredFiles) {
+      if (selected.some(candidate => candidate.entry.id === file.entry.id)) continue;
+      selected.push(file);
+      if (selected.length >= Math.min(6, MAX_SUPPORT_AI_FILES)) break;
+    }
+  }
+
+  return selected.slice(0, MAX_SUPPORT_AI_FILES).map(file => ({
+    entryId: file.entry.id,
+    path: file.entry.path,
+    text: buildSupportAnalysisExcerpt(file.content.text, options.query),
+    truncated: Boolean(file.content.truncated || file.content.text.length > MAX_SUPPORT_AI_FILE_CHARS),
+    reason: file.entry.id === options.selectedFileId
+      ? 'Currently selected file'
+      : keyFilePriority.has(file.entry.id)
+        ? 'High-priority troubleshooting file'
+        : file.score > 0
+          ? 'Matched the smart scan query'
+          : 'Additional support context'
+  }));
+}
+
 async function importSupportFileFromDialog(webContents) {
   const browserWindow = BrowserWindow.fromWebContents(webContents);
   const dialogResult = await dialog.showOpenDialog(browserWindow || undefined, {
@@ -863,6 +1431,39 @@ function setupIPCHandlers() {
 
   ipcMain.handle('generate-support-template', async (_event, options) => {
     return generateSupportTemplate(options);
+  });
+
+  ipcMain.handle('analyze-support-file', async (event, sessionId, options = {}) => {
+    const session = supportArchiveSessions.get(sessionId);
+    if (!session || session.ownerId !== event.sender.id) {
+      return createSupportFileFailure('invalid-file', 'Support file session is no longer available.');
+    }
+
+    const files = getSupportAnalysisFiles(session, {
+      query: options.query,
+      selectedFileId: options.selectedFileId
+    });
+    const result = await analyzeSupportFiles({
+      provider: options.provider,
+      apiKey: options.apiKey,
+      skill: options.skill,
+      query: options.query,
+      files,
+      summary: session.summary
+    });
+
+    if (!result || !result.success) {
+      return result;
+    }
+
+    return {
+      ...result,
+      sources: files.map(file => ({
+        entryId: file.entryId,
+        path: file.path,
+        reason: file.reason
+      }))
+    };
   });
 
   ipcMain.handle('import-support-file', async (event) => {
