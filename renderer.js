@@ -10,9 +10,17 @@ const CLAUDE_KEY_STORAGE_KEY = 'claudeKey';
 const PREFERRED_PROVIDER_STORAGE_KEY = 'preferredProvider';
 const AGENT_SKILL_STORAGE_KEY = 'agentSkill';
 const AGENT_SKILL_SOURCE_STORAGE_KEY = 'agentSkillSource';
+const THEME_STYLESHEET_STORAGE_KEY = 'themeStylesheet';
 const TEMPLATES_VIEW_ID = '__templates__';
 const AI_PROVIDERS = ['openai', 'claude'];
 const DEFAULT_AI_PROVIDER = 'openai';
+const DEFAULT_THEME_STYLESHEET = 'styles.css';
+const THEME_STYLESHEETS = [
+  { href: 'styles.css', label: 'Digi' },
+  { href: 'styles_aqua.css', label: 'Aqua' },
+  { href: 'styles_dark.css', label: 'Dark' },
+  { href: 'styles_grey.css', label: 'Grey' }
+];
 const DEFAULT_LINE_NAMES = ['IX', 'TX', 'EX'];
 const NEXT_LINE_NAMES = ['AX', 'BX', 'CX', 'DX', 'GX', 'HX', 'MX', 'PX', 'RX', 'ZX'];
 const PORT_POLL_INTERVAL = 2000;
@@ -791,6 +799,7 @@ const pendingPortChecks = new Set();
 const pendingHostChecks = new Set();
 
 document.addEventListener('DOMContentLoaded', () => {
+  applyThemeStylesheet(getThemeStylesheet());
   initializeProductLines();
   setupProductImageModal();
   setupProductSpecsModal();
@@ -2808,6 +2817,52 @@ function getProviderLabel(provider) {
   return normalizePreferredProvider(provider) === 'claude' ? 'Claude' : 'OpenAI';
 }
 
+function normalizeThemeStylesheet(href) {
+  const normalizedHref = String(href || '').trim();
+  return THEME_STYLESHEETS.some((theme) => theme.href === normalizedHref)
+    ? normalizedHref
+    : DEFAULT_THEME_STYLESHEET;
+}
+
+function getThemeStylesheet() {
+  return normalizeThemeStylesheet(localStorage.getItem(THEME_STYLESHEET_STORAGE_KEY));
+}
+
+function getThemeStylesheetLabel(href) {
+  const normalizedHref = normalizeThemeStylesheet(href);
+  return THEME_STYLESHEETS.find((theme) => theme.href === normalizedHref)?.label || 'Digi';
+}
+
+function populateThemeStylesheetInputs() {
+  const activeStylesheet = getThemeStylesheet();
+  document.querySelectorAll('input[name="theme-stylesheet"]').forEach((input) => {
+    input.checked = normalizeThemeStylesheet(input.value) === activeStylesheet;
+  });
+}
+
+function applyThemeStylesheet(href, options = {}) {
+  const activeStylesheet = normalizeThemeStylesheet(href);
+  const stylesheetLink = document.getElementById('app-theme-stylesheet');
+
+  if (stylesheetLink && stylesheetLink.getAttribute('href') !== activeStylesheet) {
+    stylesheetLink.setAttribute('href', activeStylesheet);
+  }
+
+  if (options.persist) {
+    localStorage.setItem(THEME_STYLESHEET_STORAGE_KEY, activeStylesheet);
+  }
+
+  populateThemeStylesheetInputs();
+
+  if (options.notify) {
+    showNotification(`Color theme: ${getThemeStylesheetLabel(activeStylesheet)}`);
+  }
+}
+
+function handleThemeStylesheetChange(event) {
+  applyThemeStylesheet(event.target?.value, { persist: true, notify: true });
+}
+
 function populatePreferredProviderInputs() {
   const preferredProvider = getPreferredProvider();
   document.querySelectorAll('input[name="preferred-provider"]').forEach((input) => {
@@ -2845,6 +2900,7 @@ function populateAgentSkillInputs() {
 function openSettingsModal() {
   const modal = document.getElementById('settings-modal');
   if (!modal) return;
+  populateThemeStylesheetInputs();
   populateProviderKeyInputs();
   populateAgentSkillInputs();
   modal.style.display = 'flex';
@@ -2988,6 +3044,7 @@ function setupSettingsModal() {
   const openButton = document.getElementById('settings-button');
   const closeButton = document.getElementById('close-settings');
   const keysForm = document.getElementById('api-keys-form');
+  const themeInputs = document.querySelectorAll('input[name="theme-stylesheet"]');
   const providerInputs = document.querySelectorAll('input[name="preferred-provider"]');
   const skillForm = document.getElementById('agent-skill-form');
   const loadSkillButton = document.getElementById('load-agent-skill-btn');
@@ -3008,6 +3065,9 @@ function setupSettingsModal() {
       saveProviderKeys();
     });
   }
+  themeInputs.forEach((input) => {
+    input.addEventListener('change', handleThemeStylesheetChange);
+  });
   providerInputs.forEach((input) => {
     input.addEventListener('change', handlePreferredProviderChange);
   });

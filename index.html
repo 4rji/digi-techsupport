@@ -6,7 +6,7 @@
   <title>Digi TechSupport</title>
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="img/icono.png">
-  <link rel="stylesheet" href="styles.css">
+  <link id="app-theme-stylesheet" rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="node_modules/@xterm/xterm/css/xterm.css">
 </head>
 <body>
@@ -132,6 +132,27 @@
           <button type="button" class="config-transfer-button settings-action-button" id="export-config-btn">Save config</button>
           <button type="button" class="config-transfer-button settings-action-button" id="import-config-btn">Load config</button>
           <input type="file" id="import-config-input" accept="application/json" style="display:none;">
+        </div>
+      </div>
+      <div class="settings-section">
+        <h3>Color theme</h3>
+        <div class="provider-toggle theme-toggle" role="radiogroup" aria-label="Color theme">
+          <label class="provider-toggle-option theme-toggle-option">
+            <input type="radio" name="theme-stylesheet" value="styles.css" checked>
+            <span>Digi</span>
+          </label>
+          <label class="provider-toggle-option theme-toggle-option">
+            <input type="radio" name="theme-stylesheet" value="styles_aqua.css">
+            <span>Aqua</span>
+          </label>
+          <label class="provider-toggle-option theme-toggle-option">
+            <input type="radio" name="theme-stylesheet" value="styles_dark.css">
+            <span>Dark</span>
+          </label>
+          <label class="provider-toggle-option theme-toggle-option">
+            <input type="radio" name="theme-stylesheet" value="styles_grey.css">
+            <span>Grey</span>
+          </label>
         </div>
       </div>
       <form id="api-keys-form" class="settings-section settings-form">
