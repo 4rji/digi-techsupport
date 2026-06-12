@@ -770,6 +770,7 @@ let supportTemplates = [];
 let templateDrafts = [];
 let activeLineId = '';
 let activeTemplateId = '';
+let templateSearchQuery = '';
 let itemCounter = 0;
 let lineCounter = 0;
 let editingItemId = null;
@@ -1061,6 +1062,21 @@ function saveTemplateDrafts() {
   }
 }
 
+function templateMatchesSearch(template, query) {
+  const normalizedQuery = String(query || '').trim().toLowerCase();
+  if (!normalizedQuery) return true;
+
+  const searchableText = [
+    template?.title,
+    template?.body,
+    template?.sourceName
+  ].join(' ').toLowerCase();
+
+  return normalizedQuery
+    .split(/\s+/)
+    .every(term => searchableText.includes(term));
+}
+
 function createDefaultProductLines(legacyItems = []) {
   return DEFAULT_LINE_NAMES.map((name, index) => {
     const line = createProductLine(name, { items: [] });
@@ -1336,16 +1352,44 @@ function renderTemplatesView(workspace) {
   listTitle.textContent = 'Templates';
   list.appendChild(listTitle);
 
+  const searchInput = document.createElement('input');
+  searchInput.type = 'search';
+  searchInput.className = 'template-search-input';
+  searchInput.placeholder = 'Search templates';
+  searchInput.value = templateSearchQuery;
+  searchInput.setAttribute('aria-label', 'Search templates');
+  searchInput.addEventListener('input', () => {
+    templateSearchQuery = searchInput.value;
+    renderProductApp();
+    requestAnimationFrame(() => {
+      const nextSearchInput = document.querySelector('.template-search-input');
+      if (!nextSearchInput) return;
+      nextSearchInput.focus();
+      nextSearchInput.setSelectionRange(nextSearchInput.value.length, nextSearchInput.value.length);
+    });
+  });
+  list.appendChild(searchInput);
+
+  const matchingDrafts = templateDrafts.filter(template => templateMatchesSearch(template, templateSearchQuery));
+  const matchingTemplates = supportTemplates.filter(template => templateMatchesSearch(template, templateSearchQuery));
+
   if (templateDrafts.length === 0 && supportTemplates.length === 0) {
     const emptyState = document.createElement('div');
     emptyState.className = 'template-empty-state';
     emptyState.textContent = 'No templates loaded';
     list.appendChild(emptyState);
+  } else if (matchingDrafts.length === 0 && matchingTemplates.length === 0) {
+    const emptyState = document.createElement('div');
+    emptyState.className = 'template-empty-state';
+    emptyState.textContent = 'No matching templates';
+    list.appendChild(emptyState);
   } else {
-    templateDrafts.forEach((template, index) => {
+    matchingDrafts.forEach((template) => {
+      const index = templateDrafts.findIndex(candidate => candidate.id === template.id);
       list.appendChild(createTemplateListItem(template, index, { isDraft: true }));
     });
-    supportTemplates.forEach((template, index) => {
+    matchingTemplates.forEach((template) => {
+      const index = supportTemplates.findIndex(candidate => candidate.id === template.id);
       list.appendChild(createTemplateListItem(template, index));
     });
   }

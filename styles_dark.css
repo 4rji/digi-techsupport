@@ -2504,6 +2504,27 @@ body {
   font-size: 1rem;
 }
 
+.template-search-input {
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 9px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: #202020;
+  color: #fff;
+  font: inherit;
+  outline: none;
+}
+
+.template-search-input:focus {
+  border-color: rgba(76, 175, 80, 0.72);
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.16);
+}
+
+.template-search-input::placeholder {
+  color: #8f8f8f;
+}
+
 .template-empty-state,
 .template-editor-placeholder {
   color: #a8a8a8;
