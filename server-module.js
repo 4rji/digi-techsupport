@@ -387,13 +387,13 @@ async function loadVMs(serverId) {
                 <button class="action-button stop-btn" data-vmid="${vm.vmid}" data-server="${serverId}">Stop</button>
                 <button class="action-button hibernate-btn" data-vmid="${vm.vmid}" data-server="${serverId}">Hibernate</button>
                 <button class="action-button console-btn" data-vmid="${vm.vmid}" data-server="${serverId}">Console</button>
-                <button class="action-button https-btn" data-vmid="${vm.vmid}" data-server="${serverId}">Web</button>
+                <button class="action-button https-btn" data-vmid="${vm.vmid}" data-server="${serverId}" title="Open WebConsole over HTTPS">WebConsole</button>
               ` : (displayStatus === 'paused' || displayStatus === 'suspended' || displayStatus === 'hibernating') ? `
                 <button class="action-button resume-btn" data-vmid="${vm.vmid}" data-server="${serverId}">Resume</button>
-                <button class="action-button https-btn" data-vmid="${vm.vmid}" data-server="${serverId}">Web</button>
+                <button class="action-button https-btn" data-vmid="${vm.vmid}" data-server="${serverId}" title="Open WebConsole over HTTPS">WebConsole</button>
               ` : `
                 <button class="action-button start-btn" data-vmid="${vm.vmid}" data-server="${serverId}">Start</button>
-                <button class="action-button https-btn" data-vmid="${vm.vmid}" data-server="${serverId}">Web</button>
+                <button class="action-button https-btn" data-vmid="${vm.vmid}" data-server="${serverId}" title="Open WebConsole over HTTPS">WebConsole</button>
               `}
             </div>
           </div>
@@ -561,7 +561,7 @@ function setupVMButtons(serverId) {
 
       try {
         button.disabled = true;
-        showNotification('Getting IP address...');
+        showNotification('Getting WebConsole IP address...');
         const result = await window.proxmoxAPI.getVMIPs(vmid, server);
         const ip = getFirstVMIPAddress(result && result.ips);
 
@@ -572,8 +572,8 @@ function setupVMButtons(serverId) {
 
         window.open(formatHTTPSURL(ip), '_blank', 'noopener,noreferrer');
       } catch (error) {
-        console.error('Error opening HTTPS for VM:', error);
-        showNotification(`Error opening HTTPS: ${error.message}`);
+        console.error('Error opening WebConsole for VM:', error);
+        showNotification(`Error opening WebConsole: ${error.message}`);
       } finally {
         button.disabled = false;
       }

@@ -790,6 +790,15 @@ const LEGACY_SUPPORT_TEMPLATE_IDS = new Set([
   'case-follow-up'
 ]);
 
+const FILE_SUPPORT_QUICK_SEARCHES = [
+  'config_dump',
+  'config_json',
+  'mmcli',
+  'ip_route',
+  'ip_addr',
+  'runt_j'
+];
+
 let productLines = [];
 let supportTemplates = [];
 let templateDrafts = [];
@@ -2154,6 +2163,29 @@ function renderFileSupportView(workspace) {
   }
   treePanel.appendChild(treeSearch);
 
+  const quickSearches = document.createElement('div');
+  quickSearches.className = 'file-support-quick-searches';
+  FILE_SUPPORT_QUICK_SEARCHES.forEach(searchTerm => {
+    const quickButton = document.createElement('button');
+    quickButton.type = 'button';
+    quickButton.className = 'file-support-quick-search-button';
+    quickButton.textContent = searchTerm;
+    quickButton.disabled = supportFileState.tree.length === 0;
+    quickButton.title = `Search ${searchTerm}`;
+    quickButton.addEventListener('click', () => {
+      supportTreeSearchQuery = searchTerm;
+      renderProductApp();
+      requestAnimationFrame(() => {
+        const nextInput = document.getElementById('file-support-tree-search');
+        if (!nextInput) return;
+        nextInput.focus();
+        nextInput.setSelectionRange(nextInput.value.length, nextInput.value.length);
+      });
+    });
+    quickSearches.appendChild(quickButton);
+  });
+  treePanel.appendChild(quickSearches);
+
   if (supportFileState.tree.length === 0) {
     const emptyState = document.createElement('div');
     emptyState.className = 'file-support-empty-state';
@@ -2202,8 +2234,10 @@ function renderFileSupportView(workspace) {
     const modeButton = document.createElement('button');
     modeButton.type = 'button';
     modeButton.className = 'file-support-view-mode-button';
-    modeButton.textContent = mode.label;
+    modeButton.textContent = mode.label.charAt(0);
+    modeButton.title = mode.label;
     modeButton.disabled = !supportFileState.selectedFileId;
+    modeButton.setAttribute('aria-label', `${mode.label} view`);
     modeButton.setAttribute('aria-pressed', supportContentViewMode === mode.id ? 'true' : 'false');
     modeButton.addEventListener('click', () => {
       supportContentViewMode = supportContentViewMode === mode.id ? 'auto' : mode.id;

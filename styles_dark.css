@@ -509,6 +509,8 @@ body {
 
 .vm-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 10px;
   margin-top: 15px;
   opacity: 0;
@@ -3139,6 +3141,41 @@ body.is-file-support-resizing {
   white-space: nowrap;
 }
 
+.file-support-quick-searches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid var(--app-border, rgba(255, 255, 255, 0.14));
+  background: rgba(var(--app-card-rgb, var(--app-sidebar-rgb, 27, 73, 101)), 0.2);
+}
+
+.file-support-quick-search-button {
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--app-border, rgba(255, 255, 255, 0.14));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--app-muted, #9c9c9c);
+  font: inherit;
+  font-size: 0.74rem;
+  line-height: 1.1;
+  cursor: pointer;
+}
+
+.file-support-quick-search-button:hover:not(:disabled),
+.file-support-quick-search-button:focus-visible {
+  border-color: rgba(var(--app-primary-rgb, 132, 195, 97), 0.58);
+  color: var(--app-text, #fff);
+  background: rgba(var(--app-primary-rgb, 132, 195, 97), 0.12);
+  outline: none;
+}
+
+.file-support-quick-search-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .file-support-tree,
 .file-support-viewer-body {
   flex: 1;
@@ -3251,9 +3288,7 @@ body.is-file-support-resizing {
 .file-support-fullscreen-button,
 .file-support-view-mode-button {
   flex: 0 0 auto;
-  padding: 8px 12px;
   border: 1px solid rgba(var(--app-primary-rgb, 132, 195, 97), 0.48);
-  border-radius: 6px;
   background: rgba(var(--app-primary-rgb, 132, 195, 97), 0.12);
   color: var(--app-text, #fff);
   font: inherit;
@@ -3261,8 +3296,19 @@ body.is-file-support-resizing {
   cursor: pointer;
 }
 
+.file-support-view-mode-button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .file-support-fullscreen-button {
   margin-right: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
 }
 
 .file-support-fullscreen-button:hover:not(:disabled),
