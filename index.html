@@ -4,20 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Digi TechSupport</title>
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="img/icono.png">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="node_modules/@xterm/xterm/css/xterm.css">
 </head>
 <body>
   <header class="product-topbar">
+    <img class="app-logo" src="img/digitechsupport.png" alt="Digi TechSupport">
     <div class="tabs product-tabs" id="product-tabs"></div>
-    <div class="product-top-controls" aria-label="Product line controls">
-      <button id="add-line-btn" class="control-button line-control-button" type="button" title="Add product line">
-        <span class="plus-icon">+</span>
-      </button>
-      <button id="remove-line-btn" class="control-button line-control-button remove-control-button" type="button" title="Remove product line">
-        <span class="plus-icon">-</span>
-      </button>
-    </div>
+    <button id="settings-button" class="settings-button" type="button" title="Settings" aria-label="Open settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M12 8.6a3.4 3.4 0 1 1 0 6.8 3.4 3.4 0 0 1 0-6.8Zm8.2 3.4c0-.5-.1-1-.2-1.5l2-1.5-2-3.5-2.4 1a9.1 9.1 0 0 0-2.6-1.5L14.7 2H9.3L9 4.5c-.9.3-1.7.8-2.6 1.5l-2.4-1-2 3.5 2 1.5c-.1.5-.2 1-.2 1.5s.1 1 .2 1.5l-2 1.5 2 3.5 2.4-1c.8.7 1.7 1.2 2.6 1.5l.3 2.5h5.4l.3-2.5c.9-.3 1.7-.8 2.6-1.5l2.4 1 2-3.5-2-1.5c.1-.5.2-1 .2-1.5Z"/>
+      </svg>
+    </button>
   </header>
 
   <main id="product-workspace" class="product-workspace"></main>
@@ -119,10 +119,51 @@
     </div>
   </div>
 
-  <div class="config-transfer-bar config-transfer-bar-right" id="product-config-transfer">
-    <button type="button" class="config-transfer-button" id="export-config-btn">Save config</button>
-    <button type="button" class="config-transfer-button" id="import-config-btn">Load config</button>
-    <input type="file" id="import-config-input" accept="application/json" style="display:none;">
+  <div id="settings-modal" class="settings-modal" style="display:none;">
+    <div class="settings-content">
+      <button id="close-settings" type="button" class="close-button settings-close">×</button>
+      <div class="settings-header">
+        <p class="settings-eyebrow">Application</p>
+        <h2>Settings</h2>
+      </div>
+      <div class="settings-section">
+        <h3>Configuration</h3>
+        <div class="settings-actions">
+          <button type="button" class="config-transfer-button settings-action-button" id="export-config-btn">Save config</button>
+          <button type="button" class="config-transfer-button settings-action-button" id="import-config-btn">Load config</button>
+          <input type="file" id="import-config-input" accept="application/json" style="display:none;">
+        </div>
+      </div>
+      <form id="api-keys-form" class="settings-section settings-form">
+        <h3>Provider keys</h3>
+        <div class="form-group">
+          <label for="openai-key">OpenAI key</label>
+          <input type="password" id="openai-key" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="form-group">
+          <label for="claude-key">Claude key</label>
+          <input type="password" id="claude-key" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="form-buttons settings-form-buttons">
+          <button type="submit" class="save-button">Save keys</button>
+        </div>
+      </form>
+      <form id="agent-skill-form" class="settings-section settings-form">
+        <h3>Agent skill</h3>
+        <div class="settings-actions">
+          <button type="button" class="config-transfer-button settings-action-button" id="load-agent-skill-btn">Load skill</button>
+          <input type="file" id="agent-skill-input" accept=".md,.markdown,.txt,.json,text/markdown,text/plain,application/json" style="display:none;">
+          <span id="agent-skill-source" class="agent-skill-source">No skill loaded</span>
+        </div>
+        <div class="form-group">
+          <label for="agent-skill-body">Skill content</label>
+          <textarea id="agent-skill-body" rows="8" spellcheck="false"></textarea>
+        </div>
+        <div class="form-buttons settings-form-buttons">
+          <button type="submit" class="save-button">Save skill</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <script type="module" src="renderer.js"></script>

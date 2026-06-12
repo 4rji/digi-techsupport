@@ -5,6 +5,8 @@ const net = require('net');
 const { execFile } = require('child_process');
 const { checkNode, checkVMStatus, checkNodeHealth, testNodeConnection } = require('./helpers/health');
 
+const APP_ICON_PATH = path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+
 function pingHost(host, timeout = 3000) {
   if (!host) {
     return Promise.resolve({ success: false, online: false, error: 'Host is required' });
@@ -33,7 +35,7 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 800,
     height: 600,
-    icon: path.join(__dirname, 'build', 'icon.png'),
+    icon: APP_ICON_PATH,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
@@ -184,4 +186,9 @@ ipcMain.handle('ping-host', async (event, host, timeout = 3000) => {
   return pingHost(host, timeout);
 });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(APP_ICON_PATH);
+  }
+  createWindow();
+});

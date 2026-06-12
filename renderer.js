@@ -5,6 +5,10 @@ const PRODUCT_LINES_STORAGE_KEY = 'product_lines';
 const TEMPLATES_STORAGE_KEY = 'support_templates';
 const LEGACY_MONITOR_STORAGE_KEY = 'monitor_vm_cards';
 const ACTIVE_LINE_STORAGE_KEY = 'active_product_line';
+const OPENAI_KEY_STORAGE_KEY = 'openAiKey';
+const CLAUDE_KEY_STORAGE_KEY = 'claudeKey';
+const AGENT_SKILL_STORAGE_KEY = 'agentSkill';
+const AGENT_SKILL_SOURCE_STORAGE_KEY = 'agentSkillSource';
 const TEMPLATES_VIEW_ID = '__templates__';
 const DEFAULT_LINE_NAMES = ['IX', 'TX', 'EX'];
 const NEXT_LINE_NAMES = ['AX', 'BX', 'CX', 'DX', 'GX', 'HX', 'MX', 'PX', 'RX', 'ZX'];
@@ -742,62 +746,17 @@ const KNOWN_PORT_SERVICES = {
   8089: 'HTTP Alt'
 };
 
-const DEFAULT_SUPPORT_TEMPLATES = [
-  {
-    id: 'connectivity-troubleshooting',
-    title: 'Connectivity Troubleshooting',
-    body: `Hello,
-
-Thank you for contacting technical support.
-
-To troubleshoot the connectivity issue, please confirm the device model, serial number, current firmware version, SIM/carrier information, and the current LED status. Also include the WAN IP address, signal strength, and whether the device is reachable locally.
-
-Recommended first steps:
-1. Power cycle the device and confirm it boots normally.
-2. Verify antennas, SIM card, Ethernet cabling, and power supply.
-3. Confirm APN and cellular profile settings.
-4. Run a ping test to 8.8.8.8 and a DNS test to google.com.
-
-Please send screenshots or logs from the device status page so we can review the next steps.`
-  },
-  {
-    id: 'firmware-upgrade',
-    title: 'Firmware Upgrade Request',
-    body: `Hello,
-
-We recommend verifying the current firmware before making configuration changes.
-
-Please provide the device model, serial number, current firmware version, and the target firmware version you want to install. Before upgrading, export a backup of the current configuration and confirm the device has stable power and network access.
-
-If the device is remote, please schedule a maintenance window in case a reboot or rollback is required.`
-  },
-  {
-    id: 'remote-access',
-    title: 'Remote Access Setup',
-    body: `Hello,
-
-To help configure remote access, please confirm the access method you want to use, such as VPN, SSH, HTTPS, or Digi Remote Manager.
-
-Please include the device IP address, LAN subnet, firewall requirements, user permissions, and whether access should be limited to specific source IP addresses.
-
-For security, avoid sending passwords by email. Share only the required connection details and confirm who should have access.`
-  },
-  {
-    id: 'case-follow-up',
-    title: 'Case Follow-up',
-    body: `Hello,
-
-I am following up on this support case to confirm whether the issue is still occurring.
-
-Please let us know if the device is currently online, whether any changes were made since the last update, and if you can provide recent logs or screenshots from the device status page.
-
-If the issue has been resolved, please confirm the fix so we can document the case outcome.`
-  }
-];
+const LEGACY_SUPPORT_TEMPLATE_IDS = new Set([
+  'connectivity-troubleshooting',
+  'firmware-upgrade',
+  'remote-access',
+  'case-follow-up'
+]);
 
 let productLines = [];
 let supportTemplates = [];
 let activeLineId = '';
+let activeTemplateId = '';
 let itemCounter = 0;
 let lineCounter = 0;
 let editingItemId = null;
@@ -834,7 +793,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupProductSpecsModal();
   setupSSHTerminalModal();
   setupItemConfigModal();
-  setupControls();
+  setupSettingsModal();
   setupConfigTransferControls();
 });
 
@@ -1017,19 +976,22 @@ function normalizeProductLine(line, index) {
 }
 
 function normalizeSupportTemplate(template, index) {
-  const fallback = DEFAULT_SUPPORT_TEMPLATES[index] || {
-    id: `template-${index + 1}`,
-    title: `Template ${index + 1}`,
-    body: '',
-    hidden: false
-  };
+  const title = String(template?.title || template?.name || `Template ${index + 1}`).trim() || `Template ${index + 1}`;
 
   return {
-    id: String(template?.id || fallback.id || `template-${index + 1}`),
-    title: String(template?.title || fallback.title || `Template ${index + 1}`),
-    body: String(template?.body ?? fallback.body ?? ''),
-    hidden: Boolean(template?.hidden ?? fallback.hidden ?? false)
+    id: String(template?.id || createTemplateId(title, index)),
+    title,
+    body: String(template?.body ?? template?.content ?? template?.text ?? ''),
+    hidden: false
   };
+}
+
+function normalizeSupportTemplates(templates) {
+  if (!Array.isArray(templates)) return [];
+
+  return templates
+    .filter(template => !LEGACY_SUPPORT_TEMPLATE_IDS.has(String(template?.id || '')))
+    .map((template, index) => normalizeSupportTemplate(template, index));
 }
 
 function loadSupportTemplates() {
@@ -1038,7 +1000,10 @@ function loadSupportTemplates() {
     if (storedTemplates) {
       const parsed = JSON.parse(storedTemplates);
       if (Array.isArray(parsed)) {
-        supportTemplates = parsed.map((template, index) => normalizeSupportTemplate(template, index));
+        supportTemplates = normalizeSupportTemplates(parsed);
+        if (supportTemplates.length !== parsed.length) {
+          saveSupportTemplates();
+        }
         return;
       }
     }
@@ -1046,7 +1011,7 @@ function loadSupportTemplates() {
     console.error('Error loading support templates:', error);
   }
 
-  supportTemplates = DEFAULT_SUPPORT_TEMPLATES.map((template, index) => normalizeSupportTemplate(template, index));
+  supportTemplates = [];
   saveSupportTemplates();
 }
 
@@ -1288,98 +1253,122 @@ function renderTemplatesView(workspace) {
 
   headerRow.appendChild(title);
   const controls = document.createElement('div');
-  controls.className = 'product-top-controls template-top-controls';
+  controls.className = 'template-top-controls';
 
-  const addButton = document.createElement('button');
-  addButton.type = 'button';
-  addButton.id = 'add-template-btn';
-  addButton.className = 'control-button line-control-button';
-  addButton.title = 'Add template';
-  addButton.setAttribute('aria-label', 'Add template');
-  addButton.innerHTML = '<span class="plus-icon">+</span>';
-  addButton.addEventListener('click', addSupportTemplate);
+  const importButton = document.createElement('button');
+  importButton.type = 'button';
+  importButton.id = 'import-template-btn';
+  importButton.className = 'config-transfer-button template-import-button';
+  importButton.textContent = 'Load';
 
-  const removeButton = document.createElement('button');
-  removeButton.type = 'button';
-  removeButton.id = 'remove-template-btn';
-  removeButton.className = 'control-button line-control-button remove-control-button';
-  removeButton.title = 'Remove template';
-  removeButton.setAttribute('aria-label', 'Remove template');
-  removeButton.innerHTML = '<span class="plus-icon">-</span>';
-  removeButton.addEventListener('click', removeSupportTemplate);
+  const importInput = document.createElement('input');
+  importInput.type = 'file';
+  importInput.id = 'template-import-input';
+  importInput.accept = '.md,.markdown,text/markdown,text/plain';
+  importInput.multiple = true;
+  importInput.style.display = 'none';
+  importInput.addEventListener('change', handleTemplateFileSelection);
 
-  controls.appendChild(addButton);
-  controls.appendChild(removeButton);
+  importButton.addEventListener('click', () => {
+    importInput.value = '';
+    importInput.click();
+  });
+
+  controls.appendChild(importButton);
+  controls.appendChild(importInput);
   headerRow.appendChild(controls);
   headerText.appendChild(headerRow);
   header.appendChild(headerText);
   workspace.appendChild(header);
 
-  const grid = document.createElement('div');
-  grid.className = 'templates-grid';
-  const visibleTemplates = supportTemplates
-    .map((template, index) => ({ template, index }))
-    .filter(entry => !entry.template.hidden);
+  if (activeTemplateId && !supportTemplates.some(template => template.id === activeTemplateId)) {
+    activeTemplateId = '';
+  }
+
+  const library = document.createElement('section');
+  library.className = 'templates-library';
+
+  const list = document.createElement('div');
+  list.className = 'template-list';
+
+  const listTitle = document.createElement('h3');
+  listTitle.className = 'template-list-title';
+  listTitle.textContent = 'Loaded templates';
+  list.appendChild(listTitle);
 
   if (supportTemplates.length === 0) {
-    grid.classList.add('empty');
     const emptyState = document.createElement('div');
-    emptyState.className = 'monitor-placeholder-card';
-    emptyState.innerHTML = '<h3>No templates yet</h3>';
-    grid.appendChild(emptyState);
-  } else if (visibleTemplates.length === 0) {
-    grid.classList.add('empty');
-    const emptyState = document.createElement('div');
-    emptyState.className = 'monitor-placeholder-card';
-    emptyState.innerHTML = '<h3>No templates visible</h3>';
-    grid.appendChild(emptyState);
+    emptyState.className = 'template-empty-state';
+    emptyState.textContent = 'No templates loaded';
+    list.appendChild(emptyState);
   } else {
-    visibleTemplates.forEach(entry => {
-      grid.appendChild(createTemplateCard(entry.template, entry.index));
+    supportTemplates.forEach((template, index) => {
+      list.appendChild(createTemplateListItem(template, index));
     });
   }
 
-  workspace.appendChild(grid);
-}
-
-function createSupportTemplate(index) {
-  const fallbackTitle = `Template ${index + 1}`;
-  return {
-    id: `support-template-${Date.now()}-${index + 1}`,
-    title: fallbackTitle,
-    body: '',
-    hidden: false
-  };
-}
-
-function addSupportTemplate() {
-  const hiddenIndex = [...supportTemplates].map((template, index) => ({ template, index })).reverse().find(entry => entry.template.hidden)?.index;
-  if (typeof hiddenIndex === 'number') {
-    supportTemplates[hiddenIndex].hidden = false;
+  const editor = document.createElement('div');
+  editor.className = 'template-editor';
+  const activeIndex = supportTemplates.findIndex(template => template.id === activeTemplateId);
+  if (activeIndex >= 0) {
+    editor.appendChild(createTemplateEditor(supportTemplates[activeIndex], activeIndex));
   } else {
-    supportTemplates.push(createSupportTemplate(supportTemplates.length));
+    const placeholder = document.createElement('div');
+    placeholder.className = 'template-editor-placeholder';
+    placeholder.textContent = supportTemplates.length > 0 ? 'Select a template' : 'Load .md files';
+    editor.appendChild(placeholder);
   }
-  saveSupportTemplates();
-  renderProductApp();
+
+  library.appendChild(list);
+  library.appendChild(editor);
+  workspace.appendChild(library);
+
+  const createRow = document.createElement('section');
+  createRow.className = 'template-create-row';
+
+  const createLabel = document.createElement('label');
+  createLabel.className = 'template-create-label';
+  createLabel.htmlFor = 'template-agent-input';
+  createLabel.textContent = 'Create template';
+
+  const createInput = document.createElement('textarea');
+  createInput.id = 'template-agent-input';
+  createInput.className = 'template-agent-input';
+  createInput.rows = 2;
+  createInput.placeholder = 'Paste text here';
+
+  createRow.appendChild(createLabel);
+  createRow.appendChild(createInput);
+  workspace.appendChild(createRow);
 }
 
-function removeSupportTemplate() {
-  const visibleTemplates = supportTemplates
-    .map((template, index) => ({ template, index }))
-    .filter(entry => !entry.template.hidden);
+function createTemplateListItem(template) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'template-list-button';
+  button.classList.toggle('active', template.id === activeTemplateId);
+  button.addEventListener('click', () => {
+    activeTemplateId = template.id;
+    renderProductApp();
+  });
 
-  if (visibleTemplates.length === 0) return;
+  const title = document.createElement('span');
+  title.className = 'template-list-button-title';
+  title.textContent = template.title;
 
-  const entry = visibleTemplates[visibleTemplates.length - 1];
-  supportTemplates[entry.index].hidden = true;
-  saveSupportTemplates();
-  showNotification('Template hidden');
-  renderProductApp();
+  const status = document.createElement('span');
+  status.className = 'template-list-button-status';
+  status.textContent = template.id === activeTemplateId ? 'Editing' : 'Show';
+
+  button.appendChild(title);
+  button.appendChild(status);
+
+  return button;
 }
 
-function createTemplateCard(template, index) {
-  const card = document.createElement('section');
-  card.className = 'template-card';
+function createTemplateEditor(template, index) {
+  const editor = document.createElement('section');
+  editor.className = 'template-editor-card';
 
   const titleInput = document.createElement('input');
   titleInput.type = 'text';
@@ -1407,6 +1396,7 @@ function createTemplateCard(template, index) {
       body: bodyInput.value
     };
     saveSupportTemplates();
+    activeTemplateId = supportTemplates[index].id;
     showNotification('Template saved');
     renderProductApp();
   });
@@ -1425,10 +1415,11 @@ function createTemplateCard(template, index) {
   deleteButton.textContent = 'Delete';
   deleteButton.addEventListener('click', () => {
     const templateTitle = titleInput.value.trim() || template.title || `Template ${index + 1}`;
-    const shouldDelete = window.confirm(`Delete "${templateTitle}" permanently? This cannot be undone.`);
+    const shouldDelete = window.confirm(`Delete "${templateTitle}" permanently?`);
     if (!shouldDelete) return;
 
     supportTemplates.splice(index, 1);
+    activeTemplateId = supportTemplates[index]?.id || supportTemplates[index - 1]?.id || '';
     saveSupportTemplates();
     showNotification('Template deleted');
     renderProductApp();
@@ -1437,11 +1428,116 @@ function createTemplateCard(template, index) {
   actions.appendChild(saveButton);
   actions.appendChild(copyButton);
   actions.appendChild(deleteButton);
-  card.appendChild(titleInput);
-  card.appendChild(bodyInput);
-  card.appendChild(actions);
+  editor.appendChild(titleInput);
+  editor.appendChild(bodyInput);
+  editor.appendChild(actions);
 
-  return card;
+  return editor;
+}
+
+function createTemplateId(title, index = 0) {
+  const slug = String(title || 'template')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || 'template';
+
+  return `support-template-${Date.now()}-${index + 1}-${slug}`;
+}
+
+function createTemplateFromMarkdown(file, body, index) {
+  const fallbackTitle = getTemplateTitleFromFilename(file.name);
+  const title = extractMarkdownTemplateTitle(body, fallbackTitle);
+
+  return {
+    id: createTemplateId(title, supportTemplates.length + index),
+    title,
+    body,
+    hidden: false,
+    sourceName: file.name
+  };
+}
+
+function getTemplateTitleFromFilename(filename) {
+  const baseName = String(filename || 'Template')
+    .split(/[\\/]/)
+    .pop()
+    .replace(/\.(md|markdown)$/i, '')
+    .replace(/[-_]+/g, ' ')
+    .trim();
+
+  return cleanMarkdownTitle(baseName) || 'Template';
+}
+
+function extractMarkdownTemplateTitle(markdown, fallbackTitle) {
+  const lines = String(markdown || '').split(/\r?\n/);
+  const heading = lines
+    .map(line => line.trim())
+    .find(line => /^#{1,6}\s+\S/.test(line));
+
+  if (heading) {
+    return cleanMarkdownTitle(heading.replace(/^#{1,6}\s+/, '').replace(/\s+#+\s*$/, '')) || fallbackTitle;
+  }
+
+  return fallbackTitle;
+}
+
+function cleanMarkdownTitle(title) {
+  return String(title || '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[`*_~]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isMarkdownTemplateFile(file) {
+  const fileName = String(file?.name || '');
+  return /\.(md|markdown)$/i.test(fileName) || file?.type === 'text/markdown';
+}
+
+function readTemplateFileText(file) {
+  if (file && typeof file.text === 'function') {
+    return file.text();
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => resolve(String(event.target.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('Could not read file'));
+    reader.readAsText(file);
+  });
+}
+
+async function handleTemplateFileSelection(event) {
+  const input = event.target;
+  const files = Array.from(input.files || []);
+  const markdownFiles = files.filter(isMarkdownTemplateFile);
+
+  if (markdownFiles.length === 0) {
+    showNotification('Select .md files');
+    input.value = '';
+    return;
+  }
+
+  try {
+    const importedTemplates = await Promise.all(markdownFiles.map(async (file, index) => {
+      const body = await readTemplateFileText(file);
+      return createTemplateFromMarkdown(file, body, index);
+    }));
+
+    supportTemplates.push(...importedTemplates);
+    activeTemplateId = importedTemplates[0]?.id || activeTemplateId;
+    saveSupportTemplates();
+    showNotification(importedTemplates.length === 1 ? 'Template loaded' : `${importedTemplates.length} templates loaded`);
+    renderProductApp();
+  } catch (error) {
+    console.error('Error importing templates:', error);
+    showNotification('Could not load templates');
+  } finally {
+    input.value = '';
+  }
 }
 
 async function copyTemplateText(text) {
@@ -1717,28 +1813,10 @@ function removeProductLine() {
 }
 
 function updateControlButtonsState() {
-  const addButton = document.getElementById('add-item-btn');
-  const removeButton = document.getElementById('remove-item-btn');
-  const removeLineButton = document.getElementById('remove-line-btn');
-  const addTemplateButton = document.getElementById('add-template-btn');
-  const removeTemplateButton = document.getElementById('remove-template-btn');
-  const line = getActiveLine();
-  const visibleTemplateCount = supportTemplates.filter(template => !template.hidden).length;
+  const importTemplateButton = document.getElementById('import-template-btn');
 
-  if (addButton) {
-    addButton.disabled = !line || isLineLockedForManualItems(line);
-  }
-  if (removeButton) {
-    removeButton.disabled = !line || isLineLockedForManualItems(line) || line.items.length === 0;
-  }
-  if (removeLineButton) {
-    removeLineButton.disabled = activeLineId === TEMPLATES_VIEW_ID || productLines.length === 0;
-  }
-  if (addTemplateButton) {
-    addTemplateButton.disabled = activeLineId !== TEMPLATES_VIEW_ID;
-  }
-  if (removeTemplateButton) {
-    removeTemplateButton.disabled = activeLineId !== TEMPLATES_VIEW_ID || visibleTemplateCount === 0;
+  if (importTemplateButton) {
+    importTemplateButton.disabled = activeLineId !== TEMPLATES_VIEW_ID;
   }
 }
 
@@ -2558,6 +2636,181 @@ function setupItemConfigModal() {
   refreshPortsUI();
 }
 
+function populateProviderKeyInputs() {
+  const openAiInput = document.getElementById('openai-key');
+  const claudeInput = document.getElementById('claude-key');
+
+  if (openAiInput) {
+    openAiInput.value = localStorage.getItem(OPENAI_KEY_STORAGE_KEY) || '';
+  }
+  if (claudeInput) {
+    claudeInput.value = localStorage.getItem(CLAUDE_KEY_STORAGE_KEY) || '';
+  }
+}
+
+function populateAgentSkillInputs() {
+  const skillInput = document.getElementById('agent-skill-body');
+  const sourceLabel = document.getElementById('agent-skill-source');
+  const sourceName = localStorage.getItem(AGENT_SKILL_SOURCE_STORAGE_KEY) || '';
+
+  if (skillInput) {
+    skillInput.value = localStorage.getItem(AGENT_SKILL_STORAGE_KEY) || '';
+  }
+  if (sourceLabel) {
+    sourceLabel.textContent = sourceName || 'No skill loaded';
+  }
+}
+
+function openSettingsModal() {
+  const modal = document.getElementById('settings-modal');
+  if (!modal) return;
+  populateProviderKeyInputs();
+  populateAgentSkillInputs();
+  modal.style.display = 'flex';
+}
+
+function closeSettingsModal() {
+  const modal = document.getElementById('settings-modal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+}
+
+function saveProviderKeys() {
+  const openAiInput = document.getElementById('openai-key');
+  const claudeInput = document.getElementById('claude-key');
+  const openAiKey = openAiInput ? openAiInput.value.trim() : '';
+  const claudeKey = claudeInput ? claudeInput.value.trim() : '';
+
+  if (openAiKey) {
+    localStorage.setItem(OPENAI_KEY_STORAGE_KEY, openAiKey);
+  } else {
+    localStorage.removeItem(OPENAI_KEY_STORAGE_KEY);
+  }
+
+  if (claudeKey) {
+    localStorage.setItem(CLAUDE_KEY_STORAGE_KEY, claudeKey);
+  } else {
+    localStorage.removeItem(CLAUDE_KEY_STORAGE_KEY);
+  }
+
+  showNotification('Provider keys saved');
+}
+
+function getProviderKeys() {
+  return {
+    openAiKey: localStorage.getItem(OPENAI_KEY_STORAGE_KEY) || '',
+    claudeKey: localStorage.getItem(CLAUDE_KEY_STORAGE_KEY) || ''
+  };
+}
+
+function saveAgentSkill(sourceName = '') {
+  const skillInput = document.getElementById('agent-skill-body');
+  const sourceLabel = document.getElementById('agent-skill-source');
+  const skill = skillInput ? skillInput.value : '';
+  const hasSkill = skill.trim().length > 0;
+  const existingSourceName = localStorage.getItem(AGENT_SKILL_SOURCE_STORAGE_KEY) || '';
+  const nextSourceName = sourceName || existingSourceName || 'Manual skill';
+
+  if (hasSkill) {
+    localStorage.setItem(AGENT_SKILL_STORAGE_KEY, skill);
+    if (nextSourceName) {
+      localStorage.setItem(AGENT_SKILL_SOURCE_STORAGE_KEY, nextSourceName);
+    }
+  } else {
+    localStorage.removeItem(AGENT_SKILL_STORAGE_KEY);
+    localStorage.removeItem(AGENT_SKILL_SOURCE_STORAGE_KEY);
+  }
+
+  if (sourceLabel) {
+    sourceLabel.textContent = hasSkill && nextSourceName ? nextSourceName : 'No skill loaded';
+  }
+
+  showNotification(hasSkill ? 'Agent skill saved' : 'Agent skill cleared');
+}
+
+function getAgentSkill() {
+  return {
+    sourceName: localStorage.getItem(AGENT_SKILL_SOURCE_STORAGE_KEY) || '',
+    content: localStorage.getItem(AGENT_SKILL_STORAGE_KEY) || ''
+  };
+}
+
+async function handleAgentSkillFileSelection(event) {
+  const input = event.target;
+  const file = input.files && input.files[0];
+  if (!file) return;
+
+  try {
+    const body = await readTemplateFileText(file);
+    const skillInput = document.getElementById('agent-skill-body');
+    const sourceLabel = document.getElementById('agent-skill-source');
+    if (skillInput) {
+      skillInput.value = body;
+    }
+    if (sourceLabel) {
+      sourceLabel.textContent = file.name;
+    }
+    saveAgentSkill(file.name);
+  } catch (error) {
+    console.error('Error loading agent skill:', error);
+    showNotification('Could not load agent skill');
+  } finally {
+    input.value = '';
+  }
+}
+
+function setupSettingsModal() {
+  const modal = document.getElementById('settings-modal');
+  const openButton = document.getElementById('settings-button');
+  const closeButton = document.getElementById('close-settings');
+  const keysForm = document.getElementById('api-keys-form');
+  const skillForm = document.getElementById('agent-skill-form');
+  const loadSkillButton = document.getElementById('load-agent-skill-btn');
+  const skillFileInput = document.getElementById('agent-skill-input');
+
+  if (!modal) return;
+
+  if (openButton) {
+    openButton.addEventListener('click', openSettingsModal);
+  }
+  if (closeButton) {
+    closeButton.addEventListener('click', closeSettingsModal);
+  }
+  if (keysForm) {
+    keysForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      saveProviderKeys();
+    });
+  }
+  if (skillForm) {
+    skillForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      saveAgentSkill();
+    });
+  }
+  if (loadSkillButton && skillFileInput) {
+    loadSkillButton.addEventListener('click', () => {
+      skillFileInput.value = '';
+      skillFileInput.click();
+    });
+    skillFileInput.addEventListener('change', handleAgentSkillFileSelection);
+  }
+
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) {
+      closeSettingsModal();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (modal.style.display === 'flex' && event.key === 'Escape') {
+      event.preventDefault();
+      closeSettingsModal();
+    }
+  });
+}
+
 function handleImageFileSelection(event) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
@@ -2642,26 +2895,6 @@ function removePort(index) {
 function clearPorts() {
   itemConfigTemp.ports = [];
   refreshPortsUI();
-}
-
-function setupControls() {
-  const addItemButton = document.getElementById('add-item-btn');
-  const removeItemButton = document.getElementById('remove-item-btn');
-  const addLineButton = document.getElementById('add-line-btn');
-  const removeLineButton = document.getElementById('remove-line-btn');
-
-  if (addItemButton) {
-    addItemButton.addEventListener('click', addProductItem);
-  }
-  if (removeItemButton) {
-    removeItemButton.addEventListener('click', removeProductItem);
-  }
-  if (addLineButton) {
-    addLineButton.addEventListener('click', () => addProductLine(getNextLineName()));
-  }
-  if (removeLineButton) {
-    removeLineButton.addEventListener('click', removeProductLine);
-  }
 }
 
 function getPortStatus(item, port) {
@@ -3048,8 +3281,11 @@ function applyImportedConfiguration(configData) {
     : productLines[0].id;
 
   supportTemplates = Array.isArray(configData.supportTemplates)
-    ? configData.supportTemplates.map((template, index) => normalizeSupportTemplate(template, index))
-    : DEFAULT_SUPPORT_TEMPLATES.map((template, index) => normalizeSupportTemplate(template, index));
+    ? normalizeSupportTemplates(configData.supportTemplates)
+    : [];
+  activeTemplateId = supportTemplates.some(template => template.id === activeTemplateId)
+    ? activeTemplateId
+    : '';
 
   portStatuses.clear();
   hostStatuses.clear();

@@ -6,6 +6,7 @@ const { execFile } = require('child_process');
 const crypto = require('crypto');
 const { Client } = require('ssh2');
 
+const APP_ICON_PATH = path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const sshSessions = new Map();
 const SSH_ADMIN_PASSWORD_FILE = 'ssh-admin-password.json';
 
@@ -345,6 +346,7 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
+    icon: APP_ICON_PATH,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -359,6 +361,9 @@ function createWindow() {
 
 app.whenReady().then(() => {
   setupIPCHandlers();
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(APP_ICON_PATH);
+  }
   createWindow();
 
   app.on('activate', () => {

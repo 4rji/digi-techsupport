@@ -544,21 +544,21 @@ body {
 
 /* Specific state for powered-on VMs */
 .vm-card[data-status="running"] .vm-icon {
-  background-color: #1e4620; /* Verde oscuro apagado */
+  background-color: #1e4620; /* Muted dark green */
   border-color: rgba(76, 175, 80, 0.95);
   box-shadow: 0 0 16px rgba(76, 175, 80, 0.35);
 }
 
 /* Specific state for powered-off VMs */
 .vm-card[data-status="stopped"] .vm-icon {
-  background-color: #2a2a2a; /* Negro mate */
+  background-color: #2a2a2a; /* Matte black */
 }
 
 /* Specific state for paused, suspended, or hibernating VMs */
 .vm-card[data-status="paused"] .vm-icon,
 .vm-card[data-status="suspended"] .vm-icon,
 .vm-card[data-status="hibernating"] .vm-icon {
-  background-color: #2a3347 !important; /* Gris azulado oscuro */
+  background-color: #2a3347 !important; /* Dark bluish gray */
   border: 1px solid #3a4357;
 }
 
@@ -1334,6 +1334,115 @@ body {
   text-align: center;
 }
 
+.settings-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.76);
+  overflow-y: auto;
+}
+
+.settings-content {
+  position: relative;
+  width: min(520px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 28px;
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(76, 175, 80, 0.08), transparent 180px),
+    #111;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.58);
+}
+
+.settings-close {
+  top: 12px;
+  right: 12px;
+}
+
+.settings-header {
+  margin-bottom: 18px;
+  padding-right: 42px;
+}
+
+.settings-eyebrow {
+  margin: 0 0 4px;
+  color: #8f8f8f;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-header h2 {
+  margin: 0;
+  color: #d6ffe0;
+  font-size: 1.8rem;
+}
+
+.settings-section {
+  padding: 16px;
+  margin-top: 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.settings-section h3 {
+  margin: 0 0 14px;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.settings-action-button {
+  min-width: 112px;
+  padding: 9px 14px;
+  font-size: 0.86rem;
+}
+
+.agent-skill-source {
+  align-self: center;
+  min-width: 0;
+  color: #a8a8a8;
+  font-size: 0.86rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+}
+
+#agent-skill-body {
+  min-height: 160px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.settings-form-buttons {
+  justify-content: flex-end;
+}
+
+.settings-form-buttons .save-button {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 112px;
+  padding: 10px 18px;
+}
+
 .monitor-config-form {
   display: flex;
   flex-direction: column;
@@ -1780,34 +1889,12 @@ body {
   display: block !important;
 }
 
-/* Estilo para botones deshabilitados */
+/* Disabled button styles */
 #add-server-btn:disabled,
 #remove-server-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   background: #333;
-}
-
-.config-transfer-bar {
-  position: fixed;
-  bottom: 20px;
-  display: flex;
-  gap: 8px;
-  z-index: 1000;
-  background: rgba(17, 17, 17, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-  padding: 6px 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(8px);
-}
-
-.config-transfer-bar-left {
-  left: 20px;
-}
-
-.config-transfer-bar-right {
-  right: 20px;
 }
 
 .config-transfer-button {
@@ -2223,8 +2310,50 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 4px 0 10px;
+  padding: 0 0 10px;
   background: #000;
+}
+
+.app-logo {
+  flex: 0 0 auto;
+  width: clamp(132px, 18vw, 230px);
+  height: auto;
+  display: block;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.settings-button {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.18), transparent 35%),
+    #151515;
+  color: #d6ffe0;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32);
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.settings-button:hover {
+  color: #fff;
+  border-color: rgba(76, 175, 80, 0.6);
+  background:
+    radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.22), transparent 35%),
+    rgba(76, 175, 80, 0.18);
+  transform: translateY(-1px);
+}
+
+.settings-button svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
 }
 
 .product-tabs {
@@ -2265,33 +2394,115 @@ body {
   margin-bottom: 12px;
 }
 
-.templates-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
-  padding: 12px 0 28px;
-}
-
-.templates-grid.empty {
+.template-top-controls {
   display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: 280px;
+  gap: 8px;
 }
 
-.template-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 420px;
-  padding: 16px;
+.template-import-button {
+  width: auto;
+  min-width: 92px;
+  margin: 0;
+}
+
+.templates-library {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.32fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 12px 0 28px;
+  align-items: stretch;
+}
+
+.template-list,
+.template-editor-card,
+.template-editor-placeholder,
+.template-create-row {
   border-radius: 8px;
   background: #161616;
   border: 1px solid #333;
 }
 
+.template-list {
+  min-height: 420px;
+  padding: 14px;
+}
+
+.template-list-title {
+  margin: 0 0 12px;
+  color: #d6ffe0;
+  font-size: 1rem;
+}
+
+.template-empty-state,
+.template-editor-placeholder {
+  color: #a8a8a8;
+  font-size: 0.95rem;
+}
+
+.template-list-button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: #202020;
+  color: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.template-list-button:hover {
+  background: #292929;
+  border-color: rgba(76, 175, 80, 0.4);
+}
+
+.template-list-button.active {
+  background: rgba(76, 175, 80, 0.16);
+  border-color: rgba(76, 175, 80, 0.72);
+}
+
+.template-list-button-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.template-list-button-status {
+  color: #9fd7ff;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.template-editor {
+  min-width: 0;
+}
+
+.template-editor-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 420px;
+  padding: 16px;
+}
+
+.template-editor-placeholder {
+  min-height: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .template-title-input,
-.template-body-input {
+.template-body-input,
+.template-agent-input {
   width: 100%;
   box-sizing: border-box;
   border: 1px solid #333;
@@ -2318,7 +2529,8 @@ body {
 }
 
 .template-title-input:focus,
-.template-body-input:focus {
+.template-body-input:focus,
+.template-agent-input:focus {
   border-color: #4caf50;
   box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.18);
 }
@@ -2330,7 +2542,30 @@ body {
 }
 
 .template-action-button {
+  width: auto;
   min-width: 82px;
+}
+
+.template-create-row {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  margin-bottom: 28px;
+  padding: 14px 16px;
+}
+
+.template-create-label {
+  color: #d6ffe0;
+  font-weight: 700;
+  padding-top: 10px;
+}
+
+.template-agent-input {
+  min-height: 46px;
+  padding: 10px 12px;
+  line-height: 1.4;
+  resize: vertical;
 }
 
 .product-card {
@@ -2399,14 +2634,6 @@ body {
   background: #314b68;
 }
 
-#add-item-btn {
-  background: #1e4620;
-}
-
-#add-item-btn:hover {
-  background: #2a5a2a;
-}
-
 .remove-control-button {
   background: #461e1e;
 }
@@ -2433,6 +2660,16 @@ body {
   .product-topbar {
     align-items: flex-start;
     gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .app-logo {
+    width: 152px;
+  }
+
+  .settings-button {
+    width: 42px;
+    height: 42px;
   }
 
   .product-top-controls {
@@ -2449,21 +2686,50 @@ body {
     padding: 10px 16px;
   }
 
-  .config-transfer-bar {
-    position: static;
-    width: fit-content;
-    margin: 10px auto;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
   .product-workspace {
     padding-bottom: 110px;
+  }
+
+  .templates-library,
+  .template-create-row {
+    grid-template-columns: 1fr;
+  }
+
+  .template-list,
+  .template-editor-card,
+  .template-editor-placeholder {
+    min-height: auto;
+  }
+
+  .template-body-input {
+    min-height: 240px;
+  }
+
+  .template-create-label {
+    padding-top: 0;
   }
 
   .monitor-config-content {
     max-width: calc(100vw - 24px);
     padding: 22px;
+  }
+
+  .settings-modal {
+    padding: 12px;
+  }
+
+  .settings-content {
+    width: calc(100vw - 24px);
+    padding: 22px;
+  }
+
+  .settings-actions {
+    flex-direction: column;
+  }
+
+  .settings-action-button,
+  .settings-form-buttons .save-button {
+    width: 100%;
   }
 
   .product-specs-modal {
