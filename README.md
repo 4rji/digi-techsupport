@@ -27,14 +27,14 @@ General Build
 
 Platform Builds
 ---------------
-- macOS universal: `npm run build --mac`
-- Windows: `npm run build --win`
-- Linux: `npm run build --linux`
+- macOS universal: `npm run build -- --mac`
+- Windows x64: `npm run build -- --win --x64`
+- Linux: `npm run build -- --linux`
 
 Specific macOS Architectures
 ----------------------------
-- Apple Silicon (M1/M2/M3): `npm run build --mac --arm64`
-- Intel: `npm run build --mac --x64`
+- Apple Silicon (M1/M2/M3): `npm run build -- --mac --arm64`
+- Intel: `npm run build -- --mac --x64`
 
 Main Features
 -------------
