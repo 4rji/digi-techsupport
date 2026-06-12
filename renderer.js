@@ -93,6 +93,18 @@ const LOCKED_ITEM_IMAGE_VARIANTS = {
     'img/digi-ix20-front.png',
     'img/digi-ix20-front-no-wifi.png'
   ],
+  'Digi IX25 5G Industrial Cellular Router': [
+    'img/digi-ix25.png',
+    'img/digi-ix25-front.png',
+    'img/digi-ix25-front-non-wifi.png',
+    'img/digi-ix25-5g-back.png'
+  ],
+  'Digi IX30 Industrial Cellular Router': [
+    'img/digi-ix30.png',
+    'img/digi-ix30-front.png',
+    'img/digi-ix30-right.png',
+    'img/digi-ix30-with-din.png'
+  ],
   'Digi EX12 Cellular Extender': [
     'img/digi-ex12.png',
     'img/digi-ex12-left.png',
