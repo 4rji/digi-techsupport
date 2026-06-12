@@ -3012,6 +3012,25 @@ body {
   box-sizing: border-box;
 }
 
+.file-support-layout.is-viewer-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  grid-template-columns: minmax(0, 1fr);
+  height: 100vh;
+  padding: 12px;
+  background: var(--app-background, #121417);
+}
+
+.file-support-layout.is-viewer-fullscreen .file-support-tree-panel,
+.file-support-layout.is-viewer-fullscreen .file-support-resizer {
+  display: none;
+}
+
+.file-support-layout.is-viewer-fullscreen .file-support-viewer-panel {
+  border-radius: 8px;
+}
+
 .file-support-panel {
   min-width: 0;
   min-height: 0;
@@ -3206,6 +3225,47 @@ body.is-file-support-resizing {
   flex: 0 0 auto;
 }
 
+.file-support-viewer-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--app-border, rgba(255, 255, 255, 0.14));
+}
+
+.file-support-viewer-title-row .file-support-panel-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-bottom: 0;
+}
+
+.file-support-fullscreen-button {
+  flex: 0 0 auto;
+  margin-right: 12px;
+  padding: 8px 12px;
+  border: 1px solid rgba(var(--app-primary-rgb, 132, 195, 97), 0.48);
+  border-radius: 6px;
+  background: rgba(var(--app-primary-rgb, 132, 195, 97), 0.12);
+  color: var(--app-text, #fff);
+  font: inherit;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.file-support-fullscreen-button:hover:not(:disabled),
+.file-support-fullscreen-button:focus-visible {
+  border-color: var(--app-primary, #84c361);
+  background: rgba(var(--app-primary-rgb, 132, 195, 97), 0.2);
+  outline: none;
+}
+
+.file-support-fullscreen-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .file-support-content {
   min-height: 100%;
   margin: 0;
@@ -3292,6 +3352,12 @@ body.is-file-support-resizing {
     min-height: auto;
   }
 
+  .file-support-layout.is-viewer-fullscreen {
+    height: 100vh;
+    min-height: 0;
+    padding: 8px;
+  }
+
   .file-support-panel {
     height: 320px;
     min-height: 0;
@@ -3303,6 +3369,11 @@ body.is-file-support-resizing {
 
   .file-support-viewer-panel {
     height: 430px;
+    min-height: 0;
+  }
+
+  .file-support-layout.is-viewer-fullscreen .file-support-viewer-panel {
+    height: 100%;
     min-height: 0;
   }
 

@@ -836,6 +836,7 @@ let supportFileState = {
 let supportFileTreeWidth = getSavedSupportTreeWidth();
 let supportTreeSearchQuery = '';
 let supportContentSearchQuery = '';
+let supportFileViewerFullscreen = false;
 let expandedSupportFolders = new Set();
 
 const portStatuses = new Map();
@@ -1623,6 +1624,13 @@ function focusSupportSearchInput(inputId) {
 }
 
 function handleFileSupportSearchShortcut(event) {
+  if (event.key === 'Escape' && activeLineId === FILE_SUPPORT_VIEW_ID && supportFileViewerFullscreen) {
+    event.preventDefault();
+    supportFileViewerFullscreen = false;
+    renderProductApp();
+    return;
+  }
+
   const key = String(event.key || '').toLowerCase();
   const isFindShortcut = key === 'f' && (event.ctrlKey || event.metaKey) && !event.altKey;
   if (!isFindShortcut || activeLineId !== FILE_SUPPORT_VIEW_ID) return;
@@ -1916,6 +1924,7 @@ function getSupportContentSearchPresentation(filePath, content, query) {
 function renderFileSupportView(workspace) {
   const treeSearchResult = filterSupportTreeNodes(supportFileState.tree, supportTreeSearchQuery);
   const treeSearchActive = normalizeSearchQuery(supportTreeSearchQuery).length > 0;
+  const isViewerFullscreen = supportFileViewerFullscreen && Boolean(supportFileState.selectedFileId);
   const selectedContentPresentation = supportFileState.selectedFileId
     && !supportFileState.selectedLoading
     && !supportFileState.selectedError
@@ -1974,7 +1983,7 @@ function renderFileSupportView(workspace) {
   }
 
   const layout = document.createElement('section');
-  layout.className = 'file-support-layout';
+  layout.className = `file-support-layout${isViewerFullscreen ? ' is-viewer-fullscreen' : ''}`;
   layout.style.setProperty('--file-support-tree-width', `${supportFileTreeWidth}px`);
 
   const treePanel = document.createElement('div');
@@ -2046,10 +2055,25 @@ function renderFileSupportView(workspace) {
   viewerPanel.className = 'file-support-panel file-support-viewer-panel';
   const viewerHeader = document.createElement('div');
   viewerHeader.className = 'file-support-viewer-header';
+  const viewerTitleRow = document.createElement('div');
+  viewerTitleRow.className = 'file-support-viewer-title-row';
   const viewerTitle = document.createElement('h3');
   viewerTitle.className = 'file-support-panel-title';
   viewerTitle.textContent = supportFileState.selectedPath || 'Viewer';
-  viewerHeader.appendChild(viewerTitle);
+  viewerTitleRow.appendChild(viewerTitle);
+  const fullscreenButton = document.createElement('button');
+  fullscreenButton.type = 'button';
+  fullscreenButton.className = 'file-support-fullscreen-button';
+  fullscreenButton.textContent = isViewerFullscreen ? 'Normal View' : 'Full Screen';
+  fullscreenButton.disabled = !supportFileState.selectedFileId;
+  fullscreenButton.setAttribute('aria-pressed', isViewerFullscreen ? 'true' : 'false');
+  fullscreenButton.setAttribute('aria-label', isViewerFullscreen ? 'Return to normal file view' : 'Open selected file full screen');
+  fullscreenButton.addEventListener('click', () => {
+    supportFileViewerFullscreen = !isViewerFullscreen;
+    renderProductApp();
+  });
+  viewerTitleRow.appendChild(fullscreenButton);
+  viewerHeader.appendChild(viewerTitleRow);
   const contentSearch = document.createElement('div');
   contentSearch.className = 'file-support-search';
   const contentSearchInput = document.createElement('input');
@@ -2234,6 +2258,7 @@ async function handleSupportFileImport() {
     }
     supportTreeSearchQuery = '';
     supportContentSearchQuery = '';
+    supportFileViewerFullscreen = false;
 
     supportFileState = {
       sessionId: result.sessionId,
