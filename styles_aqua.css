@@ -1486,6 +1486,99 @@ body {
   padding-right: 34px;
 }
 
+.file-support-shortcuts-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1260;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.file-support-shortcuts-content {
+  position: relative;
+  width: min(440px, 100%);
+  padding: 28px 28px 24px;
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(var(--app-primary-rgb, 132, 195, 97), 0.08), transparent 160px),
+    var(--app-card, #111);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.58);
+}
+
+.file-support-shortcuts-close {
+  top: 12px;
+  right: 12px;
+}
+
+.file-support-shortcuts-title {
+  margin: 4px 0 20px;
+  font-size: 1.2rem;
+  color: var(--app-text, #fff);
+  padding-right: 34px;
+}
+
+.file-support-shortcuts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.file-support-shortcuts-table th {
+  text-align: left;
+  padding: 0 12px 10px 0;
+  color: var(--app-primary, #84c361);
+  font-weight: 600;
+  border-bottom: 1px solid var(--app-border, rgba(255, 255, 255, 0.14));
+}
+
+.file-support-shortcuts-table td {
+  padding: 9px 12px 9px 0;
+  color: var(--app-text, #fff);
+  border-bottom: 1px solid var(--app-border, rgba(255, 255, 255, 0.07));
+}
+
+.file-support-shortcuts-table tr:last-child td {
+  border-bottom: none;
+}
+
+.file-support-shortcuts-table kbd {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--app-border, rgba(255, 255, 255, 0.22));
+  background: rgba(255, 255, 255, 0.07);
+  font-family: inherit;
+  font-size: 0.88rem;
+  color: var(--app-primary, #84c361);
+  white-space: nowrap;
+}
+
+.file-support-shortcuts-button {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--app-border, rgba(255, 255, 255, 0.22));
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--app-muted, #9c9c9c);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.file-support-shortcuts-button:hover {
+  border-color: var(--app-primary, #84c361);
+  color: var(--app-primary, #84c361);
+  background: rgba(var(--app-primary-rgb, 132, 195, 97), 0.1);
+}
+
 .saved-support-files-header h2 {
   margin: 0;
   color: var(--app-text, #fff);
@@ -2916,7 +3009,8 @@ body {
   min-height: 300px;
   padding: 12px;
   line-height: 1.45;
-  resize: vertical;
+  overflow: hidden;
+  resize: none;
 }
 
 .template-title-input:focus,
@@ -2960,10 +3054,11 @@ body {
 }
 
 .template-agent-input {
-  min-height: 46px;
-  padding: 10px 12px;
-  line-height: 1.4;
-  resize: vertical;
+  min-height: 64px;
+  padding: 12px;
+  line-height: 1.45;
+  overflow: hidden;
+  resize: none;
 }
 
 .template-generate-row {
@@ -3664,8 +3759,10 @@ body.is-templates-view .template-editor-placeholder {
 
 body.is-templates-view .template-body-input {
   flex: none;
-  min-height: max(300px, calc(100vh - 460px));
-  resize: vertical;
+  min-height: 300px;
+  height: auto;
+  overflow: hidden;
+  resize: none;
 }
 
 .file-support-layout.is-viewer-fullscreen {

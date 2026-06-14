@@ -87,6 +87,16 @@ Default models:
 - OpenAI: `gpt-4.1-mini`
 - Claude: `claude-sonnet-4-5`
 
+Keyboard Shortcuts — File Support
+----------------------------------
+
+| Key | Action |
+|-----|--------|
+| `F` | Toggle viewer fullscreen |
+| `Esc` | Exit fullscreen |
+| `Ctrl+G` | Toggle grep mode on/off |
+| `Ctrl+C` | Toggle cut mode (only when grep is active) |
+
 Local Persistence
 -----------------
 - Theme selection, provider preference, API keys, loaded agent skill, and templates are persisted locally in the renderer.

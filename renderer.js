@@ -903,6 +903,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupItemConfigModal();
   setupSettingsModal();
   setupSavedSupportFilesModal();
+  setupFileSupportShortcutsModal();
   setupConfigTransferControls();
   setupFileSupportKeyboardShortcuts();
   setupTabCycleShortcut();
@@ -1535,8 +1536,9 @@ function renderTemplatesView(workspace) {
   const createInput = document.createElement('textarea');
   createInput.id = 'template-agent-input';
   createInput.className = 'template-agent-input';
-  createInput.rows = 2;
+  createInput.rows = 1;
   createInput.placeholder = 'Paste text here';
+  attachAutoSizingTextarea(createInput);
 
   const createControls = document.createElement('div');
   createControls.className = 'template-create-controls';
@@ -1696,27 +1698,68 @@ function focusSupportSearchInput(inputId) {
 }
 
 function handleFileSupportSearchShortcut(event) {
-  if (event.key === 'Escape' && activeLineId === FILE_SUPPORT_VIEW_ID && supportFileViewerFullscreen) {
-    event.preventDefault();
-    supportFileViewerFullscreen = false;
-    renderProductApp();
+  if (activeLineId !== FILE_SUPPORT_VIEW_ID) return;
+
+  const key = String(event.key || '').toLowerCase();
+  const inInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+  const hasFile = Boolean(supportFileState.selectedFileId);
+  const fileReady = hasFile && !supportFileState.selectedLoading && !supportFileState.selectedError;
+
+  // Esc: close shortcuts modal or exit fullscreen
+  if (event.key === 'Escape') {
+    const shortcutsModal = document.getElementById('file-support-shortcuts-modal');
+    if (shortcutsModal && shortcutsModal.style.display === 'flex') {
+      shortcutsModal.style.display = 'none';
+      return;
+    }
+    if (supportFileViewerFullscreen) {
+      event.preventDefault();
+      supportFileViewerFullscreen = false;
+      renderProductApp();
+      return;
+    }
+  }
+
+  // F (bare): toggle fullscreen
+  if (key === 'f' && !event.ctrlKey && !event.metaKey && !event.altKey && !inInput) {
+    if (hasFile) {
+      event.preventDefault();
+      supportFileViewerFullscreen = !supportFileViewerFullscreen;
+      renderProductApp();
+    }
     return;
   }
 
-  const key = String(event.key || '').toLowerCase();
-  const isFindShortcut = key === 'f' && (event.ctrlKey || event.metaKey) && !event.altKey;
-  if (!isFindShortcut || activeLineId !== FILE_SUPPORT_VIEW_ID) return;
+  // Ctrl+F: focus search input (existing)
+  if (key === 'f' && (event.ctrlKey || event.metaKey) && !event.altKey) {
+    event.preventDefault();
+    event.stopPropagation();
+    const inputId = event.shiftKey
+      ? 'file-support-tree-search'
+      : 'file-support-content-search';
+    const focused = focusSupportSearchInput(inputId);
+    if (!focused && inputId === 'file-support-content-search') {
+      showNotification('Select a file first');
+    }
+    return;
+  }
 
-  event.preventDefault();
-  event.stopPropagation();
+  // Ctrl+G: toggle grep
+  if (key === 'g' && event.ctrlKey && !event.metaKey && !event.altKey) {
+    if (fileReady) {
+      event.preventDefault();
+      supportGrepEnabled = !supportGrepEnabled;
+      renderProductApp();
+    }
+    return;
+  }
 
-  const inputId = event.shiftKey
-    ? 'file-support-tree-search'
-    : 'file-support-content-search';
-  const focused = focusSupportSearchInput(inputId);
-
-  if (!focused && inputId === 'file-support-content-search') {
-    showNotification('Select a file first');
+  // Ctrl+C: toggle cut (only when grep is active so copy still works normally)
+  if (key === 'c' && event.ctrlKey && !event.metaKey && !event.altKey && supportGrepEnabled && fileReady) {
+    event.preventDefault();
+    supportGrepCutMatches = !supportGrepCutMatches;
+    renderProductApp();
+    return;
   }
 }
 
@@ -3055,6 +3098,9 @@ function renderSavedSupportFilesModal() {
         };
         renderSavedSupportFilesModal();
       });
+      itemButton.addEventListener('dblclick', () => {
+        handleSavedSupportFileOpen(file.id);
+      });
 
       const itemTitle = document.createElement('strong');
       itemTitle.textContent = getSavedSupportFileTitle(file);
@@ -3327,6 +3373,20 @@ function setupSavedSupportFilesModal() {
   });
 }
 
+function setupFileSupportShortcutsModal() {
+  const modal = document.getElementById('file-support-shortcuts-modal');
+  const closeButton = document.getElementById('close-file-support-shortcuts');
+  if (!modal) return;
+
+  if (closeButton) {
+    closeButton.addEventListener('click', () => { modal.style.display = 'none'; });
+  }
+
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) modal.style.display = 'none';
+  });
+}
+
 function renderFileSupportView(workspace) {
   const treeSearchResult = filterSupportTreeNodes(supportFileState.tree, supportTreeSearchQuery);
   const treeSearchActive = normalizeSearchQuery(supportTreeSearchQuery).length > 0;
@@ -3386,6 +3446,18 @@ function renderFileSupportView(workspace) {
   savedFilesButton.textContent = 'Saved Files';
   savedFilesButton.addEventListener('click', openSavedSupportFilesModal);
   controls.appendChild(savedFilesButton);
+
+  const shortcutsButton = document.createElement('button');
+  shortcutsButton.type = 'button';
+  shortcutsButton.className = 'file-support-shortcuts-button';
+  shortcutsButton.textContent = '?';
+  shortcutsButton.setAttribute('aria-label', 'Keyboard shortcuts');
+  shortcutsButton.title = 'Keyboard shortcuts';
+  shortcutsButton.addEventListener('click', () => {
+    const modal = document.getElementById('file-support-shortcuts-modal');
+    if (modal) modal.style.display = 'flex';
+  });
+  controls.appendChild(shortcutsButton);
   headerRow.appendChild(controls);
 
   headerText.appendChild(headerRow);
@@ -4131,6 +4203,17 @@ function createTemplateListItem(template, index, options = {}) {
   return button;
 }
 
+function attachAutoSizingTextarea(textarea) {
+  if (!(textarea instanceof HTMLTextAreaElement)) return () => {};
+  const syncHeight = () => {
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  };
+  textarea.addEventListener('input', syncHeight);
+  requestAnimationFrame(syncHeight);
+  return syncHeight;
+}
+
 function createTemplateEditor(template, index, options = {}) {
   const isDraft = Boolean(options.isDraft);
   const editor = document.createElement('section');
@@ -4145,8 +4228,9 @@ function createTemplateEditor(template, index, options = {}) {
   const bodyInput = document.createElement('textarea');
   bodyInput.className = 'template-body-input';
   bodyInput.value = template.body;
-  bodyInput.rows = 14;
+  bodyInput.rows = 1;
   bodyInput.setAttribute('aria-label', `${template.title} body`);
+  const syncBodyHeight = attachAutoSizingTextarea(bodyInput);
 
   if (isDraft) {
     const syncDraft = () => {
@@ -4157,6 +4241,7 @@ function createTemplateEditor(template, index, options = {}) {
         body: bodyInput.value
       };
       saveTemplateDrafts();
+      syncBodyHeight();
     };
     titleInput.addEventListener('input', syncDraft);
     bodyInput.addEventListener('input', syncDraft);
