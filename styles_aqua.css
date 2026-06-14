@@ -68,13 +68,16 @@
 .file-support-smart-scan-button:hover:not(:disabled),.file-support-smart-scan-button:focus-visible{border-color:var(--app-primary,#84c361);background:rgba(var(--app-primary-rgb,132,195,97),.22);outline:none}
 .file-support-smart-scan-button:disabled{opacity:.55;cursor:not-allowed}
 .file-support-smart-result{margin:14px;padding:12px;border:1px solid rgba(var(--app-primary-rgb,132,195,97),.32);border-radius:8px;background:rgba(var(--app-card-rgb,var(--app-sidebar-rgb,27,73,101)),.36)}
-.file-support-smart-result h4{margin:0 0 8px;color:var(--app-primary,#84c361);font-size:.92rem}
+.file-support-smart-result-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.file-support-smart-result h4{margin:0;color:var(--app-primary,#84c361);font-size:.92rem}
+.file-support-smart-save-button{flex:0 0 auto;min-height:30px;padding:5px 9px;border:1px solid rgba(var(--app-primary-rgb,132,195,97),.46);border-radius:6px;background:rgba(var(--app-primary-rgb,132,195,97),.14);color:var(--app-text,#fff);font:inherit;font-size:.78rem;cursor:pointer;white-space:nowrap}
+.file-support-smart-save-button:hover,.file-support-smart-save-button:focus-visible{border-color:var(--app-primary,#84c361);background:rgba(var(--app-primary-rgb,132,195,97),.22);outline:none}
 .file-support-smart-result p{margin:0;color:var(--app-muted,#9c9c9c);font-size:.86rem;line-height:1.45}
 .file-support-smart-error{color:var(--app-warning,#c9653d)!important}
 .file-support-smart-answer{margin:0;color:var(--app-text,#fff);white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit;font-size:.86rem;line-height:1.45}
 .file-support-smart-sources{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .file-support-smart-sources .file-support-summary-link{max-width:260px;margin:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-@media (max-width:720px){.file-support-smart-scan{grid-template-columns:1fr}}
+@media (max-width:720px){.file-support-smart-scan{grid-template-columns:1fr}.file-support-smart-result-header{align-items:flex-start;flex-wrap:wrap}}
 
 body {
   background-color: var(--app-background);

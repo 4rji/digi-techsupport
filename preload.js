@@ -23,6 +23,18 @@ const redactArgs = (name, args) => {
   if (name === 'sshSaveAdminPassword') {
     return ['[redacted]'];
   }
+  if (name === 'saveTextFile') {
+    return args.map((arg) => {
+      if (!arg || typeof arg !== 'object') return arg;
+      return {
+        title: arg.title,
+        buttonLabel: arg.buttonLabel,
+        defaultPath: arg.defaultPath,
+        content: typeof arg.content === 'string' ? `[${arg.content.length} chars]` : '',
+        filters: Array.isArray(arg.filters) ? `[${arg.filters.length} filters]` : ''
+      };
+    });
+  }
   if (name === 'generateSupportTemplate' || name === 'analyzeSupportFile') {
     return args.map((arg) => {
       if (!arg || typeof arg !== 'object') return arg;
@@ -98,6 +110,9 @@ contextBridge.exposeInMainWorld('appAPI', {
   }),
   getSupportFileEntryContent: logWrapper('getSupportFileEntryContent', (sessionId, entryId) => {
     return ipcRenderer.invoke('get-support-file-entry-content', sessionId, entryId);
+  }),
+  saveTextFile: logWrapper('saveTextFile', (options) => {
+    return ipcRenderer.invoke('save-text-file', options);
   }),
   onSSHData: (callback) => {
     const listener = (_event, payload) => callback(payload);

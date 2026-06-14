@@ -860,7 +860,11 @@ let supportSmartScanState = {
   loading: false,
   answer: '',
   error: '',
-  sources: []
+  sources: [],
+  resultQuery: '',
+  resultProvider: '',
+  resultSelectedPath: '',
+  completedAt: ''
 };
 let supportFileTreeWidth = getSavedSupportTreeWidth();
 let supportTreeSearchQuery = '';
@@ -2420,9 +2424,23 @@ function renderSupportSmartScanResult(parent) {
   const panel = document.createElement('section');
   panel.className = 'file-support-smart-result';
 
+  const resultHeader = document.createElement('div');
+  resultHeader.className = 'file-support-smart-result-header';
   const title = document.createElement('h4');
   title.textContent = supportSmartScanState.loading ? 'Smart scan running' : 'Smart scan result';
-  panel.appendChild(title);
+  resultHeader.appendChild(title);
+
+  if (!supportSmartScanState.loading && supportSmartScanState.answer) {
+    const saveButton = document.createElement('button');
+    saveButton.type = 'button';
+    saveButton.className = 'file-support-smart-save-button';
+    saveButton.textContent = 'Save report';
+    saveButton.setAttribute('aria-label', 'Save AI scan report');
+    saveButton.addEventListener('click', handleSupportSmartScanReportSave);
+    resultHeader.appendChild(saveButton);
+  }
+
+  panel.appendChild(resultHeader);
 
   if (supportSmartScanState.loading) {
     const loading = document.createElement('p');
@@ -2453,6 +2471,120 @@ function renderSupportSmartScanResult(parent) {
   }
 
   parent.appendChild(panel);
+}
+
+function sanitizeDownloadFilenamePart(value, fallback = 'support-file') {
+  const compactValue = String(value || '')
+    .trim()
+    .replace(/\.[^/.\\]+$/, '')
+    .replace(/[<>:"/\\|?*\x00-\x1f]+/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return compactValue || fallback;
+}
+
+function escapeInlineCode(value) {
+  return String(value || '').replace(/`/g, "'");
+}
+
+function formatSmartScanReportDate(value) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) {
+    return new Date().toLocaleString();
+  }
+  return date.toLocaleString();
+}
+
+function buildSupportSmartScanReport() {
+  const answer = String(supportSmartScanState.answer || '').trim();
+  const query = String(supportSmartScanState.resultQuery || supportSmartScanState.query || '').trim();
+  const sources = Array.isArray(supportSmartScanState.sources) ? supportSmartScanState.sources : [];
+  const lines = [
+    '# AI Scan Report',
+    '',
+    `- Support file: ${supportFileState.fileName || 'Unknown support file'}`,
+    `- Generated: ${formatSmartScanReportDate(supportSmartScanState.completedAt)}`,
+    `- Provider: ${supportSmartScanState.resultProvider || getProviderLabel(getPreferredProvider())}`,
+    `- Query: ${query || 'Default support file scan'}`
+  ];
+
+  if (supportSmartScanState.resultSelectedPath) {
+    lines.push(`- Selected file: \`${escapeInlineCode(supportSmartScanState.resultSelectedPath)}\``);
+  }
+
+  lines.push('', '## Result', '', answer || 'No AI scan answer was returned.');
+
+  if (sources.length > 0) {
+    lines.push('', '## Sources', '');
+    sources.forEach(source => {
+      const pathLabel = escapeInlineCode(source?.path || 'Unknown source');
+      const reason = String(source?.reason || '').trim();
+      lines.push(`- \`${pathLabel}\`${reason ? ` - ${reason}` : ''}`);
+    });
+  }
+
+  lines.push('');
+  return lines.join('\n');
+}
+
+function getSupportSmartScanReportFilename() {
+  const supportFileName = sanitizeDownloadFilenamePart(supportFileState.fileName, 'support-file');
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return `ai-scan-report-${supportFileName}-${timestamp}.md`;
+}
+
+function triggerTextDownload(text, filename, type = 'text/plain;charset=utf-8') {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+async function handleSupportSmartScanReportSave() {
+  if (!supportSmartScanState.answer) {
+    showNotification('Run an AI scan first');
+    return;
+  }
+
+  const filename = getSupportSmartScanReportFilename();
+  const content = buildSupportSmartScanReport();
+  const networkAPI = getNetworkAPI();
+
+  try {
+    if (networkAPI && typeof networkAPI.saveTextFile === 'function') {
+      const result = await networkAPI.saveTextFile({
+        title: 'Save AI Scan Report',
+        buttonLabel: 'Save Report',
+        defaultPath: filename,
+        content,
+        filters: [
+          { name: 'Markdown', extensions: ['md'] },
+          { name: 'Text files', extensions: ['txt'] },
+          { name: 'All files', extensions: ['*'] }
+        ]
+      });
+
+      if (result?.canceled) {
+        return;
+      }
+      if (!result || !result.success) {
+        throw new Error(result?.error || 'Could not save AI scan report');
+      }
+    } else {
+      triggerTextDownload(content, filename, 'text/markdown;charset=utf-8');
+    }
+
+    showNotification('AI scan report saved');
+  } catch (error) {
+    console.error('Error saving AI scan report:', error);
+    showNotification(error.message || 'Could not save AI scan report');
+  }
 }
 
 function renderFileSupportView(workspace) {
@@ -2892,7 +3024,11 @@ async function handleSupportFileImport() {
       loading: false,
       answer: '',
       error: '',
-      sources: []
+      sources: [],
+      resultQuery: '',
+      resultProvider: '',
+      resultSelectedPath: '',
+      completedAt: ''
     };
 
     supportFileState = {
@@ -3067,13 +3203,19 @@ async function handleSupportSmartScan() {
     return;
   }
 
+  const scanQuery = supportSmartScanState.query;
+  const selectedPath = supportFileState.selectedPath;
   supportSmartScanState = {
     ...supportSmartScanState,
     visible: true,
     loading: true,
     answer: '',
     error: '',
-    sources: []
+    sources: [],
+    resultQuery: '',
+    resultProvider: '',
+    resultSelectedPath: '',
+    completedAt: ''
   };
   renderProductApp();
   showNotification(`Scanning support file with ${providerConfig.label}`);
@@ -3083,7 +3225,7 @@ async function handleSupportSmartScan() {
       provider: providerConfig.provider,
       apiKey: providerConfig.apiKey,
       skill: fileSupportSkill,
-      query: supportSmartScanState.query,
+      query: scanQuery,
       selectedFileId: supportFileState.selectedFileId
     });
 
@@ -3096,7 +3238,11 @@ async function handleSupportSmartScan() {
       loading: false,
       answer: result.answer || '',
       error: '',
-      sources: Array.isArray(result.sources) ? result.sources : []
+      sources: Array.isArray(result.sources) ? result.sources : [],
+      resultQuery: scanQuery,
+      resultProvider: providerConfig.label,
+      resultSelectedPath: selectedPath,
+      completedAt: new Date().toISOString()
     };
     showNotification('Smart scan complete');
   } catch (error) {
@@ -3106,7 +3252,11 @@ async function handleSupportSmartScan() {
       loading: false,
       answer: '',
       error: error.message || 'Smart scan failed',
-      sources: []
+      sources: [],
+      resultQuery: scanQuery,
+      resultProvider: providerConfig.label,
+      resultSelectedPath: selectedPath,
+      completedAt: ''
     };
     showNotification('Smart scan failed');
   }
@@ -5299,17 +5449,9 @@ function collectConfigurationSnapshot() {
 
 function triggerConfigDownload(payload) {
   const data = JSON.stringify(payload, null, 2);
-  const blob = new Blob([data], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const filename = `product-line-config-${timestamp}.json`;
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  triggerTextDownload(data, filename, 'application/json');
 }
 
 function handleConfigExport() {

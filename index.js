@@ -1424,6 +1424,59 @@ async function importSupportFileFromDialog(webContents) {
   };
 }
 
+function sanitizeSaveDialogFileName(fileName, fallback = 'file.txt') {
+  const baseName = String(fileName || fallback).split(/[\\/]/).pop();
+  const safeName = baseName
+    .replace(/[<>:"/\\|?*\x00-\x1f]+/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return safeName || fallback;
+}
+
+function normalizeSaveDialogFilters(filters) {
+  const fallbackFilters = [
+    { name: 'Text files', extensions: ['txt'] },
+    { name: 'All files', extensions: ['*'] }
+  ];
+  if (!Array.isArray(filters)) return fallbackFilters;
+
+  const normalizedFilters = filters
+    .map(filter => {
+      const name = String(filter?.name || 'File').trim() || 'File';
+      const extensions = Array.isArray(filter?.extensions)
+        ? filter.extensions
+          .map(extension => String(extension || '').replace(/^\./, '').trim())
+          .filter(extension => /^[a-z0-9*]+$/i.test(extension))
+        : [];
+      return extensions.length ? { name, extensions } : null;
+    })
+    .filter(Boolean);
+
+  return normalizedFilters.length ? normalizedFilters : fallbackFilters;
+}
+
+async function saveTextFileFromDialog(webContents, options = {}) {
+  const browserWindow = BrowserWindow.fromWebContents(webContents);
+  const defaultPath = sanitizeSaveDialogFileName(options.defaultPath, 'ai-scan-report.md');
+  const dialogResult = await dialog.showSaveDialog(browserWindow || undefined, {
+    title: String(options.title || 'Save File'),
+    buttonLabel: String(options.buttonLabel || 'Save'),
+    defaultPath,
+    filters: normalizeSaveDialogFilters(options.filters)
+  });
+
+  if (dialogResult.canceled || !dialogResult.filePath) {
+    return { success: false, canceled: true };
+  }
+
+  const content = typeof options.content === 'string' ? options.content : String(options.content || '');
+  await fs.promises.writeFile(dialogResult.filePath, content, 'utf8');
+  return {
+    success: true,
+    filePath: dialogResult.filePath
+  };
+}
+
 function setupIPCHandlers() {
   ipcMain.handle('ping-host', async (_event, host, timeout = 3000) => {
     return pingHost(host, timeout);
@@ -1497,6 +1550,14 @@ function setupIPCHandlers() {
       text: content.text,
       truncated: content.truncated
     };
+  });
+
+  ipcMain.handle('save-text-file', async (event, options = {}) => {
+    try {
+      return await saveTextFileFromDialog(event.sender, options);
+    } catch (error) {
+      return { success: false, error: error.message || 'Could not save file' };
+    }
   });
 
   ipcMain.handle('test-tcp-port', async (_event, host, port, timeout = 3000) => {

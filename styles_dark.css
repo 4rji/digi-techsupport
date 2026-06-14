@@ -139,10 +139,39 @@ body {
   background: rgba(var(--app-card-rgb, var(--app-sidebar-rgb, 27, 73, 101)), 0.36);
 }
 
+.file-support-smart-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
 .file-support-smart-result h4 {
-  margin: 0 0 8px;
+  margin: 0;
   color: var(--app-primary, #84c361);
   font-size: 0.92rem;
+}
+
+.file-support-smart-save-button {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid rgba(var(--app-primary-rgb, 132, 195, 97), 0.46);
+  border-radius: 6px;
+  background: rgba(var(--app-primary-rgb, 132, 195, 97), 0.14);
+  color: var(--app-text, #fff);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.file-support-smart-save-button:hover,
+.file-support-smart-save-button:focus-visible {
+  border-color: var(--app-primary, #84c361);
+  background: rgba(var(--app-primary-rgb, 132, 195, 97), 0.22);
+  outline: none;
 }
 
 .file-support-smart-result p {
@@ -3858,6 +3887,11 @@ body.is-file-support-resizing {
 
   .file-support-smart-scan {
     grid-template-columns: 1fr;
+  }
+
+  .file-support-smart-result-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
   }
 
   .file-support-controls,
