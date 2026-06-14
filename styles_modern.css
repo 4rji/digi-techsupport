@@ -93,9 +93,9 @@ body {
   background-repeat: no-repeat;
 }
 
-html {
-  scroll-behavior: smooth;
-}
+/* scroll-behavior: smooth intentionally omitted — native apps don't animate
+   scrolls; smooth-scroll is a browser/web convention and makes the app feel
+   like webpage navigation instead of an instant panel switch. */
 
 /* Crisper headings */
 h1, h2, h3 {
@@ -205,6 +205,17 @@ select:focus-visible,
   gap: 8px;
 }
 
+/* #product-tabs is the main tab strip inside the topbar.
+   Remove the container frame (background box, border, shadow, padding) so
+   the tab buttons float freely without a surrounding "box". */
+#product-tabs {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 4px 0 !important;
+  margin-bottom: 0 !important;
+}
+
 .tab-button {
   border-radius: var(--ui-r-pill);
   transition: transform var(--ui-fast) var(--ui-ease-out),
@@ -268,12 +279,10 @@ select:focus-visible,
               0 8px 18px -10px rgba(var(--ui-accent-rgb), 0.5);
 }
 
-/* Line-index badge becomes a branded glass chip */
+/* Line-index badge — branded glass chip, simulated (no backdrop-filter) */
 .product-line-tag {
-  background: rgba(var(--ui-accent-rgb), 0.16);
+  background: rgba(var(--ui-accent-rgb), 0.18);
   border-color: rgba(var(--ui-accent-rgb), 0.42);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
   box-shadow: var(--ui-shadow-sm);
 }
 
@@ -439,25 +448,25 @@ select:focus-visible,
   box-shadow: var(--glass-bead), 0 22px 36px -30px rgba(0, 0, 0, 0.95);
 }
 
-/* --- Tabs tray ------------------------------------------------------------ */
+/* --- Tabs tray — simulated glass (no backdrop-filter: it's nested inside
+   the already-blurred sticky topbar; multiple blur layers cause GPU layer
+   desync = the visible "sliding" across the whole app) -------------------- */
 .tabs {
-  background: var(--glass-fill-soft);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-rim);
+  background: rgba(18, 22, 28, 0.70);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: var(--glass-bead), var(--ui-shadow-sm);
 }
 
 .tab-button:not(.active) {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   box-shadow: var(--glass-bead);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  /* NO backdrop-filter — tab buttons are inside .tabs which is inside the
+     sticky topbar; nesting blur here causes compositing layer desync */
 }
 
 .tab-button:not(.active):hover {
-  background: rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.11);
   border-color: rgba(var(--ui-accent-rgb), 0.4);
 }
 
@@ -476,15 +485,17 @@ select:focus-visible,
     0 12px 28px -8px rgba(var(--ui-accent-rgb), 0.65);
 }
 
-/* --- Product / VM cards: the hero glass panels ---------------------------- */
+/* --- Product / VM cards: simulated glass panels ----------------------------
+   backdrop-filter on a grid of 10-20 cards = dozens of simultaneous GPU
+   compositing layers → compositing desync → the "sliding" effect.
+   Simulated glass (opaque tinted fill + sheen gradient + shadows) looks
+   identical but doesn't create compositing layers per card. -------------- */
 .product-card,
 .vm-card {
   background:
     var(--glass-sheen),
     var(--glass-accent-wash),
-    var(--glass-fill);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
+    rgba(18, 24, 32, 0.88);
   border: 1px solid var(--glass-rim);
   border-radius: var(--ui-r-lg);
   box-shadow:
@@ -518,13 +529,12 @@ select:focus-visible,
     0 10px 22px -10px rgba(var(--ui-accent-rgb), 0.7);
 }
 
-/* --- Settings button → glass orb ------------------------------------------ */
+/* --- Settings button → simulated glass orb (no backdrop-filter: inside
+   the sticky topbar, another blur layer = compositing desync) ------------ */
 .settings-button {
   background:
-    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.4), transparent 46%),
-    var(--glass-fill);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
+    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.38), transparent 46%),
+    rgba(18, 24, 32, 0.82);
   border: 1px solid var(--glass-rim);
   box-shadow: var(--glass-bead), var(--ui-shadow-md);
 }
@@ -549,13 +559,11 @@ select:focus-visible,
   box-shadow: var(--glass-bead), var(--ui-shadow-sm);
 }
 
-/* --- Pills & count badges → glass chips ----------------------------------- */
+/* --- Pills & count badges → simulated glass chips (no backdrop-filter) -- */
 .product-count,
 .product-top-controls,
 .port-chip {
-  background: var(--glass-fill-soft);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
+  background: rgba(22, 28, 36, 0.75);
   border: 1px solid var(--glass-rim);
   box-shadow: var(--glass-bead);
 }
@@ -608,45 +616,16 @@ select:focus-visible,
   }
 }
 
-/* --------------------------------------------------------------------------
-   Orchestrated entrance — cards rise in a quick stagger when a view renders.
-   `backwards` fill releases transform after finishing, so hover-lift still works.
-   Polling only toggles `.online` on existing cards, so this never replays.
-   -------------------------------------------------------------------------- */
-.product-grid > * {
-  animation: ui-card-in 460ms var(--ui-ease-out) backwards;
-}
-
-.product-grid > *:nth-child(1)  { animation-delay: 30ms; }
-.product-grid > *:nth-child(2)  { animation-delay: 70ms; }
-.product-grid > *:nth-child(3)  { animation-delay: 110ms; }
-.product-grid > *:nth-child(4)  { animation-delay: 150ms; }
-.product-grid > *:nth-child(5)  { animation-delay: 190ms; }
-.product-grid > *:nth-child(6)  { animation-delay: 230ms; }
-.product-grid > *:nth-child(7)  { animation-delay: 270ms; }
-.product-grid > *:nth-child(8)  { animation-delay: 310ms; }
-.product-grid > *:nth-child(9)  { animation-delay: 350ms; }
-.product-grid > *:nth-child(n+10) { animation-delay: 390ms; }
-
-@keyframes ui-card-in {
-  from {
-    opacity: 0;
-    transform: translateY(16px) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
+/* Card entrance animation intentionally removed.
+   The workspace grid is fully rebuilt on every tab switch (workspace.innerHTML='')
+   so a translateY/opacity animation would replay on every single tab click —
+   making the app feel like web page navigation. Native apps switch panels
+   instantly. The hover-lift and online-pulse animations remain. */
 
 /* --------------------------------------------------------------------------
    Respect reduced-motion preferences
    -------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-
   *,
   *::before,
   *::after {

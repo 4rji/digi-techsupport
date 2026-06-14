@@ -905,7 +905,25 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSavedSupportFilesModal();
   setupConfigTransferControls();
   setupFileSupportKeyboardShortcuts();
+  setupTabCycleShortcut();
 });
+
+function setupTabCycleShortcut() {
+  document.addEventListener('keydown', (event) => {
+    if (!event.ctrlKey || event.key !== 'Tab') return;
+    event.preventDefault();
+
+    const tabsEl = document.getElementById('product-tabs');
+    if (!tabsEl) return;
+    const buttons = Array.from(tabsEl.querySelectorAll('.tab-button'));
+    if (buttons.length < 2) return;
+
+    const currentIndex = buttons.findIndex(b => b.classList.contains('active'));
+    const delta = event.shiftKey ? -1 : 1;
+    const nextIndex = (currentIndex + delta + buttons.length) % buttons.length;
+    buttons[nextIndex].click();
+  });
+}
 
 window.addEventListener('beforeunload', () => {
   if (portPollTimer) {
