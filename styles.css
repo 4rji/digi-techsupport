@@ -3703,7 +3703,7 @@ body.is-file-support-resizing {
 
 .file-support-search {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
@@ -3738,6 +3738,40 @@ body.is-file-support-resizing {
   color: var(--app-muted, #9c9c9c);
   font-size: 0.78rem;
   white-space: nowrap;
+}
+
+.file-support-grep-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.file-support-grep-button {
+  min-height: 34px;
+  padding: 6px 9px;
+  border: 1px solid var(--app-border, rgba(255, 255, 255, 0.14));
+  border-radius: 6px;
+  background: transparent;
+  color: var(--app-muted, #9c9c9c);
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.file-support-grep-button:hover:not(:disabled),
+.file-support-grep-button:focus-visible,
+.file-support-grep-button[aria-pressed="true"] {
+  border-color: rgba(var(--app-primary-rgb, 132, 195, 97), 0.58);
+  background: rgba(var(--app-primary-rgb, 132, 195, 97), 0.14);
+  color: var(--app-text, #fff);
+  outline: none;
+}
+
+.file-support-grep-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .file-support-smart-scan {
@@ -4430,6 +4464,18 @@ body.is-file-support-resizing {
   border-radius: 3px;
   background: #ffd166;
   color: #111;
+}
+
+.support-grep-line-number {
+  display: inline-block;
+  min-width: 4ch;
+  margin-right: 8px;
+  color: var(--app-muted, #9c9c9c);
+  user-select: none;
+}
+
+.support-grep-empty {
+  color: var(--app-muted, #9c9c9c);
 }
 
 .file-support-empty-state,

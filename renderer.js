@@ -883,6 +883,9 @@ let supportTreeSearchQuery = '';
 let supportContentSearchQuery = '';
 let supportFileViewerFullscreen = false;
 let supportContentViewMode = 'ruby';
+let supportGrepEnabled = false;
+let supportGrepIgnoreCase = false;
+let supportGrepCutMatches = false;
 let expandedSupportFolders = new Set();
 
 const portStatuses = new Map();
@@ -1877,13 +1880,15 @@ function highlightLinesWithPatterns(text, patterns) {
   return String(text || '').split('\n').map(line => highlightContentLine(line, patterns)).join('\n');
 }
 
-function highlightBashContent(text) {
+function highlightScalaContent(text) {
   return highlightLinesWithPatterns(text, [
-    { regex: /^\s*#.*/, className: 'support-token-comment' },
+    { regex: /\/\/.*/, className: 'support-token-comment' },
+    { regex: /\/\*[\s\S]*?\*\//g, className: 'support-token-comment' },
     { regex: /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, className: 'support-token-string' },
-    { regex: /\$\{?[A-Za-z_][\w]*\}?|\$[0-9@#?*!]/g, className: 'support-token-variable' },
-    { regex: /\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|select|until|in|return|exit|export|local|readonly|source|sudo|systemctl|journalctl|grep|awk|sed|cat|tail|head|chmod|chown|mkdir|rm|cp|mv)\b/g, className: 'support-token-key' },
-    { regex: /(^|[\s;|&])--?[A-Za-z0-9][\w-]*/g, className: 'support-token-boolean' },
+    { regex: /\b(abstract|case|catch|class|def|derives|do|else|enum|export|extends|false|final|finally|for|given|if|implicit|import|lazy|macro|match|new|null|object|opaque|override|package|private|protected|return|sealed|super|then|this|throw|trait|transparent|true|try|type|val|var|while|with|yield)\b/g, className: 'support-token-key' },
+    { regex: /\b(Boolean|Byte|Char|Double|Either|Float|Future|Int|List|Long|Map|None|Option|Seq|Set|Short|Some|String|Unit|Vector)\b/g, className: 'support-token-boolean' },
+    { regex: /[@][A-Za-z_][\w]*(?:\.[A-Za-z_][\w]*)*/g, className: 'support-token-variable' },
+    { regex: /\b[A-Za-z_][\w]*(?=\s*(?:\(|\[))/g, className: 'support-token-function' },
     { regex: /\/(?:[\w.-]+\/?)+/g, className: 'support-token-path' },
     { regex: /\b-?\d+(?:\.\d+)?\b/g, className: 'support-token-number' }
   ]);
@@ -1945,7 +1950,7 @@ function getSupportContentPresentation(filePath, content, viewMode = 'auto') {
   const trimmedContent = rawContent.trim();
   const extension = filePath.split('.').pop()?.toLowerCase() || '';
   const canHighlight = rawContent.length <= MAX_HIGHLIGHTED_CONTENT_CHARS;
-  const requestedMode = ['ruby', 'bash', 'python', 'log'].includes(viewMode) ? viewMode : 'auto';
+  const requestedMode = ['ruby', 'scala', 'python', 'log'].includes(viewMode) ? viewMode : 'auto';
 
   if (!canHighlight) {
     return {
@@ -1955,11 +1960,11 @@ function getSupportContentPresentation(filePath, content, viewMode = 'auto') {
     };
   }
 
-  if (requestedMode === 'bash') {
+  if (requestedMode === 'scala') {
     return {
-      mode: 'bash',
+      mode: 'scala',
       text: rawContent,
-      html: highlightBashContent(rawContent)
+      html: highlightScalaContent(rawContent)
     };
   }
 
@@ -2019,7 +2024,7 @@ function getSupportContentPresentation(filePath, content, viewMode = 'auto') {
 function highlightSupportContentSegment(text, mode) {
   if (mode === 'json') return highlightJSONContent(text);
   if (mode === 'xml') return highlightXMLContent(text);
-  if (mode === 'bash') return highlightBashContent(text);
+  if (mode === 'scala') return highlightScalaContent(text);
   if (mode === 'python') return highlightPythonContent(text);
   if (mode === 'ruby') return highlightRubyContent(text);
   if (mode === 'log') return highlightLogContent(text);
@@ -2061,7 +2066,158 @@ function findContentSearchRanges(text, query) {
     }, []);
 }
 
+function escapeRegExp(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function parseSupportGrepQuery(query) {
+  let pattern = String(query || '').trim();
+  let ignoreCase = supportGrepIgnoreCase;
+
+  pattern = pattern.replace(/^(?:rg|ripgrep|grep)\s+/i, '').trim();
+  let flagMatch = pattern.match(/^(-[A-Za-z]+)\s+/);
+  while (flagMatch) {
+    if (flagMatch[1].includes('i')) {
+      ignoreCase = true;
+    }
+    pattern = pattern.slice(flagMatch[0].length).trim();
+    flagMatch = pattern.match(/^(-[A-Za-z]+)\s+/);
+  }
+
+  return { pattern, ignoreCase };
+}
+
+function createSupportGrepRegex(pattern, ignoreCase) {
+  if (!pattern) return { regex: null, literal: false, error: '' };
+  try {
+    return {
+      regex: new RegExp(pattern, ignoreCase ? 'gi' : 'g'),
+      literal: false,
+      error: ''
+    };
+  } catch (error) {
+    try {
+      return {
+        regex: new RegExp(escapeRegExp(pattern), ignoreCase ? 'gi' : 'g'),
+        literal: true,
+        error: ''
+      };
+    } catch (_literalError) {
+      return { regex: null, literal: false, error: error.message || 'Invalid grep pattern' };
+    }
+  }
+}
+
+function supportGrepLineMatches(line, regex) {
+  if (!regex) return false;
+  regex.lastIndex = 0;
+  const matched = regex.test(line);
+  regex.lastIndex = 0;
+  return matched;
+}
+
+function highlightSupportGrepLine(line, regex) {
+  if (!regex) return escapeHTML(line);
+
+  let html = '';
+  let cursor = 0;
+  regex.lastIndex = 0;
+  let match = regex.exec(line);
+
+  while (match) {
+    const value = match[0];
+    if (!value) {
+      regex.lastIndex += 1;
+      match = regex.exec(line);
+      continue;
+    }
+
+    html += escapeHTML(line.slice(cursor, match.index));
+    html += `<mark class="support-content-match">${escapeHTML(value)}</mark>`;
+    cursor = match.index + value.length;
+    match = regex.exec(line);
+  }
+
+  html += escapeHTML(line.slice(cursor));
+  regex.lastIndex = 0;
+  return html;
+}
+
+function getSupportGrepPresentation(content, query) {
+  const { pattern, ignoreCase } = parseSupportGrepQuery(query);
+  const { regex, literal, error } = createSupportGrepRegex(pattern, ignoreCase);
+  const source = String(content || '');
+  const lines = source.split('\n');
+
+  if (!pattern) {
+    return {
+      mode: 'grep',
+      html: escapeHTML(source),
+      lineCount: lines.length,
+      matchLineCount: 0,
+      shownLineCount: lines.length,
+      hiddenLineCount: 0,
+      ignoreCase,
+      literal,
+      error: ''
+    };
+  }
+
+  if (error || !regex) {
+    return {
+      mode: 'grep',
+      html: escapeHTML(source),
+      lineCount: lines.length,
+      matchLineCount: 0,
+      shownLineCount: lines.length,
+      hiddenLineCount: 0,
+      ignoreCase,
+      literal,
+      error
+    };
+  }
+
+  let matchLineCount = 0;
+  let hiddenLineCount = 0;
+  const renderedLines = [];
+
+  lines.forEach((line, index) => {
+    const matched = supportGrepLineMatches(line, regex);
+    if (matched) matchLineCount += 1;
+
+    const keepLine = supportGrepCutMatches ? !matched : matched;
+    if (!keepLine) {
+      hiddenLineCount += 1;
+      return;
+    }
+
+    const number = String(index + 1).padStart(String(lines.length).length, ' ');
+    const lineHTML = supportGrepCutMatches
+      ? escapeHTML(line)
+      : highlightSupportGrepLine(line, regex);
+    renderedLines.push(`<span class="support-grep-line-number">${number}:</span>${lineHTML}`);
+  });
+
+  return {
+    mode: 'grep',
+    html: renderedLines.length
+      ? renderedLines.join('\n')
+      : '<span class="support-grep-empty">No lines to show</span>',
+    lineCount: lines.length,
+    matchLineCount,
+    shownLineCount: renderedLines.length,
+    hiddenLineCount,
+    ignoreCase,
+    literal,
+    error: ''
+  };
+}
+
 function getSupportContentSearchPresentation(filePath, content, query, viewMode = 'auto') {
+  if (supportGrepEnabled) {
+    return getSupportGrepPresentation(content, query);
+  }
+
   const presentation = getSupportContentPresentation(filePath, content, viewMode);
   const normalizedQuery = normalizeSearchQuery(query);
 
@@ -2094,6 +2250,43 @@ function getSupportContentSearchPresentation(filePath, content, query, viewMode 
     html,
     matchCount: ranges.length
   };
+}
+
+function getSupportViewerSelectionText(container, fallbackTarget) {
+  const selection = window.getSelection?.();
+  const anchorNode = selection?.anchorNode;
+  const focusNode = selection?.focusNode;
+  const selectionInsideViewer = selection
+    && selection.rangeCount > 0
+    && anchorNode
+    && focusNode
+    && container.contains(anchorNode)
+    && container.contains(focusNode);
+
+  const selectedText = selectionInsideViewer ? selection.toString() : '';
+  const fallbackText = fallbackTarget instanceof Element && container.contains(fallbackTarget)
+    ? fallbackTarget.closest('mark, span')?.textContent || ''
+    : '';
+
+  return String(selectedText || fallbackText || '')
+    .replace(/\r?\n/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 240);
+}
+
+function applySupportViewerSelectionToSearch(container, fallbackTarget) {
+  const selectedText = getSupportViewerSelectionText(container, fallbackTarget);
+  if (!selectedText) return;
+
+  supportContentSearchQuery = selectedText;
+  renderProductApp();
+  requestAnimationFrame(() => {
+    const nextInput = document.getElementById('file-support-content-search');
+    if (!nextInput) return;
+    nextInput.focus();
+    nextInput.setSelectionRange(nextInput.value.length, nextInput.value.length);
+  });
 }
 
 function findSupportNodeById(nodes, entryId) {
@@ -3290,7 +3483,7 @@ function renderFileSupportView(workspace) {
   viewModeControls.className = 'file-support-view-mode-controls';
   [
     { id: 'ruby', label: 'Ruby' },
-    { id: 'bash', label: 'Bash' },
+    { id: 'scala', label: 'Scala' },
     { id: 'python', label: 'Python' },
     { id: 'log', label: 'Log' }
   ].forEach(mode => {
@@ -3359,7 +3552,7 @@ function renderFileSupportView(workspace) {
   contentSearchInput.type = 'search';
   contentSearchInput.id = 'file-support-content-search';
   contentSearchInput.className = 'file-support-search-input';
-  contentSearchInput.placeholder = 'Search in selected file';
+  contentSearchInput.placeholder = supportGrepEnabled ? 'grep pattern, e.g. -i error|fail' : 'Search in selected file';
   contentSearchInput.value = supportContentSearchQuery;
   contentSearchInput.disabled = !supportFileState.selectedFileId || supportFileState.selectedLoading || Boolean(supportFileState.selectedError);
   contentSearchInput.setAttribute('aria-label', 'Search selected file content');
@@ -3374,12 +3567,69 @@ function renderFileSupportView(workspace) {
     });
   });
   contentSearch.appendChild(contentSearchInput);
+  const grepControls = document.createElement('div');
+  grepControls.className = 'file-support-grep-controls';
+
+  const grepButton = document.createElement('button');
+  grepButton.type = 'button';
+  grepButton.className = 'file-support-grep-button';
+  grepButton.textContent = 'grep';
+  grepButton.disabled = !supportFileState.selectedFileId || supportFileState.selectedLoading || Boolean(supportFileState.selectedError);
+  grepButton.setAttribute('aria-pressed', supportGrepEnabled ? 'true' : 'false');
+  grepButton.title = 'Show only lines matching the search pattern';
+  grepButton.addEventListener('click', () => {
+    supportGrepEnabled = !supportGrepEnabled;
+    renderProductApp();
+    requestAnimationFrame(() => focusSupportSearchInput('file-support-content-search'));
+  });
+  grepControls.appendChild(grepButton);
+
+  const ignoreCaseButton = document.createElement('button');
+  ignoreCaseButton.type = 'button';
+  ignoreCaseButton.className = 'file-support-grep-button';
+  ignoreCaseButton.textContent = '-i';
+  ignoreCaseButton.disabled = !supportFileState.selectedFileId || supportFileState.selectedLoading || Boolean(supportFileState.selectedError);
+  ignoreCaseButton.setAttribute('aria-pressed', supportGrepIgnoreCase ? 'true' : 'false');
+  ignoreCaseButton.title = 'Ignore uppercase and lowercase differences';
+  ignoreCaseButton.addEventListener('click', () => {
+    supportGrepIgnoreCase = !supportGrepIgnoreCase;
+    renderProductApp();
+    requestAnimationFrame(() => focusSupportSearchInput('file-support-content-search'));
+  });
+  grepControls.appendChild(ignoreCaseButton);
+
+  const cutButton = document.createElement('button');
+  cutButton.type = 'button';
+  cutButton.className = 'file-support-grep-button';
+  cutButton.textContent = 'Cut';
+  cutButton.disabled = !supportFileState.selectedFileId || supportFileState.selectedLoading || Boolean(supportFileState.selectedError);
+  cutButton.setAttribute('aria-pressed', supportGrepCutMatches ? 'true' : 'false');
+  cutButton.title = 'Hide matching lines from the viewer';
+  cutButton.addEventListener('click', () => {
+    supportGrepEnabled = true;
+    supportGrepCutMatches = !supportGrepCutMatches;
+    renderProductApp();
+    requestAnimationFrame(() => focusSupportSearchInput('file-support-content-search'));
+  });
+  grepControls.appendChild(cutButton);
+  contentSearch.appendChild(grepControls);
   if (normalizeSearchQuery(supportContentSearchQuery) && selectedContentPresentation) {
     const contentSearchStatus = document.createElement('span');
     contentSearchStatus.className = 'file-support-search-status';
-    contentSearchStatus.textContent = selectedContentPresentation.matchCount === 1
-      ? '1 match'
-      : `${selectedContentPresentation.matchCount} matches`;
+    if (supportGrepEnabled) {
+      const shown = selectedContentPresentation.shownLineCount || 0;
+      const matched = selectedContentPresentation.matchLineCount || 0;
+      const hidden = selectedContentPresentation.hiddenLineCount || 0;
+      const mode = supportGrepCutMatches ? 'cut' : 'grep';
+      const flags = selectedContentPresentation.ignoreCase ? ' -i' : '';
+      contentSearchStatus.textContent = selectedContentPresentation.error
+        ? 'invalid pattern'
+        : `${mode}${flags}: ${shown} shown, ${matched} matched, ${hidden} hidden`;
+    } else {
+      contentSearchStatus.textContent = selectedContentPresentation.matchCount === 1
+        ? '1 match'
+        : `${selectedContentPresentation.matchCount} matches`;
+    }
     contentSearch.appendChild(contentSearchStatus);
   }
   viewerHeader.appendChild(contentSearch);
@@ -3423,6 +3673,9 @@ function renderFileSupportView(workspace) {
     );
     pre.className = `file-support-content mode-${presentation.mode}`;
     pre.innerHTML = presentation.html;
+    pre.addEventListener('dblclick', (event) => {
+      requestAnimationFrame(() => applySupportViewerSelectionToSearch(pre, event.target));
+    });
     viewerBody.appendChild(pre);
   } else {
     const emptyViewer = document.createElement('div');
