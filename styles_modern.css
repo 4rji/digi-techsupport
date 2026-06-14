@@ -1,0 +1,668 @@
+/* ==========================================================================
+   styles_modern.css — Modern UI enhancement layer
+   --------------------------------------------------------------------------
+   Loaded AFTER the active theme stylesheet (styles.css / _aqua / _dark / _grey).
+   Structural polish ONLY — radius, spacing, depth, motion and focus.
+   It NEVER hardcodes theme colours: accents resolve through the universal
+   --app-primary / --app-primary-rgb tokens (with the shared green fallback),
+   so every theme keeps its own identity and the colour switcher keeps working.
+   ========================================================================== */
+
+:root {
+  /* Accent (universal across all four themes) */
+  --ui-accent: var(--app-primary, #84c361);
+  --ui-accent-rgb: var(--app-primary-rgb, 132, 195, 97);
+
+  /* Consistent radius scale — Apple-ish continuous, generous corners */
+  --ui-r-sm: 12px;
+  --ui-r-md: 18px;
+  --ui-r-lg: 24px;
+  --ui-r-pill: 999px;
+
+  /* --- Liquid Glass material system ---------------------------------------
+     A glassy surface = translucent tint + heavy saturated blur + a bright
+     specular rim + an inner top "bead" highlight + a soft inner bottom shade.
+     Built from neutral whites/blacks + the universal accent so EVERY theme
+     tints its own glass and stays readable on its own background. */
+  --glass-blur: blur(22px) saturate(175%);
+  --glass-blur-strong: blur(34px) saturate(190%);
+
+  /* Neutral frost base (dark-glass — all four themes are dark surfaces) */
+  --glass-fill: rgba(22, 26, 32, 0.55);
+  --glass-fill-soft: rgba(28, 32, 40, 0.42);
+
+  /* Bright edge + specular highlights that sell the "glass" */
+  --glass-rim: rgba(255, 255, 255, 0.16);
+  --glass-bead: inset 0 1px 0.5px rgba(255, 255, 255, 0.42);
+  --glass-bead-strong: inset 0 1.5px 0.5px rgba(255, 255, 255, 0.55);
+  --glass-inner-shade: inset 0 -10px 26px -16px rgba(0, 0, 0, 0.55);
+
+  /* Diagonal lens sheen layered on top of any glass fill */
+  --glass-sheen: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.14),
+    rgba(255, 255, 255, 0.03) 36%,
+    transparent 62%
+  );
+
+  /* Accent wash — gives the cool glass a hint of the theme's living colour */
+  --glass-accent-wash: linear-gradient(
+    180deg,
+    rgba(var(--ui-accent-rgb), 0.12),
+    rgba(var(--ui-accent-rgb), 0.03) 60%,
+    transparent
+  );
+
+  /* Layered, soft elevation (reads well on every theme background) */
+  --ui-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.16);
+  --ui-shadow-md: 0 6px 16px rgba(0, 0, 0, 0.28), 0 2px 4px rgba(0, 0, 0, 0.18);
+  --ui-shadow-lg: 0 20px 52px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.28);
+
+  /* Motion */
+  --ui-fast: 130ms;
+  --ui-base: 200ms;
+  --ui-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ui-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Focus ring */
+  --ui-ring: 0 0 0 3px rgba(var(--ui-accent-rgb), 0.42);
+}
+
+/* --------------------------------------------------------------------------
+   Global polish
+   -------------------------------------------------------------------------- */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+
+  /* Ambient liquid-glass backdrop: a soft multi-bloom accent mesh + vignette
+     composited over the theme's own background-color. Gives the glass
+     something colourful and lively to refract. */
+  background-image:
+    radial-gradient(1100px 620px at 84% -14%, rgba(var(--ui-accent-rgb), 0.16), transparent 58%),
+    radial-gradient(900px 560px at -8% 8%, rgba(var(--ui-accent-rgb), 0.10), transparent 55%),
+    radial-gradient(820px 560px at 18% 118%, rgba(var(--ui-accent-rgb), 0.09), transparent 56%),
+    radial-gradient(700px 520px at 112% 88%, rgba(120, 170, 255, 0.07), transparent 58%),
+    radial-gradient(140% 120% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.34));
+  /* NOTE: deliberately NOT `background-attachment: fixed`.
+     A fixed background repaints on the main thread while content scrolls on
+     the GPU; the two desync and dense, scroll-heavy views (File Support)
+     visibly judder — the panels appear to "slide" over a pinned backdrop.
+     Letting the mesh scroll with the document keeps scrolling smooth. */
+  background-repeat: no-repeat;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Crisper headings */
+h1, h2, h3 {
+  letter-spacing: -0.01em;
+}
+
+/* Accessible, consistent keyboard focus for every interactive element */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+}
+
+/* Text selection picks up the active accent */
+::selection {
+  background: rgba(var(--ui-accent-rgb), 0.32);
+}
+
+/* Modern thin scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--ui-accent-rgb), 0.45) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: var(--ui-r-pill);
+  transition: background-color var(--ui-base) var(--ui-ease);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--ui-accent-rgb), 0.55);
+  background-clip: padding-box;
+}
+
+/* --------------------------------------------------------------------------
+   Top bar — soft separation from the workspace
+   -------------------------------------------------------------------------- */
+.product-topbar {
+  padding-bottom: 12px;
+  /* Frosted, floating command bar — content scrolls *under* it. */
+  background: linear-gradient(180deg, rgba(8, 9, 11, 0.92), rgba(8, 9, 11, 0.70));
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 18px 30px -28px rgba(0, 0, 0, 0.95);
+}
+
+/* Signature accent hairline glowing under the top bar */
+.product-topbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(var(--ui-accent-rgb), 0.55) 30%,
+    rgba(var(--ui-accent-rgb), 0.55) 70%,
+    transparent);
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.app-logo {
+  box-shadow: var(--ui-shadow-sm);
+  transition: transform var(--ui-base) var(--ui-ease-out);
+}
+
+.settings-button {
+  border-radius: var(--ui-r-pill);
+  transition: transform var(--ui-fast) var(--ui-ease-out),
+              background var(--ui-base) var(--ui-ease),
+              border-color var(--ui-base) var(--ui-ease),
+              color var(--ui-base) var(--ui-ease);
+}
+
+.settings-button:hover {
+  transform: translateY(-1px) rotate(20deg);
+}
+
+.settings-button:active {
+  transform: translateY(0) scale(0.94);
+}
+
+/* --------------------------------------------------------------------------
+   Tabs
+   -------------------------------------------------------------------------- */
+.tabs {
+  border-radius: var(--ui-r-lg);
+  gap: 8px;
+}
+
+.tab-button {
+  border-radius: var(--ui-r-pill);
+  transition: transform var(--ui-fast) var(--ui-ease-out),
+              background var(--ui-base) var(--ui-ease),
+              color var(--ui-base) var(--ui-ease),
+              box-shadow var(--ui-base) var(--ui-ease),
+              opacity var(--ui-base) var(--ui-ease);
+}
+
+.tab-button:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* Active tab reads as "selected & live" with an accent lift-glow */
+.tab-button.active {
+  box-shadow: 0 10px 26px -8px rgba(var(--ui-accent-rgb), 0.5),
+              var(--ui-shadow-sm);
+}
+
+/* --------------------------------------------------------------------------
+   Cards
+   -------------------------------------------------------------------------- */
+.vm-card,
+.product-card {
+  border-radius: var(--ui-r-md);
+  box-shadow: var(--ui-shadow-sm);
+  transition: transform var(--ui-base) var(--ui-ease-out),
+              box-shadow var(--ui-base) var(--ui-ease),
+              background-color var(--ui-base) var(--ui-ease),
+              border-color var(--ui-base) var(--ui-ease);
+}
+
+/* Glassy top-edge highlight — depth without clipping the corner badge */
+.vm-card::after,
+.product-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 40%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.vm-card:hover,
+.product-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(var(--ui-accent-rgb), 0.45);
+  box-shadow: var(--ui-shadow-md),
+              0 20px 48px -22px rgba(var(--ui-accent-rgb), 0.6),
+              inset 0 0 0 1px rgba(var(--ui-accent-rgb), 0.12);
+}
+
+.vm-icon,
+.product-icon {
+  border-radius: var(--ui-r-md);
+}
+
+.product-icon {
+  box-shadow: 0 0 0 1px rgba(var(--ui-accent-rgb), 0.20),
+              0 8px 18px -10px rgba(var(--ui-accent-rgb), 0.5);
+}
+
+/* Line-index badge becomes a branded glass chip */
+.product-line-tag {
+  background: rgba(var(--ui-accent-rgb), 0.16);
+  border-color: rgba(var(--ui-accent-rgb), 0.42);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--ui-shadow-sm);
+}
+
+/* --------------------------------------------------------------------------
+   Buttons — shape & motion only (theme keeps the colours)
+   -------------------------------------------------------------------------- */
+.save-button,
+.cancel-button,
+.delete-button,
+.web-button,
+.settings-action-button,
+.config-transfer-button,
+.line-control-button,
+.remove-control-button,
+.control-button {
+  border-radius: var(--ui-r-sm);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: transform var(--ui-fast) var(--ui-ease-out),
+              background-color var(--ui-base) var(--ui-ease),
+              box-shadow var(--ui-base) var(--ui-ease),
+              filter var(--ui-base) var(--ui-ease);
+  will-change: transform;
+}
+
+.save-button:hover,
+.cancel-button:hover,
+.delete-button:hover,
+.web-button:hover,
+.settings-action-button:hover,
+.config-transfer-button:hover:not(:disabled),
+.line-control-button:hover,
+.remove-control-button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--ui-shadow-md);
+}
+
+.save-button:active,
+.cancel-button:active,
+.delete-button:active,
+.web-button:active,
+.settings-action-button:active,
+.config-transfer-button:active:not(:disabled),
+.line-control-button:active,
+.remove-control-button:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: var(--ui-shadow-sm);
+}
+
+/* --------------------------------------------------------------------------
+   Form fields
+   -------------------------------------------------------------------------- */
+.form-group input,
+.form-group textarea,
+.form-group select {
+  border-radius: var(--ui-r-sm);
+  padding: 10px 12px;
+  transition: border-color var(--ui-base) var(--ui-ease),
+              box-shadow var(--ui-base) var(--ui-ease),
+              background-color var(--ui-base) var(--ui-ease);
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: rgba(var(--ui-accent-rgb), 0.9);
+  box-shadow: var(--ui-ring);
+}
+
+/* --------------------------------------------------------------------------
+   Segmented toggles (theme picker & provider picker)
+   -------------------------------------------------------------------------- */
+.provider-toggle-option span {
+  border-radius: var(--ui-r-sm);
+  transition: transform var(--ui-fast) var(--ui-ease-out),
+              background-color var(--ui-base) var(--ui-ease),
+              border-color var(--ui-base) var(--ui-ease),
+              color var(--ui-base) var(--ui-ease),
+              box-shadow var(--ui-base) var(--ui-ease);
+}
+
+.provider-toggle-option:active span {
+  transform: scale(0.98);
+}
+
+/* --------------------------------------------------------------------------
+   Settings sections
+   -------------------------------------------------------------------------- */
+.settings-section {
+  border-radius: var(--ui-r-md);
+}
+
+/* --------------------------------------------------------------------------
+   Modals — stronger scrim, backdrop blur, and an entrance animation
+   -------------------------------------------------------------------------- */
+.monitor-config-modal,
+.settings-modal,
+.saved-support-files-modal,
+.ssh-terminal-modal,
+.product-specs-modal,
+.product-image-modal {
+  background: rgba(8, 10, 12, 0.62);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  backdrop-filter: blur(10px) saturate(120%);
+}
+
+.monitor-config-content,
+.settings-content,
+.saved-support-files-content,
+.ssh-terminal-content,
+.product-specs-content {
+  border-radius: var(--ui-r-lg);
+  box-shadow: var(--ui-shadow-lg);
+  animation: ui-modal-in 260ms var(--ui-ease-out) both;
+}
+
+@keyframes ui-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Close buttons
+   -------------------------------------------------------------------------- */
+.close-button {
+  border-radius: var(--ui-r-pill);
+  transition: transform var(--ui-fast) var(--ui-ease-out),
+              background-color var(--ui-base) var(--ui-ease),
+              color var(--ui-base) var(--ui-ease);
+}
+
+.close-button:hover {
+  transform: rotate(90deg);
+  color: #fff;
+}
+
+.close-button:active {
+  transform: rotate(90deg) scale(0.9);
+}
+
+/* ==========================================================================
+   LIQUID GLASS — Apple-style translucent material across the key surfaces.
+   These rules intentionally supersede the subtler polish above.
+   Everything is built from neutral whites/blacks + the universal accent,
+   so each theme tints its own glass and the colour switcher still works.
+   ========================================================================== */
+
+/* --- Top bar: a frosted slab. Keep the blur moderate: this sticky element
+   sits over scrolling content and re-blurs every frame, so a heavy radius
+   (34px) janks the whole app during scroll. 16px reads as glass without it. */
+.product-topbar {
+  background: var(--glass-fill);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: var(--glass-bead), 0 22px 36px -30px rgba(0, 0, 0, 0.95);
+}
+
+/* --- Tabs tray ------------------------------------------------------------ */
+.tabs {
+  background: var(--glass-fill-soft);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-rim);
+  box-shadow: var(--glass-bead), var(--ui-shadow-sm);
+}
+
+.tab-button:not(.active) {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: var(--glass-bead);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.tab-button:not(.active):hover {
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(var(--ui-accent-rgb), 0.4);
+}
+
+/* Active tab = a glossy, vivid liquid-accent pill */
+.tab-button.active {
+  background:
+    linear-gradient(180deg,
+      rgba(var(--ui-accent-rgb), 0.96),
+      rgba(var(--ui-accent-rgb), 0.74));
+  color: rgba(8, 14, 8, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.18);
+  box-shadow:
+    var(--glass-bead-strong),
+    inset 0 -9px 16px -10px rgba(0, 0, 0, 0.35),
+    0 12px 28px -8px rgba(var(--ui-accent-rgb), 0.65);
+}
+
+/* --- Product / VM cards: the hero glass panels ---------------------------- */
+.product-card,
+.vm-card {
+  background:
+    var(--glass-sheen),
+    var(--glass-accent-wash),
+    var(--glass-fill);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-rim);
+  border-radius: var(--ui-r-lg);
+  box-shadow:
+    var(--glass-bead),
+    var(--glass-inner-shade),
+    var(--ui-shadow-md);
+}
+
+.product-card:hover,
+.vm-card:hover {
+  border-color: rgba(var(--ui-accent-rgb), 0.6);
+  box-shadow:
+    var(--glass-bead-strong),
+    var(--glass-inner-shade),
+    0 26px 56px -22px rgba(var(--ui-accent-rgb), 0.72),
+    var(--ui-shadow-md);
+}
+
+/* Product icon → a lit glass orb in the accent colour */
+.product-icon {
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.5), transparent 44%),
+    linear-gradient(180deg,
+      rgba(var(--ui-accent-rgb), 0.6),
+      rgba(var(--ui-accent-rgb), 0.18));
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  color: #ffffff;
+  box-shadow:
+    var(--glass-bead-strong),
+    inset 0 -7px 14px -8px rgba(0, 0, 0, 0.45),
+    0 10px 22px -10px rgba(var(--ui-accent-rgb), 0.7);
+}
+
+/* --- Settings button → glass orb ------------------------------------------ */
+.settings-button {
+  background:
+    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.4), transparent 46%),
+    var(--glass-fill);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-rim);
+  box-shadow: var(--glass-bead), var(--ui-shadow-md);
+}
+
+.settings-button:hover {
+  border-color: rgba(var(--ui-accent-rgb), 0.6);
+  box-shadow:
+    var(--glass-bead-strong),
+    0 12px 26px -10px rgba(var(--ui-accent-rgb), 0.7);
+}
+
+/* --- Buttons: keep their theme colour, add a glass sheen + bead ----------- */
+.save-button,
+.web-button,
+.settings-action-button,
+.config-transfer-button,
+.line-control-button,
+.remove-control-button,
+.template-import-button {
+  background-image: var(--glass-sheen);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: var(--glass-bead), var(--ui-shadow-sm);
+}
+
+/* --- Pills & count badges → glass chips ----------------------------------- */
+.product-count,
+.product-top-controls,
+.port-chip {
+  background: var(--glass-fill-soft);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-rim);
+  box-shadow: var(--glass-bead);
+}
+
+/* --- Modal panels: readable theme surface + glossy glass rim -------------- */
+.settings-content,
+.monitor-config-content,
+.saved-support-files-content,
+.product-specs-content {
+  background-image: var(--glass-sheen), var(--glass-accent-wash);
+  border: 1px solid var(--glass-rim);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  backdrop-filter: var(--glass-blur-strong);
+  box-shadow:
+    var(--glass-bead-strong),
+    var(--glass-inner-shade),
+    var(--ui-shadow-lg);
+}
+
+/* --- Inputs → recessed glass wells ---------------------------------------- */
+.form-group input,
+.form-group textarea,
+.form-group select {
+  background-color: rgba(0, 0, 0, 0.26);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* --------------------------------------------------------------------------
+   Signature moment — connected devices "breathe"
+   The status LED emits a slow accent halo while a device is online, so the
+   workspace feels alive and health is readable at a glance.
+   -------------------------------------------------------------------------- */
+.monitor-vm-card.online .product-status-dot {
+  animation: ui-status-pulse 2.6s var(--ui-ease) infinite;
+}
+
+@keyframes ui-status-pulse {
+  0% {
+    box-shadow: 0 0 9px rgba(var(--ui-accent-rgb), 0.75),
+                0 0 0 0 rgba(var(--ui-accent-rgb), 0.45);
+  }
+  70% {
+    box-shadow: 0 0 11px rgba(var(--ui-accent-rgb), 0.75),
+                0 0 0 7px rgba(var(--ui-accent-rgb), 0);
+  }
+  100% {
+    box-shadow: 0 0 9px rgba(var(--ui-accent-rgb), 0.75),
+                0 0 0 0 rgba(var(--ui-accent-rgb), 0);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Orchestrated entrance — cards rise in a quick stagger when a view renders.
+   `backwards` fill releases transform after finishing, so hover-lift still works.
+   Polling only toggles `.online` on existing cards, so this never replays.
+   -------------------------------------------------------------------------- */
+.product-grid > * {
+  animation: ui-card-in 460ms var(--ui-ease-out) backwards;
+}
+
+.product-grid > *:nth-child(1)  { animation-delay: 30ms; }
+.product-grid > *:nth-child(2)  { animation-delay: 70ms; }
+.product-grid > *:nth-child(3)  { animation-delay: 110ms; }
+.product-grid > *:nth-child(4)  { animation-delay: 150ms; }
+.product-grid > *:nth-child(5)  { animation-delay: 190ms; }
+.product-grid > *:nth-child(6)  { animation-delay: 230ms; }
+.product-grid > *:nth-child(7)  { animation-delay: 270ms; }
+.product-grid > *:nth-child(8)  { animation-delay: 310ms; }
+.product-grid > *:nth-child(9)  { animation-delay: 350ms; }
+.product-grid > *:nth-child(n+10) { animation-delay: 390ms; }
+
+@keyframes ui-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Respect reduced-motion preferences
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .settings-button:hover,
+  .close-button:hover,
+  .vm-card:hover,
+  .product-card:hover,
+  .tab-button:active,
+  .save-button:hover,
+  .cancel-button:hover,
+  .delete-button:hover {
+    transform: none;
+  }
+}
