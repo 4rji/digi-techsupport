@@ -35,6 +35,17 @@ const redactArgs = (name, args) => {
       };
     });
   }
+  if (name === 'updateSavedSupportFile') {
+    return args.map((arg, index) => {
+      if (index === 0) return arg;
+      if (!arg || typeof arg !== 'object') return arg;
+      return {
+        alias: arg.alias,
+        title: arg.title,
+        notes: typeof arg.notes === 'string' ? `[${arg.notes.length} chars]` : ''
+      };
+    });
+  }
   if (name === 'generateSupportTemplate' || name === 'analyzeSupportFile') {
     return args.map((arg) => {
       if (!arg || typeof arg !== 'object') return arg;
@@ -55,6 +66,26 @@ const redactArgs = (name, args) => {
 const redactResult = (name, result) => {
   if (name === 'sshAdminPassword' && result && typeof result === 'object') {
     return { ...result, password: result.hasPassword ? '[redacted]' : '' };
+  }
+  if ([
+    'listSavedSupportFiles',
+    'openSavedSupportFile',
+    'updateSavedSupportFile',
+    'deleteSavedSupportFile'
+  ].includes(name) && result && typeof result === 'object') {
+    const redactSavedFile = (file) => {
+      if (!file || typeof file !== 'object') return file;
+      return {
+        ...file,
+        notes: typeof file.notes === 'string' ? `[${file.notes.length} chars]` : ''
+      };
+    };
+    return {
+      ...result,
+      file: redactSavedFile(result.file),
+      savedFile: redactSavedFile(result.savedFile),
+      files: Array.isArray(result.files) ? result.files.map(redactSavedFile) : result.files
+    };
   }
   return redactSensitive(result);
 };
@@ -110,6 +141,18 @@ contextBridge.exposeInMainWorld('appAPI', {
   }),
   getSupportFileEntryContent: logWrapper('getSupportFileEntryContent', (sessionId, entryId) => {
     return ipcRenderer.invoke('get-support-file-entry-content', sessionId, entryId);
+  }),
+  listSavedSupportFiles: logWrapper('listSavedSupportFiles', () => {
+    return ipcRenderer.invoke('list-saved-support-files');
+  }),
+  openSavedSupportFile: logWrapper('openSavedSupportFile', (fileId) => {
+    return ipcRenderer.invoke('open-saved-support-file', fileId);
+  }),
+  updateSavedSupportFile: logWrapper('updateSavedSupportFile', (fileId, updates) => {
+    return ipcRenderer.invoke('update-saved-support-file', fileId, updates);
+  }),
+  deleteSavedSupportFile: logWrapper('deleteSavedSupportFile', (fileId) => {
+    return ipcRenderer.invoke('delete-saved-support-file', fileId);
   }),
   saveTextFile: logWrapper('saveTextFile', (options) => {
     return ipcRenderer.invoke('save-text-file', options);

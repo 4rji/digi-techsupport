@@ -14,6 +14,10 @@ const APP_ICON_PATH = path.join(__dirname, 'build', process.platform === 'win32'
 const sshSessions = new Map();
 const supportArchiveSessions = new Map();
 const SSH_ADMIN_PASSWORD_FILE = 'ssh-admin-password.json';
+const SUPPORT_LIBRARY_DIR = 'support-library';
+const SUPPORT_LIBRARY_FILES_DIR = 'files';
+const SUPPORT_LIBRARY_INDEX_FILE = 'index.json';
+const SUPPORT_LIBRARY_VERSION = 1;
 const MAX_SUPPORT_FILE_BYTES = 512 * 1024 * 1024;
 const MAX_UNCOMPRESSED_ARCHIVE_BYTES = 1024 * 1024 * 1024;
 const MAX_TEXT_PREVIEW_BYTES = 5 * 1024 * 1024;
@@ -313,6 +317,196 @@ function createSupportFileFailure(errorType, error) {
     errorType,
     error: error instanceof Error ? error.message : String(error || 'Unknown error')
   };
+}
+
+function getSupportLibraryRootPath() {
+  return path.join(app.getPath('userData'), SUPPORT_LIBRARY_DIR);
+}
+
+function getSupportLibraryFilesPath() {
+  return path.join(getSupportLibraryRootPath(), SUPPORT_LIBRARY_FILES_DIR);
+}
+
+function getSupportLibraryIndexPath() {
+  return path.join(getSupportLibraryRootPath(), SUPPORT_LIBRARY_INDEX_FILE);
+}
+
+async function ensureSupportLibraryDirectories() {
+  await fs.promises.mkdir(getSupportLibraryFilesPath(), { recursive: true });
+}
+
+function normalizeSupportLibraryText(value, maxLength = 4000) {
+  return String(value || '').replace(/\0/g, '').trim().slice(0, maxLength);
+}
+
+function getSupportLibraryItemPath(item) {
+  const safeFileName = path.basename(String(item?.savedFileName || ''));
+  return safeFileName ? path.join(getSupportLibraryFilesPath(), safeFileName) : '';
+}
+
+function normalizeSupportLibraryItem(item) {
+  if (!item || typeof item !== 'object') return null;
+  const id = String(item.id || '').trim();
+  const savedFileName = path.basename(String(item.savedFileName || ''));
+  const originalFileName = path.basename(String(item.originalFileName || 'support-file.bin'));
+  if (!id || !savedFileName) return null;
+
+  return {
+    id,
+    alias: normalizeSupportLibraryText(item.alias || originalFileName.replace(/\.bin$/i, ''), 96),
+    title: normalizeSupportLibraryText(item.title || item.alias || originalFileName.replace(/\.bin$/i, ''), 160),
+    notes: normalizeSupportLibraryText(item.notes || '', 8000),
+    originalFileName,
+    savedFileName,
+    hash: String(item.hash || '').trim(),
+    size: Math.max(0, Number(item.size) || 0),
+    importedAt: String(item.importedAt || new Date().toISOString()),
+    lastOpenedAt: String(item.lastOpenedAt || item.importedAt || new Date().toISOString())
+  };
+}
+
+function serializeSupportLibraryItem(item) {
+  const normalizedItem = normalizeSupportLibraryItem(item);
+  if (!normalizedItem) return null;
+  return {
+    id: normalizedItem.id,
+    alias: normalizedItem.alias,
+    title: normalizedItem.title,
+    notes: normalizedItem.notes,
+    originalFileName: normalizedItem.originalFileName,
+    hash: normalizedItem.hash,
+    size: normalizedItem.size,
+    importedAt: normalizedItem.importedAt,
+    lastOpenedAt: normalizedItem.lastOpenedAt
+  };
+}
+
+async function readSupportLibraryIndex() {
+  try {
+    const content = await fs.promises.readFile(getSupportLibraryIndexPath(), 'utf8');
+    const parsed = JSON.parse(content);
+    const files = Array.isArray(parsed.files) ? parsed.files : [];
+    return files
+      .map(normalizeSupportLibraryItem)
+      .filter(Boolean)
+      .sort((a, b) => new Date(b.lastOpenedAt).getTime() - new Date(a.lastOpenedAt).getTime());
+  } catch (error) {
+    if (error && error.code === 'ENOENT') return [];
+    console.error('Could not read support library index:', error);
+    return [];
+  }
+}
+
+async function writeSupportLibraryIndex(files) {
+  await ensureSupportLibraryDirectories();
+  const normalizedFiles = files
+    .map(normalizeSupportLibraryItem)
+    .filter(Boolean)
+    .sort((a, b) => new Date(b.lastOpenedAt).getTime() - new Date(a.lastOpenedAt).getTime());
+  const payload = {
+    version: SUPPORT_LIBRARY_VERSION,
+    updatedAt: new Date().toISOString(),
+    files: normalizedFiles
+  };
+  await fs.promises.writeFile(getSupportLibraryIndexPath(), JSON.stringify(payload, null, 2), 'utf8');
+  return normalizedFiles;
+}
+
+async function listSavedSupportFiles() {
+  const files = await readSupportLibraryIndex();
+  return {
+    success: true,
+    files: files.map(serializeSupportLibraryItem).filter(Boolean)
+  };
+}
+
+async function saveSupportFileToLibrary(sourceFilePath, compressedFile, stats) {
+  await ensureSupportLibraryDirectories();
+  const originalFileName = path.basename(sourceFilePath);
+  const hash = crypto.createHash('sha256').update(compressedFile).digest('hex');
+  const files = await readSupportLibraryIndex();
+  const now = new Date().toISOString();
+  let item = files.find(candidate => candidate.hash && candidate.hash === hash);
+
+  if (item) {
+    item.originalFileName = item.originalFileName || originalFileName;
+    item.size = Math.max(0, Number(stats?.size) || compressedFile.length);
+    item.lastOpenedAt = now;
+    const existingPath = getSupportLibraryItemPath(item);
+    if (existingPath) {
+      try {
+        await fs.promises.access(existingPath, fs.constants.R_OK);
+      } catch (_error) {
+        await fs.promises.writeFile(existingPath, compressedFile);
+      }
+    }
+  } else {
+    const id = crypto.randomUUID();
+    const alias = originalFileName.replace(/\.bin$/i, '') || 'Support file';
+    item = {
+      id,
+      alias,
+      title: alias,
+      notes: '',
+      originalFileName,
+      savedFileName: `${id}.bin`,
+      hash,
+      size: Math.max(0, Number(stats?.size) || compressedFile.length),
+      importedAt: now,
+      lastOpenedAt: now
+    };
+    await fs.promises.writeFile(getSupportLibraryItemPath(item), compressedFile);
+    files.push(item);
+  }
+
+  await writeSupportLibraryIndex(files);
+  return serializeSupportLibraryItem(item);
+}
+
+async function updateSavedSupportFile(fileId, updates = {}) {
+  const files = await readSupportLibraryIndex();
+  const item = files.find(candidate => candidate.id === fileId);
+  if (!item) {
+    return createSupportFileFailure('invalid-file', 'Saved file was not found.');
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, 'alias')) {
+    item.alias = normalizeSupportLibraryText(updates.alias, 96) || item.alias || item.originalFileName;
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'title')) {
+    item.title = normalizeSupportLibraryText(updates.title, 160) || item.title || item.alias || item.originalFileName;
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'notes')) {
+    item.notes = normalizeSupportLibraryText(updates.notes, 8000);
+  }
+
+  await writeSupportLibraryIndex(files);
+  return {
+    success: true,
+    file: serializeSupportLibraryItem(item)
+  };
+}
+
+async function deleteSavedSupportFile(fileId) {
+  const files = await readSupportLibraryIndex();
+  const item = files.find(candidate => candidate.id === fileId);
+  if (!item) {
+    return createSupportFileFailure('invalid-file', 'Saved file was not found.');
+  }
+
+  const nextFiles = files.filter(candidate => candidate.id !== fileId);
+  const filePath = getSupportLibraryItemPath(item);
+  if (filePath) {
+    try {
+      await fs.promises.unlink(filePath);
+    } catch (error) {
+      if (!error || error.code !== 'ENOENT') {
+        throw error;
+      }
+    }
+  }
+  await writeSupportLibraryIndex(nextFiles);
+  return { success: true };
 }
 
 function normalizeSupportEntryPath(entryName) {
@@ -1340,23 +1534,7 @@ function getSupportAnalysisFiles(session, options = {}) {
   }));
 }
 
-async function importSupportFileFromDialog(webContents) {
-  const browserWindow = BrowserWindow.fromWebContents(webContents);
-  const dialogResult = await dialog.showOpenDialog(browserWindow || undefined, {
-    title: 'Import Digi Support File',
-    buttonLabel: 'Import Support File',
-    properties: ['openFile'],
-    filters: [
-      { name: 'Digi support files', extensions: ['bin'] },
-      { name: 'All files', extensions: ['*'] }
-    ]
-  });
-
-  if (dialogResult.canceled || !dialogResult.filePaths.length) {
-    return { success: false, canceled: true };
-  }
-
-  const filePath = dialogResult.filePaths[0];
+async function readSupportArchiveFromFilePath(filePath) {
   if (path.extname(filePath).toLowerCase() !== '.bin') {
     return createSupportFileFailure('invalid-file', 'Select a .bin support file.');
   }
@@ -1402,14 +1580,25 @@ async function importSupportFileFromDialog(webContents) {
     return createSupportFileFailure('tar-parsing-failure', 'The tar archive did not contain any readable entries.');
   }
 
+  return {
+    success: true,
+    fileName: path.basename(filePath),
+    compressedFile,
+    stats,
+    archive
+  };
+}
+
+function createSupportArchiveSession(webContents, parsedArchive, savedFile = null) {
   const sessionId = crypto.randomUUID();
   supportArchiveSessions.set(sessionId, {
     ownerId: webContents.id,
-    fileName: path.basename(filePath),
-    tree: archive.tree,
-    filesById: archive.filesById,
-    contentById: archive.contentById,
-    summary: archive.summary,
+    fileName: parsedArchive.fileName,
+    tree: parsedArchive.archive.tree,
+    filesById: parsedArchive.archive.filesById,
+    contentById: parsedArchive.archive.contentById,
+    summary: parsedArchive.archive.summary,
+    savedFileId: savedFile?.id || '',
     createdAt: Date.now()
   });
   pruneSupportArchiveSessions();
@@ -1417,11 +1606,75 @@ async function importSupportFileFromDialog(webContents) {
   return {
     success: true,
     sessionId,
-    fileName: path.basename(filePath),
-    tree: archive.tree,
-    stats: archive.stats,
-    summary: archive.summary
+    fileName: parsedArchive.fileName,
+    tree: parsedArchive.archive.tree,
+    stats: parsedArchive.archive.stats,
+    summary: parsedArchive.archive.summary,
+    savedFile: savedFile || null
   };
+}
+
+async function importSupportFileFromDialog(webContents) {
+  const browserWindow = BrowserWindow.fromWebContents(webContents);
+  const dialogResult = await dialog.showOpenDialog(browserWindow || undefined, {
+    title: 'Import Digi Support File',
+    buttonLabel: 'Import Support File',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Digi support files', extensions: ['bin'] },
+      { name: 'All files', extensions: ['*'] }
+    ]
+  });
+
+  if (dialogResult.canceled || !dialogResult.filePaths.length) {
+    return { success: false, canceled: true };
+  }
+
+  const filePath = dialogResult.filePaths[0];
+  const parsedArchive = await readSupportArchiveFromFilePath(filePath);
+  if (!parsedArchive.success) {
+    return parsedArchive;
+  }
+
+  let savedFile = null;
+  let savedFileError = '';
+  try {
+    savedFile = await saveSupportFileToLibrary(filePath, parsedArchive.compressedFile, parsedArchive.stats);
+  } catch (error) {
+    savedFileError = error.message || 'Could not save support file to Saved Files.';
+    console.error('Could not save support file to library:', error);
+  }
+
+  return {
+    ...createSupportArchiveSession(webContents, parsedArchive, savedFile),
+    savedFileError
+  };
+}
+
+async function openSavedSupportFile(webContents, fileId) {
+  const files = await readSupportLibraryIndex();
+  const item = files.find(candidate => candidate.id === fileId);
+  if (!item) {
+    return createSupportFileFailure('invalid-file', 'Saved file was not found.');
+  }
+
+  const filePath = getSupportLibraryItemPath(item);
+  if (!filePath) {
+    return createSupportFileFailure('invalid-file', 'Saved file path is not available.');
+  }
+
+  const parsedArchive = await readSupportArchiveFromFilePath(filePath);
+  if (!parsedArchive.success) {
+    return parsedArchive;
+  }
+
+  item.lastOpenedAt = new Date().toISOString();
+  await writeSupportLibraryIndex(files);
+
+  return createSupportArchiveSession(webContents, {
+    ...parsedArchive,
+    fileName: item.originalFileName || parsedArchive.fileName
+  }, serializeSupportLibraryItem(item));
 }
 
 function sanitizeSaveDialogFileName(fileName, fallback = 'file.txt') {
@@ -1550,6 +1803,38 @@ function setupIPCHandlers() {
       text: content.text,
       truncated: content.truncated
     };
+  });
+
+  ipcMain.handle('list-saved-support-files', async () => {
+    try {
+      return await listSavedSupportFiles();
+    } catch (error) {
+      return { success: false, error: error.message || 'Could not load saved files' };
+    }
+  });
+
+  ipcMain.handle('open-saved-support-file', async (event, fileId) => {
+    try {
+      return await openSavedSupportFile(event.sender, String(fileId || ''));
+    } catch (error) {
+      return createSupportFileFailure('invalid-file', error);
+    }
+  });
+
+  ipcMain.handle('update-saved-support-file', async (_event, fileId, updates = {}) => {
+    try {
+      return await updateSavedSupportFile(String(fileId || ''), updates);
+    } catch (error) {
+      return { success: false, error: error.message || 'Could not save file details' };
+    }
+  });
+
+  ipcMain.handle('delete-saved-support-file', async (_event, fileId) => {
+    try {
+      return await deleteSavedSupportFile(String(fileId || ''));
+    } catch (error) {
+      return { success: false, error: error.message || 'Could not delete saved file' };
+    }
   });
 
   ipcMain.handle('save-text-file', async (event, options = {}) => {

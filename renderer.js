@@ -851,8 +851,20 @@ let supportFileState = {
   selectedLoading: false,
   summary: null,
   summaryVisible: false,
+  savedFile: null,
   importError: '',
   importing: false
+};
+let supportSavedFilesState = {
+  visible: false,
+  loading: false,
+  openingId: '',
+  savingId: '',
+  deletingId: '',
+  files: [],
+  selectedId: '',
+  search: '',
+  error: ''
 };
 let supportSmartScanState = {
   query: '',
@@ -887,6 +899,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSSHTerminalModal();
   setupItemConfigModal();
   setupSettingsModal();
+  setupSavedSupportFilesModal();
   setupConfigTransferControls();
   setupFileSupportKeyboardShortcuts();
 });
@@ -2587,6 +2600,518 @@ async function handleSupportSmartScanReportSave() {
   }
 }
 
+function createEmptySupportSmartScanState(query = '') {
+  return {
+    query,
+    visible: false,
+    loading: false,
+    answer: '',
+    error: '',
+    sources: [],
+    resultQuery: '',
+    resultProvider: '',
+    resultSelectedPath: '',
+    completedAt: ''
+  };
+}
+
+function formatSavedSupportFileDate(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+}
+
+function getSavedSupportFileTitle(file) {
+  return String(file?.alias || file?.title || file?.originalFileName || 'Saved support file').trim();
+}
+
+function savedSupportFileMatchesSearch(file, query) {
+  const normalizedQuery = normalizeSearchQuery(query).toLowerCase();
+  if (!normalizedQuery) return true;
+  const haystack = [
+    file?.alias,
+    file?.title,
+    file?.notes,
+    file?.originalFileName
+  ].join(' ').toLowerCase();
+  return normalizedQuery
+    .split(/\s+/)
+    .filter(Boolean)
+    .every(term => haystack.includes(term));
+}
+
+function getFilteredSavedSupportFiles() {
+  return supportSavedFilesState.files.filter(file => savedSupportFileMatchesSearch(file, supportSavedFilesState.search));
+}
+
+function getSelectedSavedSupportFile(filteredFiles = getFilteredSavedSupportFiles()) {
+  return filteredFiles.find(file => file.id === supportSavedFilesState.selectedId) || filteredFiles[0] || null;
+}
+
+function applySupportFileLoadResult(result, successMessage = 'Support file imported') {
+  expandedSupportFolders = new Set();
+  if (Array.isArray(result.tree) && result.tree.length === 1 && result.tree[0].type === 'directory') {
+    expandedSupportFolders.add(result.tree[0].id);
+  }
+  supportTreeSearchQuery = '';
+  supportContentSearchQuery = '';
+  supportFileViewerFullscreen = false;
+  supportContentViewMode = 'ruby';
+  supportSmartScanState = createEmptySupportSmartScanState();
+
+  supportFileState = {
+    sessionId: result.sessionId,
+    fileName: result.fileName || '',
+    tree: Array.isArray(result.tree) ? result.tree : [],
+    stats: result.stats || null,
+    selectedFileId: '',
+    selectedPath: '',
+    selectedContent: '',
+    selectedError: '',
+    selectedTruncated: false,
+    selectedLoading: false,
+    summary: result.summary || null,
+    summaryVisible: Boolean(result.summary),
+    savedFile: result.savedFile || null,
+    importError: '',
+    importing: false
+  };
+
+  showNotification(result.savedFileError ? `${successMessage}; not added to Saved Files` : successMessage);
+}
+
+function openSavedSupportFilesModal() {
+  supportSavedFilesState = {
+    ...supportSavedFilesState,
+    visible: true,
+    error: ''
+  };
+  renderSavedSupportFilesModal();
+  refreshSavedSupportFiles();
+}
+
+function closeSavedSupportFilesModal() {
+  supportSavedFilesState = {
+    ...supportSavedFilesState,
+    visible: false,
+    openingId: '',
+    savingId: '',
+    deletingId: ''
+  };
+  renderSavedSupportFilesModal();
+}
+
+async function refreshSavedSupportFiles() {
+  const supportAPI = getNetworkAPI();
+  if (!supportAPI || typeof supportAPI.listSavedSupportFiles !== 'function') {
+    supportSavedFilesState = {
+      ...supportSavedFilesState,
+      loading: false,
+      error: 'Saved Files are only available in the desktop app'
+    };
+    renderSavedSupportFilesModal();
+    return;
+  }
+
+  supportSavedFilesState = {
+    ...supportSavedFilesState,
+    loading: true,
+    error: ''
+  };
+  renderSavedSupportFilesModal();
+
+  try {
+    const result = await supportAPI.listSavedSupportFiles();
+    if (!result || !result.success) {
+      throw new Error(result?.error || 'Could not load saved files');
+    }
+
+    const files = Array.isArray(result.files) ? result.files : [];
+    const selectedExists = files.some(file => file.id === supportSavedFilesState.selectedId);
+    supportSavedFilesState = {
+      ...supportSavedFilesState,
+      loading: false,
+      files,
+      selectedId: selectedExists ? supportSavedFilesState.selectedId : files[0]?.id || '',
+      error: ''
+    };
+  } catch (error) {
+    console.error('Error loading Saved Files:', error);
+    supportSavedFilesState = {
+      ...supportSavedFilesState,
+      loading: false,
+      error: error.message || 'Could not load saved files'
+    };
+  }
+
+  renderSavedSupportFilesModal();
+}
+
+function renderSavedSupportFilesModal() {
+  const modal = document.getElementById('saved-support-files-modal');
+  const body = document.getElementById('saved-support-files-body');
+  if (!modal || !body) return;
+
+  modal.style.display = supportSavedFilesState.visible ? 'flex' : 'none';
+  if (!supportSavedFilesState.visible) return;
+
+  const filteredFiles = getFilteredSavedSupportFiles();
+  const selectedFile = getSelectedSavedSupportFile(filteredFiles);
+  if (selectedFile && supportSavedFilesState.selectedId !== selectedFile.id) {
+    supportSavedFilesState = {
+      ...supportSavedFilesState,
+      selectedId: selectedFile.id
+    };
+  }
+
+  body.innerHTML = '';
+
+  const layout = document.createElement('div');
+  layout.className = 'saved-support-files-layout';
+
+  const sidebar = document.createElement('aside');
+  sidebar.className = 'saved-support-files-sidebar';
+
+  const searchRow = document.createElement('div');
+  searchRow.className = 'saved-support-files-search';
+  const searchInput = document.createElement('input');
+  searchInput.type = 'search';
+  searchInput.id = 'saved-support-files-search-input';
+  searchInput.placeholder = 'Search saved files';
+  searchInput.value = supportSavedFilesState.search;
+  searchInput.setAttribute('aria-label', 'Search saved support files');
+  searchInput.addEventListener('input', () => {
+    supportSavedFilesState = {
+      ...supportSavedFilesState,
+      search: searchInput.value
+    };
+    renderSavedSupportFilesModal();
+    requestAnimationFrame(() => {
+      const nextInput = document.getElementById('saved-support-files-search-input');
+      if (!nextInput) return;
+      nextInput.focus();
+      nextInput.setSelectionRange(nextInput.value.length, nextInput.value.length);
+    });
+  });
+  const count = document.createElement('span');
+  count.textContent = supportSavedFilesState.loading
+    ? 'Loading'
+    : `${filteredFiles.length} file${filteredFiles.length === 1 ? '' : 's'}`;
+  searchRow.appendChild(searchInput);
+  searchRow.appendChild(count);
+  sidebar.appendChild(searchRow);
+
+  const list = document.createElement('div');
+  list.className = 'saved-support-files-list';
+  if (supportSavedFilesState.loading) {
+    const loading = document.createElement('div');
+    loading.className = 'saved-support-files-empty';
+    loading.textContent = 'Loading saved files';
+    list.appendChild(loading);
+  } else if (supportSavedFilesState.error) {
+    const error = document.createElement('div');
+    error.className = 'saved-support-files-alert';
+    error.textContent = supportSavedFilesState.error;
+    list.appendChild(error);
+  } else if (supportSavedFilesState.files.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'saved-support-files-empty';
+    empty.textContent = 'Imported support files will appear here.';
+    list.appendChild(empty);
+  } else if (filteredFiles.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'saved-support-files-empty';
+    empty.textContent = 'No saved files match this search.';
+    list.appendChild(empty);
+  } else {
+    filteredFiles.forEach(file => {
+      const itemButton = document.createElement('button');
+      itemButton.type = 'button';
+      itemButton.className = 'saved-support-file-item';
+      itemButton.classList.toggle('active', selectedFile?.id === file.id);
+      itemButton.addEventListener('click', () => {
+        supportSavedFilesState = {
+          ...supportSavedFilesState,
+          selectedId: file.id
+        };
+        renderSavedSupportFilesModal();
+      });
+
+      const itemTitle = document.createElement('strong');
+      itemTitle.textContent = getSavedSupportFileTitle(file);
+      const itemMeta = document.createElement('span');
+      itemMeta.textContent = [
+        file.originalFileName || 'support file',
+        formatSavedSupportFileDate(file.lastOpenedAt || file.importedAt)
+      ].filter(Boolean).join(' | ');
+      itemButton.appendChild(itemTitle);
+      itemButton.appendChild(itemMeta);
+      list.appendChild(itemButton);
+    });
+  }
+  sidebar.appendChild(list);
+
+  const detail = document.createElement('section');
+  detail.className = 'saved-support-files-detail';
+
+  if (!selectedFile || supportSavedFilesState.loading || supportSavedFilesState.error) {
+    const empty = document.createElement('div');
+    empty.className = 'saved-support-files-empty large';
+    empty.textContent = supportSavedFilesState.loading ? 'Loading details' : 'Select a saved file';
+    detail.appendChild(empty);
+  } else {
+    const detailTitle = document.createElement('h3');
+    detailTitle.textContent = getSavedSupportFileTitle(selectedFile);
+    detail.appendChild(detailTitle);
+
+    const meta = document.createElement('div');
+    meta.className = 'saved-support-files-meta';
+    meta.textContent = [
+      selectedFile.originalFileName || 'support file',
+      formatSupportFileBytes(selectedFile.size),
+      selectedFile.importedAt ? `Added ${formatSavedSupportFileDate(selectedFile.importedAt)}` : ''
+    ].filter(Boolean).join(' | ');
+    detail.appendChild(meta);
+
+    const form = document.createElement('form');
+    form.className = 'saved-support-files-form';
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      handleSavedSupportFileMetadataSave(selectedFile.id);
+    });
+
+    const aliasGroup = document.createElement('label');
+    aliasGroup.className = 'form-group saved-support-files-field';
+    aliasGroup.textContent = 'Alias';
+    const aliasInput = document.createElement('input');
+    aliasInput.id = 'saved-support-file-alias';
+    aliasInput.type = 'text';
+    aliasInput.maxLength = 96;
+    aliasInput.value = selectedFile.alias || '';
+    aliasGroup.appendChild(aliasInput);
+    form.appendChild(aliasGroup);
+
+    const titleGroup = document.createElement('label');
+    titleGroup.className = 'form-group saved-support-files-field';
+    titleGroup.textContent = 'Title';
+    const titleInput = document.createElement('input');
+    titleInput.id = 'saved-support-file-title';
+    titleInput.type = 'text';
+    titleInput.maxLength = 160;
+    titleInput.value = selectedFile.title || '';
+    titleGroup.appendChild(titleInput);
+    form.appendChild(titleGroup);
+
+    const notesGroup = document.createElement('label');
+    notesGroup.className = 'form-group saved-support-files-field';
+    notesGroup.textContent = 'Notes';
+    const notesInput = document.createElement('textarea');
+    notesInput.id = 'saved-support-file-notes';
+    notesInput.rows = 8;
+    notesInput.value = selectedFile.notes || '';
+    notesGroup.appendChild(notesInput);
+    form.appendChild(notesGroup);
+
+    const actions = document.createElement('div');
+    actions.className = 'saved-support-files-actions';
+
+    const openButton = document.createElement('button');
+    openButton.type = 'button';
+    openButton.className = 'save-button saved-support-files-open';
+    openButton.textContent = supportSavedFilesState.openingId === selectedFile.id ? 'Opening...' : 'Open';
+    openButton.disabled = Boolean(supportSavedFilesState.openingId);
+    openButton.addEventListener('click', () => handleSavedSupportFileOpen(selectedFile.id));
+
+    const saveButton = document.createElement('button');
+    saveButton.type = 'submit';
+    saveButton.className = 'config-transfer-button saved-support-files-save';
+    saveButton.textContent = supportSavedFilesState.savingId === selectedFile.id ? 'Saving...' : 'Save details';
+    saveButton.disabled = Boolean(supportSavedFilesState.savingId);
+
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.className = 'delete-button saved-support-files-delete';
+    deleteButton.textContent = supportSavedFilesState.deletingId === selectedFile.id ? 'Deleting...' : 'Delete';
+    deleteButton.disabled = Boolean(supportSavedFilesState.deletingId);
+    deleteButton.addEventListener('click', () => handleSavedSupportFileDelete(selectedFile.id));
+
+    actions.appendChild(openButton);
+    actions.appendChild(saveButton);
+    actions.appendChild(deleteButton);
+    form.appendChild(actions);
+    detail.appendChild(form);
+  }
+
+  layout.appendChild(sidebar);
+  layout.appendChild(detail);
+  body.appendChild(layout);
+}
+
+async function handleSavedSupportFileMetadataSave(fileId) {
+  const supportAPI = getNetworkAPI();
+  if (!supportAPI || typeof supportAPI.updateSavedSupportFile !== 'function') {
+    showNotification('Saved Files are only available in the desktop app');
+    return;
+  }
+
+  const aliasInput = document.getElementById('saved-support-file-alias');
+  const titleInput = document.getElementById('saved-support-file-title');
+  const notesInput = document.getElementById('saved-support-file-notes');
+  supportSavedFilesState = {
+    ...supportSavedFilesState,
+    savingId: fileId
+  };
+  renderSavedSupportFilesModal();
+
+  try {
+    const result = await supportAPI.updateSavedSupportFile(fileId, {
+      alias: aliasInput ? aliasInput.value : '',
+      title: titleInput ? titleInput.value : '',
+      notes: notesInput ? notesInput.value : ''
+    });
+    if (!result || !result.success) {
+      throw new Error(result?.error || 'Could not save file details');
+    }
+
+    const nextFile = result.file;
+    supportSavedFilesState = {
+      ...supportSavedFilesState,
+      savingId: '',
+      files: supportSavedFilesState.files.map(file => file.id === fileId ? nextFile : file),
+      selectedId: fileId
+    };
+    if (supportFileState.savedFile?.id === fileId) {
+      supportFileState = {
+        ...supportFileState,
+        savedFile: nextFile
+      };
+      renderProductApp();
+    }
+    showNotification('Saved file details updated');
+  } catch (error) {
+    console.error('Error updating saved support file:', error);
+    supportSavedFilesState = {
+      ...supportSavedFilesState,
+      savingId: ''
+    };
+    showNotification(error.message || 'Could not save file details');
+  }
+
+  renderSavedSupportFilesModal();
+}
+
+async function handleSavedSupportFileOpen(fileId) {
+  const supportAPI = getNetworkAPI();
+  if (!supportAPI || typeof supportAPI.openSavedSupportFile !== 'function') {
+    showNotification('Saved Files are only available in the desktop app');
+    return;
+  }
+
+  supportSavedFilesState = {
+    ...supportSavedFilesState,
+    openingId: fileId
+  };
+  renderSavedSupportFilesModal();
+  showNotification('Opening saved support file');
+
+  try {
+    const result = await supportAPI.openSavedSupportFile(fileId);
+    if (!result || !result.success) {
+      throw new Error(result?.error || 'Could not open saved file');
+    }
+
+    applySupportFileLoadResult(result, 'Saved support file opened');
+    closeSavedSupportFilesModal();
+  } catch (error) {
+    console.error('Error opening saved support file:', error);
+    supportSavedFilesState = {
+      ...supportSavedFilesState,
+      openingId: ''
+    };
+    showNotification(error.message || 'Could not open saved file');
+    renderSavedSupportFilesModal();
+  }
+
+  renderProductApp();
+}
+
+async function handleSavedSupportFileDelete(fileId) {
+  const selectedFile = supportSavedFilesState.files.find(file => file.id === fileId);
+  const fileTitle = getSavedSupportFileTitle(selectedFile);
+  if (!window.confirm(`Delete "${fileTitle}" from Saved Files?`)) return;
+
+  const supportAPI = getNetworkAPI();
+  if (!supportAPI || typeof supportAPI.deleteSavedSupportFile !== 'function') {
+    showNotification('Saved Files are only available in the desktop app');
+    return;
+  }
+
+  supportSavedFilesState = {
+    ...supportSavedFilesState,
+    deletingId: fileId
+  };
+  renderSavedSupportFilesModal();
+
+  try {
+    const result = await supportAPI.deleteSavedSupportFile(fileId);
+    if (!result || !result.success) {
+      throw new Error(result?.error || 'Could not delete saved file');
+    }
+
+    const nextFiles = supportSavedFilesState.files.filter(file => file.id !== fileId);
+    supportSavedFilesState = {
+      ...supportSavedFilesState,
+      deletingId: '',
+      files: nextFiles,
+      selectedId: nextFiles[0]?.id || ''
+    };
+    if (supportFileState.savedFile?.id === fileId) {
+      supportFileState = {
+        ...supportFileState,
+        savedFile: null
+      };
+      renderProductApp();
+    }
+    showNotification('Saved file deleted');
+  } catch (error) {
+    console.error('Error deleting saved support file:', error);
+    supportSavedFilesState = {
+      ...supportSavedFilesState,
+      deletingId: ''
+    };
+    showNotification(error.message || 'Could not delete saved file');
+  }
+
+  renderSavedSupportFilesModal();
+}
+
+function setupSavedSupportFilesModal() {
+  const modal = document.getElementById('saved-support-files-modal');
+  const closeButton = document.getElementById('close-saved-support-files');
+  if (!modal) return;
+
+  if (closeButton) {
+    closeButton.addEventListener('click', closeSavedSupportFilesModal);
+  }
+
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) {
+      closeSavedSupportFilesModal();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (modal.style.display === 'flex' && event.key === 'Escape') {
+      event.preventDefault();
+      closeSavedSupportFilesModal();
+    }
+  });
+}
+
 function renderFileSupportView(workspace) {
   const treeSearchResult = filterSupportTreeNodes(supportFileState.tree, supportTreeSearchQuery);
   const treeSearchActive = normalizeSearchQuery(supportTreeSearchQuery).length > 0;
@@ -2619,8 +3144,11 @@ function renderFileSupportView(workspace) {
     const summary = document.createElement('div');
     summary.className = 'file-support-summary';
     const stats = supportFileState.stats || {};
+    const displayName = supportFileState.savedFile?.alias
+      ? `${supportFileState.savedFile.alias} (${supportFileState.fileName})`
+      : supportFileState.fileName;
     summary.textContent = [
-      supportFileState.fileName,
+      displayName,
       `${stats.fileCount || 0} files`,
       `${stats.directoryCount || 0} folders`
     ].join(' | ');
@@ -2636,6 +3164,13 @@ function renderFileSupportView(workspace) {
   importButton.disabled = supportFileState.importing;
   importButton.addEventListener('click', handleSupportFileImport);
   controls.appendChild(importButton);
+
+  const savedFilesButton = document.createElement('button');
+  savedFilesButton.type = 'button';
+  savedFilesButton.className = 'config-transfer-button file-support-saved-files-button';
+  savedFilesButton.textContent = 'Saved Files';
+  savedFilesButton.addEventListener('click', openSavedSupportFilesModal);
+  controls.appendChild(savedFilesButton);
   headerRow.appendChild(controls);
 
   headerText.appendChild(headerRow);
@@ -3010,44 +3545,10 @@ async function handleSupportFileImport() {
       return;
     }
 
-    expandedSupportFolders = new Set();
-    if (Array.isArray(result.tree) && result.tree.length === 1 && result.tree[0].type === 'directory') {
-      expandedSupportFolders.add(result.tree[0].id);
+    applySupportFileLoadResult(result, 'Support file imported');
+    if (supportSavedFilesState.visible) {
+      refreshSavedSupportFiles();
     }
-    supportTreeSearchQuery = '';
-    supportContentSearchQuery = '';
-    supportFileViewerFullscreen = false;
-    supportContentViewMode = 'ruby';
-    supportSmartScanState = {
-      query: '',
-      visible: false,
-      loading: false,
-      answer: '',
-      error: '',
-      sources: [],
-      resultQuery: '',
-      resultProvider: '',
-      resultSelectedPath: '',
-      completedAt: ''
-    };
-
-    supportFileState = {
-      sessionId: result.sessionId,
-      fileName: result.fileName || '',
-      tree: Array.isArray(result.tree) ? result.tree : [],
-      stats: result.stats || null,
-      selectedFileId: '',
-      selectedPath: '',
-      selectedContent: '',
-      selectedError: '',
-      selectedTruncated: false,
-      selectedLoading: false,
-      summary: result.summary || null,
-      summaryVisible: Boolean(result.summary),
-      importError: '',
-      importing: false
-    };
-    showNotification('Support file imported');
   } catch (error) {
     console.error('Error importing support file:', error);
     supportFileState = {
