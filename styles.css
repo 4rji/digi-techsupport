@@ -3613,6 +3613,45 @@ body,
   box-sizing: border-box;
 }
 
+body.is-file-support-view .file-support-layout {
+  height: auto;
+  min-height: max(420px, calc(100vh - 184px));
+}
+
+body.is-file-support-view .file-support-panel {
+  height: auto;
+  overflow: visible;
+}
+
+body.is-file-support-view .file-support-tree,
+body.is-file-support-view .file-support-viewer-body {
+  flex: none;
+  overflow: visible;
+}
+
+body.is-templates-view .templates-library {
+  height: auto;
+  min-height: max(420px, calc(100vh - 184px));
+  align-items: start;
+}
+
+body.is-templates-view .template-list {
+  overflow: visible;
+  min-height: 0;
+}
+
+body.is-templates-view .template-editor-card,
+body.is-templates-view .template-editor-placeholder {
+  overflow: visible;
+  min-height: 0;
+}
+
+body.is-templates-view .template-body-input {
+  flex: none;
+  min-height: max(300px, calc(100vh - 460px));
+  resize: vertical;
+}
+
 .file-support-layout.is-viewer-fullscreen {
   position: fixed;
   inset: 0;

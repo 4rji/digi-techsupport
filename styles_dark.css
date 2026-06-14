@@ -3639,6 +3639,65 @@ body {
   box-sizing: border-box;
 }
 
+body.is-file-support-view .file-support-layout {
+  height: auto;
+  min-height: max(420px, calc(100vh - 184px));
+}
+
+body.is-file-support-view .file-support-panel {
+  height: auto;
+  overflow: visible;
+}
+
+body.is-file-support-view .file-support-tree,
+body.is-file-support-view .file-support-viewer-body {
+  flex: none;
+  overflow: visible;
+}
+
+body.is-templates-view {
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+
+body.is-templates-view .product-workspace {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+
+body.is-templates-view .templates-library {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+  padding-bottom: 4px;
+}
+
+body.is-templates-view .template-list {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+body.is-templates-view .template-editor {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+body.is-templates-view .template-editor-card,
+body.is-templates-view .template-editor-placeholder {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .file-support-layout.is-viewer-fullscreen {
   position: fixed;
   inset: 0;

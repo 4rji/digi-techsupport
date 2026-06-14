@@ -1359,13 +1359,17 @@ function renderActiveLine() {
   if (!workspace) return;
 
   workspace.innerHTML = '';
+  document.body.classList.remove('is-file-support-view');
+  document.body.classList.remove('is-templates-view');
 
   if (activeLineId === TEMPLATES_VIEW_ID) {
+    document.body.classList.add('is-templates-view');
     renderTemplatesView(workspace);
     return;
   }
 
   if (activeLineId === FILE_SUPPORT_VIEW_ID) {
+    document.body.classList.add('is-file-support-view');
     renderFileSupportView(workspace);
     return;
   }
