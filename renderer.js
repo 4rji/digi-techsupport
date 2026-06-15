@@ -2144,6 +2144,26 @@ function renderTemplatesView(workspace) {
     importInput.click();
   });
 
+  const newButton = document.createElement('button');
+  newButton.type = 'button';
+  newButton.className = 'config-transfer-button template-new-button';
+  newButton.textContent = 'New';
+  newButton.addEventListener('click', () => {
+    const title = 'New Template';
+    const draft = {
+      id: createTemplateId(title, supportTemplates.length + templateDrafts.length),
+      title,
+      body: '',
+      hidden: false,
+      sourceName: 'manual'
+    };
+    templateDrafts.push(draft);
+    activeTemplateId = draft.id;
+    saveTemplateDrafts();
+    renderProductApp();
+  });
+
+  controls.appendChild(newButton);
   controls.appendChild(importButton);
   controls.appendChild(importInput);
   headerRow.appendChild(controls);
