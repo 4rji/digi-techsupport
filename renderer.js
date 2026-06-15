@@ -927,6 +927,22 @@ function setupTabCycleShortcut() {
     const nextIndex = (currentIndex + delta + buttons.length) % buttons.length;
     buttons[nextIndex].click();
   });
+
+  document.addEventListener('keydown', (event) => {
+    if (!(event.altKey || event.metaKey)) return;
+    const num = parseInt(event.key, 10);
+    if (isNaN(num) || num < 1) return;
+
+    const tabsEl = document.getElementById('product-tabs');
+    if (!tabsEl) return;
+    const buttons = Array.from(tabsEl.querySelectorAll('.tab-button'));
+    const target = buttons[num - 1];
+    if (!target) return;
+
+    // Don't block native Cmd+1..9 browser/app shortcuts unless a tab exists
+    event.preventDefault();
+    target.click();
+  });
 }
 
 window.addEventListener('beforeunload', () => {
@@ -1279,7 +1295,7 @@ function initializeProductLines() {
     ? savedActiveLineId
     : (productLines.some(line => line.id === savedActiveLineId)
       ? savedActiveLineId
-      : productLines[0]?.id || '');
+      : FILE_SUPPORT_VIEW_ID);
 
   saveProductLines();
   renderProductApp();
@@ -1339,7 +1355,6 @@ function renderProductTabs() {
     tabs.appendChild(button);
   };
 
-  createBuiltInTabButton(TEMPLATES_VIEW_ID, 'Templates');
   createBuiltInTabButton(FILE_SUPPORT_VIEW_ID, 'File Support');
   createBuiltInTabButton(DEVICES_VIEW_ID, 'DRM');
 
@@ -1357,6 +1372,8 @@ function renderProductTabs() {
     });
     tabs.appendChild(button);
   });
+
+  createBuiltInTabButton(TEMPLATES_VIEW_ID, 'Templates');
 }
 
 function renderActiveLine() {
