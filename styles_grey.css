@@ -730,6 +730,7 @@ body {
   border-radius: 4px;
   background: #2a2a2a;
   color: #fff;
+  box-sizing: border-box;
 }
 
 .form-group textarea {

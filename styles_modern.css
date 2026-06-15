@@ -341,6 +341,7 @@ select:focus-visible,
 .form-group select {
   border-radius: var(--ui-r-sm);
   padding: 10px 12px;
+  box-sizing: border-box;
   transition: border-color var(--ui-base) var(--ui-ease),
               box-shadow var(--ui-base) var(--ui-ease),
               background-color var(--ui-base) var(--ui-ease);
