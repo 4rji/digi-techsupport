@@ -5,7 +5,7 @@ Digi TechSupport
 <img src="img-readme/2.webp" alt="EX product line view" width="50%">
 <img src="img-readme/3.webp" alt="Settings view" width="50%">
 
-Desktop app built with Electron for technical support workflows around Digi devices and Proxmox environments. It includes TCP checks, product organization by lines, configuration import/export, and a templates workspace with AI-assisted generation.
+Desktop app built with Electron for technical support workflows around Digi devices and Proxmox environments. It includes TCP/ping checks, product organization by lines, SSH terminal sessions, Digi Remote Manager integration, support archive file viewer, configuration import/export, and a templates workspace with AI-assisted generation.
 
 Development
 -----------
@@ -40,9 +40,13 @@ Main Features
 -------------
 - Product lines such as `IX`, `TX`, and `EX`, with support for adding new lines and products.
 - Product cards with name, IP address, DNS domain, TCP ports, scan interval, and custom image.
-- Configuration import/export through the Settings modal.
-- Templates workspace for loading, editing, searching, copying, and deleting support templates.
+- TCP port checks and ping polling on a configurable interval per card.
+- SSH terminal sessions directly from a product card using xterm.js.
+- Digi Remote Manager (DRM) integration to fetch and display cloud-managed devices.
+- Support archive viewer: import Digi `.bin` files, browse the file tree, and run AI analysis on selected entries.
+- Templates workspace for creating, loading, editing, searching, copying, and deleting support templates.
 - AI-assisted template generation using either OpenAI or Claude.
+- Configuration import/export through the Settings modal.
 
 Settings
 --------
