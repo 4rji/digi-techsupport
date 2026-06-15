@@ -1475,6 +1475,30 @@ const DEVICE_DETAIL_GROUPS = [
     ]
   }
 ];
+const DEVICE_MODEL_IMAGES = [
+  ['ix40', 'img/digi-ix40.png'],
+  ['ix30', 'img/digi-ix30.png'],
+  ['ix25', 'img/digi-ix25.png'],
+  ['ix20', 'img/digi-ix20.png'],
+  ['ix10', 'img/digi-ix10.png'],
+  ['ex50', 'img/digi-ex50-new.png'],
+  ['ex15', 'img/Digi-EX15.png'],
+  ['ex12', 'img/digi-ex12.png'],
+  ['tx64', 'img/digi-tx64-r-5gbadge.png'],
+  ['tx54', 'img/digi-tx54-dual-wifi-5g.png'],
+  ['tx40', 'img/digi-tx40-5g-badge.png'],
+  ['core-cm', 'img/digi-core-cm-18.jpg'],
+  ['cm18', 'img/digi-core-cm-18.jpg'],
+];
+
+function getDeviceProductImage(name) {
+  const normalized = (name || '').toLowerCase().replace(/[\s_]/g, '-');
+  for (const [pattern, imgPath] of DEVICE_MODEL_IMAGES) {
+    if (normalized.includes(pattern)) return imgPath;
+  }
+  return null;
+}
+
 let devicesAutoRefreshTimer = null;
 let devicesBodyEl = null;
 
@@ -1626,6 +1650,16 @@ function createDeviceRow(device) {
   row.tabIndex = 0;
   row.setAttribute('aria-expanded', String(isExpanded));
 
+  const productImg = getDeviceProductImage(device.name);
+  if (productImg) {
+    const thumb = document.createElement('img');
+    thumb.className = 'device-row-thumb';
+    thumb.src = productImg;
+    thumb.alt = '';
+    thumb.setAttribute('aria-hidden', 'true');
+    row.appendChild(thumb);
+  }
+
   const info = document.createElement('div');
   info.className = 'device-row-info';
 
@@ -1689,8 +1723,21 @@ function openDeviceDetailModal(device) {
 
   if (titleEl) titleEl.textContent = device.name || device.id || 'Unknown device';
   if (iconEl) {
-    iconEl.textContent = iconText;
     iconEl.className = `device-detail-modal-icon ${isConnected ? 'is-connected' : 'is-disconnected'}`;
+    const modalProductImg = getDeviceProductImage(device.name);
+    if (modalProductImg) {
+      iconEl.classList.add('has-product-img');
+      iconEl.innerHTML = '';
+      const imgEl = document.createElement('img');
+      imgEl.src = modalProductImg;
+      imgEl.alt = '';
+      imgEl.setAttribute('aria-hidden', 'true');
+      imgEl.className = 'device-detail-modal-icon-img';
+      iconEl.appendChild(imgEl);
+    } else {
+      iconEl.classList.remove('has-product-img');
+      iconEl.textContent = iconText;
+    }
   }
 
   if (bodyEl) {
@@ -1817,13 +1864,24 @@ function createDeviceCard(device) {
   const content = document.createElement('div');
   content.className = 'vm-card-content';
 
-  // Icon with network type indicator
+  // Icon with network type indicator or product image
   const icon = document.createElement('div');
   icon.className = `vm-icon device-card-icon${isConnected ? ' is-connected' : ' is-disconnected'}`;
   const network = String(details.network || details.connectionType || '').toUpperCase();
   const iconText = ['LTE', '5G', '4G', 'WIFI', 'ETH'].find(t => network.includes(t))
     || (isConnected ? 'DRM' : 'DRM');
-  icon.textContent = iconText;
+  const cardProductImg = getDeviceProductImage(device.name);
+  if (cardProductImg) {
+    icon.classList.add('has-product-img');
+    const imgEl = document.createElement('img');
+    imgEl.src = cardProductImg;
+    imgEl.alt = '';
+    imgEl.setAttribute('aria-hidden', 'true');
+    imgEl.className = 'device-card-icon-img';
+    icon.appendChild(imgEl);
+  } else {
+    icon.textContent = iconText;
+  }
   content.appendChild(icon);
 
   // Name
