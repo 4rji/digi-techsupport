@@ -1443,7 +1443,7 @@ const devicesState = {
   filterStatus: 'connected', // all | connected | disconnected
   sortBy: 'name', // name | status
   expandedId: '', // device id whose detail panel is open
-  viewMode: 'list' // list | grid
+  viewMode: 'grid' // list | grid
 };
 
 const DEVICE_DETAIL_GROUPS = [
@@ -1543,10 +1543,10 @@ function getFilteredDevices() {
   });
 
   result = result.slice().sort((a, b) => {
-    if (devicesState.sortBy === 'status') {
-      const statusCompare = String(a.status).localeCompare(String(b.status));
-      if (statusCompare !== 0) return statusCompare;
-    }
+    // Always show online (connected) devices first, then offline.
+    const aOnline = a.status === 'connected' ? 0 : 1;
+    const bOnline = b.status === 'connected' ? 0 : 1;
+    if (aOnline !== bOnline) return aOnline - bOnline;
     return String(a.name || a.id || '').localeCompare(String(b.name || b.id || ''), undefined, {
       sensitivity: 'base',
       numeric: true
@@ -1938,42 +1938,42 @@ function renderDevicesView(workspace) {
   });
   actions.appendChild(search);
 
-  const buildSelect = (options, selectedValue, onChange) => {
-    const select = document.createElement('select');
-    select.className = 'devices-filter-select';
+  const buildButtonGroup = (ariaLabel, options, getSelected, onChange) => {
+    const group = document.createElement('div');
+    group.className = 'devices-filter-toggle';
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', ariaLabel);
     options.forEach(({ value, label }) => {
-      const option = document.createElement('option');
-      option.value = value;
-      option.textContent = label;
-      option.selected = value === selectedValue;
-      select.appendChild(option);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `devices-filter-btn${getSelected() === value ? ' is-active' : ''}`;
+      btn.textContent = label;
+      btn.setAttribute('aria-pressed', String(getSelected() === value));
+      btn.addEventListener('click', () => {
+        onChange(value);
+        group.querySelectorAll('.devices-filter-btn').forEach((b, i) => {
+          const isActive = options[i].value === value;
+          b.classList.toggle('is-active', isActive);
+          b.setAttribute('aria-pressed', String(isActive));
+        });
+        if (devicesState.status === 'ready') {
+          renderDevicesBody();
+        }
+      });
+      group.appendChild(btn);
     });
-    select.addEventListener('change', () => {
-      onChange(select.value);
-      if (devicesState.status === 'ready') {
-        renderDevicesBody();
-      }
-    });
-    return select;
+    return group;
   };
 
-  actions.appendChild(buildSelect(
+  actions.appendChild(buildButtonGroup(
+    'Filter by status',
     [
-      { value: 'all', label: 'All statuses' },
-      { value: 'connected', label: 'Connected' },
-      { value: 'disconnected', label: 'Disconnected' }
+      { value: 'all', label: 'All' },
+      { value: 'connected', label: 'Online' },
+      { value: 'disconnected', label: 'Offline' }
     ],
-    devicesState.filterStatus,
+    () => devicesState.filterStatus,
     (value) => { devicesState.filterStatus = value; }
-  ));
-
-  actions.appendChild(buildSelect(
-    [
-      { value: 'name', label: 'Sort by name' },
-      { value: 'status', label: 'Sort by status' }
-    ],
-    devicesState.sortBy,
-    (value) => { devicesState.sortBy = value; }
   ));
 
   // View toggle (list / grid)

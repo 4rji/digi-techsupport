@@ -953,6 +953,45 @@ select:focus-visible,
 }
 
 /* ============================================================
+   Devices — filter / sort button groups (segmented)
+   ============================================================ */
+.devices-filter-toggle {
+  display: flex;
+  border-radius: var(--ui-r-pill);
+  border: 1px solid rgba(var(--ui-accent-rgb), 0.28);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.devices-filter-btn {
+  padding: 9px 16px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity var(--ui-base) var(--ui-ease),
+              background var(--ui-base) var(--ui-ease);
+}
+
+.devices-filter-btn + .devices-filter-btn {
+  border-left: 1px solid rgba(var(--ui-accent-rgb), 0.2);
+}
+
+.devices-filter-btn:hover {
+  opacity: 0.9;
+  background: rgba(var(--ui-accent-rgb), 0.08);
+}
+
+.devices-filter-btn.is-active {
+  opacity: 1;
+  font-weight: 600;
+  background: rgba(var(--ui-accent-rgb), 0.18);
+}
+
+/* ============================================================
    Devices — grid / card view
    ============================================================ */
 .devices-grid {
