@@ -73,6 +73,23 @@ The Settings modal now includes the following options:
 ### Templates
 - `Delete all templates` permanently removes saved templates from the local app state.
 
+SSH Terminal
+------------
+Each product card includes an SSH button that opens an inline terminal session powered by xterm.js. Connection fields (host, username, password) are pre-filled from the card's configured IP and stored credentials. SSH access is restricted to private and local IP ranges.
+
+Digi Remote Manager
+--------------------
+The DRM panel fetches the device inventory from the Digi Remote Manager cloud API. Credentials (server URL and API key) are stored securely in the app's userData directory. Devices are listed with their name and online/offline status. The HTTP server also exposes `GET /api/digi/devices` for headless access.
+
+Support Archive Viewer
+-----------------------
+The File Support view imports Digi `.bin` support archives (gzip/tar format). After import:
+- A file tree shows all entries inside the archive.
+- Selecting a file displays its raw content.
+- Grep mode (`Ctrl+G`) filters content by keyword; cut mode (`Ctrl+C`) trims surrounding blank lines.
+- The AI analysis button sends the selected file content to the configured provider for analysis.
+- Files can be saved to a local support library and reopened later.
+
 AI Template Generation
 ----------------------
 Template generation requires:
@@ -91,6 +108,13 @@ Default models:
 - OpenAI: `gpt-4.1-mini`
 - Claude: `claude-sonnet-4-5`
 
+Templates Workspace
+-------------------
+- **New** — creates a blank draft template ready to edit and save.
+- **Load** — imports one or more `.md` / `.markdown` files as templates.
+- Templates can be edited inline, searched, copied to clipboard, and deleted.
+- Unsaved drafts are kept in `sessionStorage` until explicitly saved to the main library.
+
 Keyboard Shortcuts — File Support
 ----------------------------------
 
@@ -100,6 +124,10 @@ Keyboard Shortcuts — File Support
 | `Esc` | Exit fullscreen |
 | `Ctrl+G` | Toggle grep mode on/off |
 | `Ctrl+C` | Toggle cut mode (only when grep is active) |
+
+Keyboard Shortcuts — SSH Terminal
+----------------------------------
+Standard terminal input is passed through. The terminal resizes automatically when the window changes size.
 
 Local Persistence
 -----------------
