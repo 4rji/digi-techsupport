@@ -3346,7 +3346,8 @@ body,
 .template-create-row,
 .product-specs-content,
 .ssh-terminal-content,
-.settings-content {
+.settings-content,
+.device-detail-modal-content {
   background: var(--app-card);
   border-color: var(--app-border);
   color: var(--app-text);

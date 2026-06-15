@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const { Client } = require('ssh2');
 const tar = require('tar-stream');
 const { generateSupportTemplate, analyzeSupportFiles } = require('./template-generator');
+const digiRemoteService = require('./digi-remote-service');
 
 const APP_ICON_PATH = path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const sshSessions = new Map();
@@ -1897,6 +1898,57 @@ function setupIPCHandlers() {
       return writeSSHAdminPassword(password);
     } catch (error) {
       return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('digi-get-credentials', async () => {
+    try {
+      const { keyId, keySecret } = digiRemoteService.readCredentials(app.getPath('userData'));
+      return {
+        success: true,
+        keyId,
+        hasCredentials: Boolean(keyId && keySecret)
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('digi-save-credentials', async (_event, credentials = {}) => {
+    try {
+      const dir = app.getPath('userData');
+      const keyId = typeof credentials.keyId === 'string' ? credentials.keyId.trim() : '';
+      let keySecret = typeof credentials.keySecret === 'string' ? credentials.keySecret : '';
+      // Preserve the stored secret when the user leaves the field blank but keeps a key id.
+      if (!keySecret && keyId) {
+        const existing = digiRemoteService.readCredentials(dir);
+        if (existing.keySecret) {
+          keySecret = existing.keySecret;
+        }
+      }
+      const result = digiRemoteService.writeCredentials(dir, { keyId, keySecret });
+      return { success: true, ...result };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('digi-get-devices', async (_event, options = {}) => {
+    try {
+      const { keyId, keySecret } = digiRemoteService.readCredentials(app.getPath('userData'));
+      const result = await digiRemoteService.getDevices({
+        keyId,
+        keySecret,
+        size: options.size,
+        cursor: options.cursor
+      });
+      return { success: true, ...result };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        code: error.code || 'DIGI_ERROR'
+      };
     }
   });
 

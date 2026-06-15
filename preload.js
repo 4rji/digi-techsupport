@@ -23,6 +23,9 @@ const redactArgs = (name, args) => {
   if (name === 'sshSaveAdminPassword') {
     return ['[redacted]'];
   }
+  if (name === 'digiSaveCredentials') {
+    return ['[redacted]'];
+  }
   if (name === 'saveTextFile') {
     return args.map((arg) => {
       if (!arg || typeof arg !== 'object') return arg;
@@ -156,6 +159,15 @@ contextBridge.exposeInMainWorld('appAPI', {
   }),
   saveTextFile: logWrapper('saveTextFile', (options) => {
     return ipcRenderer.invoke('save-text-file', options);
+  }),
+  digiGetCredentials: logWrapper('digiGetCredentials', () => {
+    return ipcRenderer.invoke('digi-get-credentials');
+  }),
+  digiSaveCredentials: logWrapper('digiSaveCredentials', (credentials) => {
+    return ipcRenderer.invoke('digi-save-credentials', credentials);
+  }),
+  digiGetDevices: logWrapper('digiGetDevices', (options) => {
+    return ipcRenderer.invoke('digi-get-devices', options);
   }),
   onSSHData: (callback) => {
     const listener = (_event, payload) => callback(payload);

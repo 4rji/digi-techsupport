@@ -6,6 +6,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { generateSupportTemplate } = require('./template-generator');
+const digiRemoteService = require('./digi-remote-service');
 
 const PORT = Number(process.env.DIGI_TECHSUPPORT_HTTP_PORT) || 3000;
 const DEFAULT_FILE = 'index.html';
@@ -103,11 +104,54 @@ async function handleTemplateGenerationRequest(req, res) {
   }
 }
 
+function resolveDigiCredentials() {
+  const envKeyId = String(process.env.DIGI_API_KEY_ID || '').trim();
+  const envKeySecret = String(process.env.DIGI_API_KEY_SECRET || '').trim();
+  if (envKeyId && envKeySecret) {
+    return { keyId: envKeyId, keySecret: envKeySecret };
+  }
+  const dataDir = process.env.DIGI_TECHSUPPORT_DATA_DIR || __dirname;
+  return digiRemoteService.readCredentials(dataDir);
+}
+
+async function handleDigiDevicesRequest(req, res) {
+  if (req.method !== 'GET') {
+    sendJson(res, 405, { success: false, error: 'Method not allowed' });
+    return;
+  }
+
+  try {
+    const requestUrl = new URL(req.url, 'http://localhost');
+    const { keyId, keySecret } = resolveDigiCredentials();
+    const result = await digiRemoteService.getDevices({
+      keyId,
+      keySecret,
+      size: requestUrl.searchParams.get('size') || undefined,
+      cursor: requestUrl.searchParams.get('cursor') || undefined
+    });
+    sendJson(res, 200, result.devices);
+  } catch (error) {
+    if (error instanceof digiRemoteService.ConfigurationError) {
+      sendJson(res, 400, { error: error.message });
+      return;
+    }
+    if (error instanceof digiRemoteService.AuthError) {
+      sendJson(res, 401, { error: error.message });
+      return;
+    }
+    sendJson(res, 500, { error: error.message });
+  }
+}
+
 async function handleRequest(req, res) {
   try {
     const requestUrl = new URL(req.url, `http://localhost`);
     if (requestUrl.pathname === '/api/generate-template') {
       await handleTemplateGenerationRequest(req, res);
+      return;
+    }
+    if (requestUrl.pathname === '/api/digi/devices') {
+      await handleDigiDevicesRequest(req, res);
       return;
     }
 

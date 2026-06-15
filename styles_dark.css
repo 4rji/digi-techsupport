@@ -4319,3 +4319,9 @@ body.is-file-support-resizing {
     width: 100%;
   }
 }
+
+.device-detail-modal-content {
+  background: var(--app-card, #111);
+  border-color: var(--app-border, rgba(120, 190, 240, 0.22));
+  color: var(--app-text, inherit);
+}

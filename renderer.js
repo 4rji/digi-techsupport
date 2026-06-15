@@ -27,7 +27,9 @@ const THEME_STYLESHEETS = [
 ];
 const DEFAULT_LINE_NAMES = ['IX', 'TX', 'EX'];
 const FILE_SUPPORT_VIEW_ID = '__file_support__';
-const BUILT_IN_VIEW_IDS = new Set([TEMPLATES_VIEW_ID, FILE_SUPPORT_VIEW_ID]);
+const DEVICES_VIEW_ID = '__devices__';
+const BUILT_IN_VIEW_IDS = new Set([TEMPLATES_VIEW_ID, FILE_SUPPORT_VIEW_ID, DEVICES_VIEW_ID]);
+const DEVICES_AUTO_REFRESH_INTERVAL = 45000;
 const DEFAULT_FILE_SUPPORT_TREE_WIDTH = 220;
 const MIN_FILE_SUPPORT_TREE_WIDTH = 120;
 const MAX_FILE_SUPPORT_TREE_WIDTH = 640;
@@ -902,6 +904,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSSHTerminalModal();
   setupItemConfigModal();
   setupSettingsModal();
+  setupDeviceDetailModal();
   setupSavedSupportFilesModal();
   setupFileSupportShortcutsModal();
   setupConfigTransferControls();
@@ -1338,6 +1341,7 @@ function renderProductTabs() {
 
   createBuiltInTabButton(TEMPLATES_VIEW_ID, 'Templates');
   createBuiltInTabButton(FILE_SUPPORT_VIEW_ID, 'File Support');
+  createBuiltInTabButton(DEVICES_VIEW_ID, 'DRM');
 
   productLines.forEach(line => {
     const button = document.createElement('button');
@@ -1362,6 +1366,11 @@ function renderActiveLine() {
   workspace.innerHTML = '';
   document.body.classList.remove('is-file-support-view');
   document.body.classList.remove('is-templates-view');
+  document.body.classList.remove('is-devices-view');
+
+  if (activeLineId !== DEVICES_VIEW_ID) {
+    stopDevicesAutoRefresh();
+  }
 
   if (activeLineId === TEMPLATES_VIEW_ID) {
     document.body.classList.add('is-templates-view');
@@ -1372,6 +1381,12 @@ function renderActiveLine() {
   if (activeLineId === FILE_SUPPORT_VIEW_ID) {
     document.body.classList.add('is-file-support-view');
     renderFileSupportView(workspace);
+    return;
+  }
+
+  if (activeLineId === DEVICES_VIEW_ID) {
+    document.body.classList.add('is-devices-view');
+    renderDevicesView(workspace);
     return;
   }
 
@@ -1417,6 +1432,604 @@ function renderActiveLine() {
 
   workspace.appendChild(grid);
   cleanupPortStatuses();
+}
+
+const devicesState = {
+  status: 'idle', // idle | loading | ready | error
+  devices: [],
+  error: '',
+  code: '',
+  search: '',
+  filterStatus: 'connected', // all | connected | disconnected
+  sortBy: 'name', // name | status
+  expandedId: '', // device id whose detail panel is open
+  viewMode: 'list' // list | grid
+};
+
+const DEVICE_DETAIL_GROUPS = [
+  {
+    title: 'Device',
+    fields: [
+      ['IP', 'ip'],
+      ['Public IP', 'publicIp'],
+      ['Private IP', 'privateIp'],
+      ['Connection type', 'connectionType'],
+      ['Firmware', 'firmwareVersion'],
+      ['Uptime', 'uptime'],
+      ['Last connect', 'lastConnect'],
+      ['Model', 'model']
+    ]
+  },
+  {
+    title: 'Modem',
+    fields: [
+      ['State', 'modemState'],
+      ['Signal bars', 'signalBars'],
+      ['Signal', 'signalStrength'],
+      ['Network', 'network'],
+      ['Carrier', 'carrier'],
+      ['Modem model', 'modemModel'],
+      ['SIM status', 'simStatus'],
+      ['SIM ICCID', 'simIccid'],
+      ['IMEI', 'imei']
+    ]
+  }
+];
+let devicesAutoRefreshTimer = null;
+let devicesBodyEl = null;
+
+function stopDevicesAutoRefresh() {
+  if (devicesAutoRefreshTimer) {
+    clearInterval(devicesAutoRefreshTimer);
+    devicesAutoRefreshTimer = null;
+  }
+}
+
+function startDevicesAutoRefresh() {
+  stopDevicesAutoRefresh();
+  devicesAutoRefreshTimer = setInterval(() => {
+    if (activeLineId !== DEVICES_VIEW_ID) {
+      stopDevicesAutoRefresh();
+      return;
+    }
+    loadDevices({ silent: true });
+  }, DEVICES_AUTO_REFRESH_INTERVAL);
+}
+
+async function loadDevices({ silent = false } = {}) {
+  const api = getNetworkAPI();
+  if (!api || typeof api.digiGetDevices !== 'function') {
+    devicesState.status = 'error';
+    devicesState.error = 'Digi integration is unavailable';
+    devicesState.code = 'DIGI_UNAVAILABLE';
+    renderDevicesBody();
+    return;
+  }
+
+  if (!silent || devicesState.status === 'idle') {
+    devicesState.status = 'loading';
+    renderDevicesBody();
+  }
+
+  const result = await api.digiGetDevices();
+
+  // Ignore late responses if the user navigated away.
+  if (activeLineId !== DEVICES_VIEW_ID) return;
+
+  if (result && result.success) {
+    devicesState.status = 'ready';
+    devicesState.devices = Array.isArray(result.devices) ? result.devices : [];
+    devicesState.error = '';
+    devicesState.code = '';
+  } else {
+    devicesState.status = 'error';
+    devicesState.error = (result && result.error) || 'Could not load devices';
+    devicesState.code = (result && result.code) || 'DIGI_ERROR';
+  }
+  renderDevicesBody();
+}
+
+function getFilteredDevices() {
+  const query = devicesState.search.trim().toLowerCase();
+  const filterStatus = devicesState.filterStatus;
+
+  let result = devicesState.devices.filter((device) => {
+    if (filterStatus === 'connected' && device.status !== 'connected') return false;
+    if (filterStatus === 'disconnected' && device.status === 'connected') return false;
+    if (!query) return true;
+    return [device.name, device.id, device.status]
+      .filter(Boolean)
+      .some((field) => String(field).toLowerCase().includes(query));
+  });
+
+  result = result.slice().sort((a, b) => {
+    if (devicesState.sortBy === 'status') {
+      const statusCompare = String(a.status).localeCompare(String(b.status));
+      if (statusCompare !== 0) return statusCompare;
+    }
+    return String(a.name || a.id || '').localeCompare(String(b.name || b.id || ''), undefined, {
+      sensitivity: 'base',
+      numeric: true
+    });
+  });
+
+  return result;
+}
+
+function createDeviceStatusBadge(status) {
+  const badge = document.createElement('span');
+  const normalized = String(status || 'unknown').toLowerCase();
+  const isConnected = normalized === 'connected';
+  badge.className = `device-status-badge ${isConnected ? 'is-connected' : 'is-disconnected'}`;
+  badge.dataset.status = normalized;
+  badge.textContent = normalized;
+  return badge;
+}
+
+function createDeviceDetailPanel(device) {
+  const details = device.details || {};
+  const panel = document.createElement('div');
+  panel.className = 'device-detail';
+
+  const groups = DEVICE_DETAIL_GROUPS
+    .map((group) => {
+      const rows = group.fields
+        .map(([label, key]) => [label, String(details[key] ?? '').trim()])
+        .filter(([, value]) => value !== '');
+      return { title: group.title, rows };
+    })
+    .filter((group) => group.rows.length > 0);
+
+  if (groups.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'device-detail-empty';
+    empty.textContent = 'No additional details available for this device';
+    panel.appendChild(empty);
+    return panel;
+  }
+
+  groups.forEach((group) => {
+    const section = document.createElement('div');
+    section.className = 'device-detail-group';
+
+    const title = document.createElement('h4');
+    title.className = 'device-detail-title';
+    title.textContent = group.title;
+    section.appendChild(title);
+
+    const grid = document.createElement('dl');
+    grid.className = 'device-detail-grid';
+    group.rows.forEach(([label, value]) => {
+      const dt = document.createElement('dt');
+      dt.textContent = label;
+      const dd = document.createElement('dd');
+      dd.textContent = value;
+      grid.appendChild(dt);
+      grid.appendChild(dd);
+    });
+    section.appendChild(grid);
+    panel.appendChild(section);
+  });
+
+  return panel;
+}
+
+function createDeviceRow(device) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'device-item';
+
+  const isExpanded = devicesState.expandedId === device.id && Boolean(device.id);
+
+  const row = document.createElement('div');
+  row.className = `device-row${isExpanded ? ' is-expanded' : ''}`;
+  row.setAttribute('role', 'button');
+  row.tabIndex = 0;
+  row.setAttribute('aria-expanded', String(isExpanded));
+
+  const info = document.createElement('div');
+  info.className = 'device-row-info';
+
+  const name = document.createElement('div');
+  name.className = 'device-row-name';
+  name.textContent = device.name || device.id || 'Unknown device';
+  info.appendChild(name);
+
+  if (device.id) {
+    const id = document.createElement('div');
+    id.className = 'device-row-id';
+    id.textContent = device.id;
+    info.appendChild(id);
+  }
+
+  const meta = document.createElement('div');
+  meta.className = 'device-row-meta';
+  meta.appendChild(createDeviceStatusBadge(device.status));
+  const chevron = document.createElement('span');
+  chevron.className = 'device-row-chevron';
+  chevron.setAttribute('aria-hidden', 'true');
+  chevron.textContent = '⌄';
+  meta.appendChild(chevron);
+
+  row.appendChild(info);
+  row.appendChild(meta);
+
+  const toggle = () => {
+    if (!device.id) return;
+    devicesState.expandedId = isExpanded ? '' : device.id;
+    renderDevicesBody();
+  };
+  row.addEventListener('click', toggle);
+  row.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggle();
+    }
+  });
+
+  wrapper.appendChild(row);
+
+  if (isExpanded) {
+    wrapper.appendChild(createDeviceDetailPanel(device));
+  }
+
+  return wrapper;
+}
+
+function openDeviceDetailModal(device) {
+  const modal = document.getElementById('device-detail-modal');
+  const titleEl = document.getElementById('device-detail-modal-title');
+  const iconEl = document.getElementById('device-detail-modal-icon');
+  const bodyEl = document.getElementById('device-detail-modal-body');
+  if (!modal) return;
+
+  const isConnected = device.status === 'connected';
+  const details = device.details || {};
+  const network = String(details.network || details.connectionType || '').toUpperCase();
+  const iconText = ['LTE', '5G', '4G', 'WIFI', 'ETH'].find(t => network.includes(t)) || 'DRM';
+
+  if (titleEl) titleEl.textContent = device.name || device.id || 'Unknown device';
+  if (iconEl) {
+    iconEl.textContent = iconText;
+    iconEl.className = `device-detail-modal-icon ${isConnected ? 'is-connected' : 'is-disconnected'}`;
+  }
+
+  if (bodyEl) {
+    bodyEl.innerHTML = '';
+    const statusLine = document.createElement('div');
+    statusLine.className = 'device-detail-modal-status-line';
+    const badge = createDeviceStatusBadge(device.status);
+    statusLine.appendChild(badge);
+    if (device.id) {
+      const idEl = document.createElement('span');
+      idEl.className = 'device-detail-modal-id';
+      idEl.textContent = device.id;
+      statusLine.appendChild(idEl);
+    }
+    bodyEl.appendChild(statusLine);
+
+    const groups = DEVICE_DETAIL_GROUPS
+      .map((group) => {
+        const rows = group.fields
+          .map(([label, key]) => [label, String(details[key] ?? '').trim()])
+          .filter(([, value]) => value !== '');
+        return { title: group.title, rows };
+      })
+      .filter((group) => group.rows.length > 0);
+
+    if (groups.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'device-detail-empty';
+      empty.textContent = 'No additional details available for this device';
+      bodyEl.appendChild(empty);
+    } else {
+      const groupsWrap = document.createElement('div');
+      groupsWrap.className = 'device-detail-modal-groups';
+      groups.forEach((group) => {
+        const section = document.createElement('div');
+        section.className = 'device-detail-group';
+        const title = document.createElement('h4');
+        title.className = 'device-detail-title';
+        title.textContent = group.title;
+        section.appendChild(title);
+        const grid = document.createElement('dl');
+        grid.className = 'device-detail-grid';
+        group.rows.forEach(([label, value]) => {
+          const dt = document.createElement('dt');
+          dt.textContent = label;
+          const dd = document.createElement('dd');
+          dd.textContent = value;
+          grid.appendChild(dt);
+          grid.appendChild(dd);
+        });
+        section.appendChild(grid);
+        groupsWrap.appendChild(section);
+      });
+      bodyEl.appendChild(groupsWrap);
+    }
+  }
+
+  modal.style.display = 'flex';
+  const closeBtn = document.getElementById('device-detail-modal-close');
+  if (closeBtn) closeBtn.focus();
+}
+
+function closeDeviceDetailModal() {
+  const modal = document.getElementById('device-detail-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function setupDeviceDetailModal() {
+  const modal = document.getElementById('device-detail-modal');
+  if (!modal) return;
+  const closeBtn = document.getElementById('device-detail-modal-close');
+  if (closeBtn) closeBtn.addEventListener('click', closeDeviceDetailModal);
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) closeDeviceDetailModal();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (modal.style.display === 'flex' && event.key === 'Escape') {
+      event.preventDefault();
+      closeDeviceDetailModal();
+    }
+  });
+}
+
+function createDevicesEmptyOrError() {
+  if (devicesState.status === 'loading') {
+    const el = document.createElement('div');
+    el.className = 'devices-state devices-loading';
+    el.innerHTML = '<div class="devices-spinner" aria-hidden="true"></div><p>Loading devices…</p>';
+    return el;
+  }
+  if (devicesState.status === 'error') {
+    const message = devicesState.code === 'DIGI_CONFIG_MISSING'
+      ? 'Configure your Digi Remote API key in Settings'
+      : devicesState.code === 'DIGI_AUTH_FAILED'
+        ? 'Invalid Digi API credentials'
+        : devicesState.error || 'Could not load devices';
+    const el = document.createElement('div');
+    el.className = 'devices-state devices-error';
+    const text = document.createElement('p');
+    text.textContent = message;
+    el.appendChild(text);
+    if (devicesState.code === 'DIGI_CONFIG_MISSING') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'save-button';
+      btn.textContent = 'Open Settings';
+      btn.addEventListener('click', openSettingsModal);
+      el.appendChild(btn);
+    }
+    return el;
+  }
+  return null;
+}
+
+function createDeviceCard(device) {
+  const isConnected = device.status === 'connected';
+  const details = device.details || {};
+
+  const card = document.createElement('div');
+  card.className = `vm-card monitor-vm-card device-card${isConnected ? ' online' : ' offline'}`;
+  card.setAttribute('role', 'button');
+  card.tabIndex = 0;
+
+  const content = document.createElement('div');
+  content.className = 'vm-card-content';
+
+  // Icon with network type indicator
+  const icon = document.createElement('div');
+  icon.className = `vm-icon device-card-icon${isConnected ? ' is-connected' : ' is-disconnected'}`;
+  const network = String(details.network || details.connectionType || '').toUpperCase();
+  const iconText = ['LTE', '5G', '4G', 'WIFI', 'ETH'].find(t => network.includes(t))
+    || (isConnected ? 'DRM' : 'DRM');
+  icon.textContent = iconText;
+  content.appendChild(icon);
+
+  // Name
+  const titleRow = document.createElement('div');
+  titleRow.className = 'monitor-card-title';
+  const name = document.createElement('div');
+  name.className = 'vm-name';
+  name.textContent = device.name || device.id || 'Unknown';
+  titleRow.appendChild(name);
+  content.appendChild(titleRow);
+
+  // Status + carrier/IP line
+  const statusRow = document.createElement('div');
+  statusRow.className = 'vm-status device-card-status';
+  const dot = document.createElement('span');
+  dot.className = 'product-status-dot';
+  dot.setAttribute('aria-hidden', 'true');
+  const statusText = document.createElement('span');
+  statusText.textContent = device.status;
+  statusRow.appendChild(dot);
+  statusRow.appendChild(statusText);
+  content.appendChild(statusRow);
+
+  const sub = details.carrier || details.ip || '';
+  if (sub) {
+    const subEl = document.createElement('div');
+    subEl.className = 'device-card-sub';
+    subEl.textContent = sub;
+    content.appendChild(subEl);
+  }
+
+  card.appendChild(content);
+
+  const open = () => openDeviceDetailModal(device);
+  card.addEventListener('click', open);
+  card.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      open();
+    }
+  });
+
+  return card;
+}
+
+function renderDevicesBody() {
+  const container = devicesBodyEl;
+  if (!container) return;
+  container.innerHTML = '';
+
+  const stateEl = createDevicesEmptyOrError();
+  if (stateEl) {
+    container.appendChild(stateEl);
+    return;
+  }
+
+  const devices = getFilteredDevices();
+
+  if (devices.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'devices-state devices-empty';
+    const text = document.createElement('p');
+    text.textContent = devicesState.search.trim() || devicesState.filterStatus !== 'all'
+      ? 'No devices match your filters'
+      : 'No devices found';
+    empty.appendChild(text);
+    container.appendChild(empty);
+    return;
+  }
+
+  if (devicesState.viewMode === 'grid') {
+    const grid = document.createElement('div');
+    grid.className = 'vm-grid monitor-grid devices-grid';
+    devices.forEach((device) => grid.appendChild(createDeviceCard(device)));
+    container.appendChild(grid);
+  } else {
+    const list = document.createElement('div');
+    list.className = 'devices-list';
+    devices.forEach((device) => list.appendChild(createDeviceRow(device)));
+    container.appendChild(list);
+  }
+}
+
+function renderDevicesView(workspace) {
+  const header = document.createElement('div');
+  header.className = 'vm-header monitor-header product-line-header devices-header';
+
+  const headerText = document.createElement('div');
+  headerText.className = 'monitor-header-text';
+  const headerRow = document.createElement('div');
+  headerRow.className = 'monitor-header-row';
+  const title = document.createElement('h2');
+  title.id = 'product-line-header-title';
+  title.textContent = 'Digi Remote Manager';
+  headerRow.appendChild(title);
+  headerText.appendChild(headerRow);
+  header.appendChild(headerText);
+
+  const actions = document.createElement('div');
+  actions.className = 'devices-header-actions';
+
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.className = 'devices-search-input';
+  search.placeholder = 'Search devices…';
+  search.value = devicesState.search;
+  search.addEventListener('input', () => {
+    devicesState.search = search.value;
+    if (devicesState.status === 'ready') {
+      renderDevicesBody();
+    }
+  });
+  actions.appendChild(search);
+
+  const buildSelect = (options, selectedValue, onChange) => {
+    const select = document.createElement('select');
+    select.className = 'devices-filter-select';
+    options.forEach(({ value, label }) => {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      option.selected = value === selectedValue;
+      select.appendChild(option);
+    });
+    select.addEventListener('change', () => {
+      onChange(select.value);
+      if (devicesState.status === 'ready') {
+        renderDevicesBody();
+      }
+    });
+    return select;
+  };
+
+  actions.appendChild(buildSelect(
+    [
+      { value: 'all', label: 'All statuses' },
+      { value: 'connected', label: 'Connected' },
+      { value: 'disconnected', label: 'Disconnected' }
+    ],
+    devicesState.filterStatus,
+    (value) => { devicesState.filterStatus = value; }
+  ));
+
+  actions.appendChild(buildSelect(
+    [
+      { value: 'name', label: 'Sort by name' },
+      { value: 'status', label: 'Sort by status' }
+    ],
+    devicesState.sortBy,
+    (value) => { devicesState.sortBy = value; }
+  ));
+
+  // View toggle (list / grid)
+  const viewToggle = document.createElement('div');
+  viewToggle.className = 'devices-view-toggle';
+  viewToggle.setAttribute('role', 'group');
+  viewToggle.setAttribute('aria-label', 'View mode');
+
+  const createViewBtn = (mode, svgPath, label) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `devices-view-btn${devicesState.viewMode === mode ? ' is-active' : ''}`;
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('aria-pressed', String(devicesState.viewMode === mode));
+    btn.innerHTML = `<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">${svgPath}</svg>`;
+    btn.addEventListener('click', () => {
+      devicesState.viewMode = mode;
+      devicesState.expandedId = '';
+      renderDevicesBody();
+      viewToggle.querySelectorAll('.devices-view-btn').forEach(b => {
+        b.classList.toggle('is-active', b === btn);
+        b.setAttribute('aria-pressed', String(b === btn));
+      });
+    });
+    return btn;
+  };
+
+  viewToggle.appendChild(createViewBtn('list',
+    '<rect x="1" y="2" width="14" height="2.5" rx="1"/><rect x="1" y="6.75" width="14" height="2.5" rx="1"/><rect x="1" y="11.5" width="14" height="2.5" rx="1"/>',
+    'List view'
+  ));
+  viewToggle.appendChild(createViewBtn('grid',
+    '<rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/>',
+    'Grid view'
+  ));
+  actions.appendChild(viewToggle);
+
+  const refreshButton = document.createElement('button');
+  refreshButton.type = 'button';
+  refreshButton.className = 'config-transfer-button settings-action-button devices-refresh-button';
+  refreshButton.textContent = 'Refresh';
+  refreshButton.addEventListener('click', () => loadDevices());
+  actions.appendChild(refreshButton);
+
+  header.appendChild(actions);
+  workspace.appendChild(header);
+
+  const body = document.createElement('div');
+  body.className = 'devices-body';
+  workspace.appendChild(body);
+  devicesBodyEl = body;
+
+  renderDevicesBody();
+  loadDevices({ silent: devicesState.status === 'ready' });
+  startDevicesAutoRefresh();
 }
 
 function renderTemplatesView(workspace) {
@@ -5608,6 +6221,67 @@ function populateProviderKeyInputs() {
   }
 }
 
+async function populateDigiKeyInputs() {
+  const keyIdInput = document.getElementById('digi-key-id');
+  const keySecretInput = document.getElementById('digi-key-secret');
+  const statusLabel = document.getElementById('digi-keys-status');
+  const api = getNetworkAPI();
+
+  if (keySecretInput) {
+    keySecretInput.value = '';
+  }
+  if (!api || typeof api.digiGetCredentials !== 'function') {
+    if (statusLabel) statusLabel.textContent = 'Not available';
+    return;
+  }
+
+  const result = await api.digiGetCredentials();
+  if (keyIdInput) {
+    keyIdInput.value = result && result.success ? (result.keyId || '') : '';
+  }
+  if (statusLabel) {
+    statusLabel.textContent = result && result.hasCredentials
+      ? 'Configured'
+      : 'Not configured';
+  }
+}
+
+async function saveDigiCredentials() {
+  const keyIdInput = document.getElementById('digi-key-id');
+  const keySecretInput = document.getElementById('digi-key-secret');
+  const statusLabel = document.getElementById('digi-keys-status');
+  const api = getNetworkAPI();
+
+  if (!api || typeof api.digiSaveCredentials !== 'function') {
+    showNotification('Digi integration is unavailable');
+    return;
+  }
+
+  const result = await api.digiSaveCredentials({
+    keyId: keyIdInput ? keyIdInput.value.trim() : '',
+    keySecret: keySecretInput ? keySecretInput.value : ''
+  });
+
+  if (!result || !result.success) {
+    showNotification((result && result.error) || 'Could not save Digi key');
+    return;
+  }
+
+  if (keySecretInput) {
+    keySecretInput.value = '';
+  }
+  if (statusLabel) {
+    statusLabel.textContent = result.hasCredentials ? 'Configured' : 'Not configured';
+  }
+  showNotification('Digi Remote API key saved');
+
+  // Refresh the Devices tab if the user has it open.
+  if (activeLineId === DEVICES_VIEW_ID) {
+    devicesState.status = 'idle';
+    loadDevices();
+  }
+}
+
 function populateAgentSkillInputs() {
   const skillInput = document.getElementById('agent-skill-body');
   const sourceLabel = document.getElementById('agent-skill-source');
@@ -5639,6 +6313,7 @@ function openSettingsModal() {
   if (!modal) return;
   populateThemeStylesheetInputs();
   populateProviderKeyInputs();
+  populateDigiKeyInputs();
   populateAgentSkillInputs();
   populateFileSupportSkillInputs();
   modal.style.display = 'flex';
@@ -5838,6 +6513,7 @@ function setupSettingsModal() {
   const openButton = document.getElementById('settings-button');
   const closeButton = document.getElementById('close-settings');
   const keysForm = document.getElementById('api-keys-form');
+  const digiKeysForm = document.getElementById('digi-keys-form');
   const themeInputs = document.querySelectorAll('input[name="theme-stylesheet"]');
   const providerInputs = document.querySelectorAll('input[name="preferred-provider"]');
   const skillForm = document.getElementById('agent-skill-form');
@@ -5860,6 +6536,12 @@ function setupSettingsModal() {
     keysForm.addEventListener('submit', (event) => {
       event.preventDefault();
       saveProviderKeys();
+    });
+  }
+  if (digiKeysForm) {
+    digiKeysForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      saveDigiCredentials();
     });
   }
   themeInputs.forEach((input) => {

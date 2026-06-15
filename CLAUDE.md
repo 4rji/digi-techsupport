@@ -41,6 +41,7 @@ This is an **Electron desktop app** for Digi device technical support workflows.
 | `renderer.js` | Renderer | All UI logic — product line/card management, TCP/ping polling, SSH terminal (xterm.js), templates workspace, file support viewer, settings modal. Loaded as an ES module (`import`). |
 | `server-http.js` | Standalone Node | Optional static file server. Also exposes `POST /api/generate-template` for headless template generation. |
 | `template-generator.js` | Main + HTTP server | Shared AI generation logic. Calls OpenAI Responses API or Anthropic Messages API depending on `provider`. Shared constants cap output tokens and context size. |
+| `digi-remote-service.js` | Main + HTTP server | Digi Remote Manager (DRM) integration. `getDevices()` fetches `/ws/v1/devices/inventory` and maps to `{ id, name, status }`. Credential read/write helpers store `digi-remote-credentials.json` (mode 0o600) in userData. Throws `ConfigurationError` (no key) / `AuthError` (401). Never logs or returns the secret. |
 | `server-module.js` | Renderer (legacy) | Proxmox server credential/VM-list UI logic, written as a plain script, not a module. |
 | `helpers/health.js` | Main | Proxmox node/VM health checks via the Proxmox REST API (self-signed certs accepted). |
 
@@ -50,6 +51,7 @@ The renderer communicates with the main process only through `window.appAPI`. Ke
 - `ping-host`, `test-tcp-port` — connectivity checks
 - `ssh-connect`, `ssh-write`, `ssh-resize`, `ssh-disconnect` — SSH session lifecycle
 - `generate-support-template`, `analyze-support-file` — AI calls
+- `digi-get-credentials`, `digi-save-credentials`, `digi-get-devices` — Digi Remote Manager (secret stays in main; only `keyId`/`hasCredentials` returned). HTTP server mirrors `GET /api/digi/devices`.
 - `import-support-file`, `get-support-file-entry-content` — support archive (.bin/.gz) parsing
 - `list/open/update/delete-saved-support-files` — support library CRUD
 - `save-text-file` — native save dialog
