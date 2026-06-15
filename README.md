@@ -5,7 +5,7 @@ Digi TechSupport
 <img src="img-readme/2.webp" alt="EX product line view" width="50%">
 <img src="img-readme/3.webp" alt="Settings view" width="50%">
 
-Desktop app built with Electron for technical support workflows around Digi devices and Proxmox environments. It includes TCP/ping checks, product organization by lines, SSH terminal sessions, Digi Remote Manager integration, support archive file viewer, configuration import/export, and a templates workspace with AI-assisted generation.
+Desktop app built with Electron for technical support workflows around Digi devices. It includes TCP/ping checks, product organization by lines, SSH terminal sessions, Digi Remote Manager integration, support archive file viewer, configuration import/export, and a templates workspace with AI-assisted generation.
 
 Development
 -----------

@@ -102,7 +102,7 @@ ipcMain.handle('get-vms', async (event, serverId) => {
     const credentials = JSON.parse(localStorage.getItem(`credentials_${serverId}`));
     if (!credentials) return { error: 'No credentials found' };
 
-    console.log(`Testing connection to Proxmox for ${serverId}...`);
+    console.log(`Testing connection for ${serverId}...`);
     const nodeStatus = await testNodeConnection(
       credentials.node,
       credentials.host,
@@ -111,8 +111,8 @@ ipcMain.handle('get-vms', async (event, serverId) => {
     );
 
     if (!nodeStatus) {
-      console.log(`Could not connect to Proxmox for ${serverId}`);
-      return { error: 'Could not connect to Proxmox' };
+      console.log(`Could not connect for ${serverId}`);
+      return { error: 'Could not connect to server' };
     }
 
     console.log(`Getting VM list for server ${serverId}`);
