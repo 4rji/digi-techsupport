@@ -227,6 +227,552 @@ const PRODUCT_LINKS = {
   ]
 };
 const PRODUCT_SPECS = {
+  'Digi IX10 Industrial Cellular Router': {
+    subtitle: 'Digi IX10 with Digi 360*',
+    sourceUrl: 'https://www.digi.com/products/networking/cellular-routers/industrial/digi-ix10#specifications',
+    sections: [
+      {
+        title: 'Cellular',
+        rows: [
+          ['Certifications**', 'Visit product certifications for latest cellular approvals and updates'],
+          ['LTE Cat 4 Global (G4)', 'LTE Cat 4 Global: B1, B2, B3, B4, B5, B7, B8, B12, B13, B18, B19, B20, B25, B26, B28, B38, B39, B40, B41; 3G: B1, B2, B4, B5, B6, B8, B19; 2G EDGE / GPRS: 850 / 900 / 1800 / 1900 MHz'],
+          ['LTE Cat 4 Regional - North America (N4)', 'LTE Cat 4 Regional - North America: B2, B4, B5, B12, B13, B14, B66, B71; 3G: B2, B4, B5'],
+          ['LTE-A Cat 6 CBRS-only - North America (C6)', 'LTE-Advanced Cat 6 CBRS-only - North America: B42, B43, B48 (CBRS)'],
+          ['SIM Slots', '(2) Mini-SIM (2FF)'],
+          ['eSIM Support', 'Digi eSIM optional 2FF accessory (IX10-00G4)'],
+          ['SIM Security', 'Behind SIM cover, secured with screw (#1 Phillips)']
+        ]
+      },
+      {
+        title: 'Software and Management*',
+        rows: [
+          ['Remote Management', 'Digi Remote Manager; SNMP v2/v3 (user installed/managed)'],
+          ['Local Management', 'WebUI (HTTP/HTTPS); CLI (SSH)'],
+          ['Management / Troubleshooting Tools', 'FTP client, SCP; protocol analyzer with PCAP for Wireshark; event logging with syslog and SMTP client; NTP/SNTP; Nagios, Intelliflow, iPerf, Dynamic DNS, ping, traceroute'],
+          ['Memory', '256 MB RAM, 256 MB flash']
+        ]
+      },
+      {
+        title: 'Ethernet',
+        rows: [
+          ['Ports', '(1) RJ-45; 10/100 Mbps (auto-sensing)']
+        ]
+      },
+      {
+        title: 'Serial',
+        rows: [
+          ['Ports', '(1) RJ-50 10-pin (10P10C); RS-232/485; software selectable; RS-232 DTE (RXD, TXD, RTS, CTS, DTR, DCD, DSR, RI); RS-485 (TX/RX+; RX/TX-); half-duplex']
+        ]
+      },
+      {
+        title: 'Physical',
+        rows: [
+          ['Dimensions (L x W x H)', '118 mm x 88 mm x 35 mm (4.65 in x 3.46 in x 1.38 in)'],
+          ['Weight', '0.39 kg (0.86 lb)'],
+          ['Status LEDs', 'Power, Internet, SIM 1, SIM 2, SIM fail, LTE, signal strength (5)'],
+          ['Enclosure', 'Glass-filled polyphenylene sulphide (PPS) / IP30']
+        ]
+      },
+      {
+        title: 'Power Requirements',
+        rows: [
+          ['Power Input', '9 - 30 VDC, reverse polarity protection, 1.0 A maximum'],
+          ['Power Consumption', 'Configurable low-power modes; 1.5 W (light traffic flow), 3.5 W (peak data transmission); 1.25 W (low power mode, idle traffic)']
+        ]
+      },
+      {
+        title: 'Accessories',
+        rows: [
+          ['Available Accessories', 'Accessories not included. Available accessories: industrial extended temperature or commercial power supply (required), and cellular antennas, DIN rail clip and EIA 422/485 to RJ-45 connector (recommended / optional)']
+        ]
+      },
+      {
+        title: 'Environmental',
+        rows: [
+          ['Operating Temperature', '−40 °C to 70 °C (−40 °F to 158 °F); device performance may be impacted above 50 °C (122 °F)'],
+          ['Storage Temperature', '−40 °C to 85 °C (−40 °F to 85 °F)'],
+          ['Relative Humidity', '5% to 95% (non-condensing)']
+        ]
+      },
+      {
+        title: 'Approvals**',
+        rows: [
+          ['Cellular', 'Visit product certifications for latest cellular approvals and updates'],
+          ['Safety', 'IEC 62368-1, CB, EN 62311, UL 121201 9th Edition, CAN/CSA C22.2 NO.213-17'],
+          ['Environmental', 'ROHS3'],
+          ['Emissions / Immunity', 'CE; RED; FCC Part 15, Subpart B; ICES-003; AU/NZS CISPR32']
+        ]
+      },
+      {
+        title: 'Warranty***',
+        rows: [
+          ['Product Warranty', '1-year']
+        ]
+      },
+      {
+        title: 'Enterprise Software',
+        rows: [
+          ['Protocol Support', 'HTTPS, FTP client, TLS v1.2, SCP (client and server), SFTP, SMTP client for use by scripts and the command line, SNMP (v2/v3), SSH; remote management via Digi Remote Manager; protocol analyzer, ability to capture PCAP for use with Wireshark; DynDNS; dynamic DNS client compatible with BIND9/No-IP/DynDNS; captive portal, Intelliflow; Nagios, DNS server, NTP server, multicast, mDNS, IPerf'],
+          ['Security', 'IP filtering, stateful firewall, custom firewall rules (iptables), address and port translation, TLS 1.2 and above, OpenVPN client and server, VPN tunnels; Authentication: RADIUS, TACACS+; certificates; MAC address filtering; VLAN support'],
+          ['VPN', 'IPSec with IKEv1, IKEv2, NAT Traversal; OpenVPN client and server; GRE VPN tunnels; Cryptology: SHA-1/256/384/512, MD5, RSA; Encryption: 3DES and AES up to 256-bit (CBC mode for IPsec); Diffie Hellman: DH groups 1-32 (CURVE448)'],
+          ['Routing/Failover', 'IP pass-through; NAT, NAPT with IP port forwarding; GRE; multicast routing; Routing protocols: RIP (v1, v2) OSPF, BGP; IP failover: VRRP; automatic failover, Digi SureLink®'],
+          ['Other Protocols', 'DHCP; dynamic DNS client compatible with No-IP/DynDNS']
+        ]
+      },
+      {
+        title: 'Notes',
+        rows: [
+          ['*', 'Includes the Digi 360 solution for Digi IX10 (1-year) with Digi Remote Manager, warranty and customer care.'],
+          ['**', 'Visit product certifications for latest approvals and updates.'],
+          ['***', 'Product warranty can be extended with Digi 360 extensions or renewals.']
+        ]
+      }
+    ]
+  },
+  'Digi IX20 Industrial 4G LTE Router': {
+    subtitle: 'Digi IX20 with Digi 360*',
+    sourceUrl: 'https://www.digi.com/products/networking/cellular-routers/industrial/digi-ix20#specifications',
+    sections: [
+      {
+        title: 'Cellular',
+        rows: [
+          ['Certifications', 'Visit product certifications for latest certifications and updates'],
+          ['LTE-A (07) with Digi CORE Plug-in LTE Modem 1003-CM07-OUS**', 'LTE-Advanced Cat 7 (North America): B2, B4, B5, B7, B12, B13, B14 FirstNet®, B25, B26, B41, B42, B43, B48, B66, B71; 3G: B2, B5; Transfer rate (max): 300 Mbps down, 150 Mbps up; Industrial temperature'],
+          ['LTE (G4) with Digi CORE Plug-in LTE Modem 1002-CMG4-GLB**', 'LTE Cat 4 (Global): B1, B2, B3, B4, B5, B7, B8, B12, B13, B18, B19, B20, B25, B26, B28, B38, B39, B40, B41; 3G: B1, B2, B4, B5, B6, B8, B19; 2G: 850 / 900 / 1800 / 1900 MHz; Transfer rate (max): 150 Mbps down, 50 Mbps up; Industrial temperature'],
+          ['LTE (G4-G) with Digi CORE Plug-in LTE Modem 1002-CMG4-GLB-G**', 'LTE Cat 4 (EMEA): B1, B2, B3, B4, B5, B7, B8, B12, B13, B18, B19, B20, B25, B26, B28, B38, B39, B40, B41; 3G: B1, B2, B4, B5, B6, B8, B19; 2G EDGE / GPRS: 850 / 900 / 1800 / 1900 MHz; Transfer rate (max): 150 Mbps down, 50 Mbps up; Industrial temperature'],
+          ['LTE (N4/P4) with Digi CORE Plug-in LTE Modem 1002-CMF4-OUS**', 'LTE Cat 4 (North America): B2, B4, B5, B12, B13, B14 FirstNet®, B66, B71; 3G: B2, B4, B5; Transfer rate (max): 150 Mbps down, 50 Mbps up; Industrial temperature'],
+          ['LTE (45) with Digi CORE Plug-in LTE Modem 1002-CM45-OEU**', 'LTE Cat 4 (EMEA): B3, B7, B20, B31, B72; 450 MHz support; Transfer rate (max): 150 Mbps down, 50 Mbps up; Industrial temperature'],
+          ['LTE (M1) with Digi CORE Plug-in LTE Modem 1002-CMM1-GLB**', 'LTE Cat M1 / NB1 (North America): B1, B2, B3, B4, B5, B8, B12, B13, B18, B19, B20, B26, B28; 2G: 850 / 900 / 1800 / 1900 MHz; Transfer rate (max): M1: 300 kbps down, 375 kbps up; NB1: 21 kbps down, 62.5 kbps up; 2G: 296 kbps down, 236 kbps up; Industrial temperature'],
+          ['Connectors', '(2) 50 Ω SMA (center pin: female)'],
+          ['SIM Slots', '(2) Mini-SIM (2FF)'],
+          ['eSIM Support', 'Digi eSIM optional 2FF accessory (IX20-00G4)'],
+          ['SIM Security', 'Secured in cellular module']
+        ]
+      },
+      {
+        title: 'Wi-Fi',
+        rows: [
+          ['Module', '1 x 1 SISO dual-band 802.11a/b/g/n/ac (2.4 GHz / 5 GHz)'],
+          ['Authentication', 'TACACS+, Enterprise RADIUS'],
+          ['Modes', 'Client mode and access point mode simultaneously'],
+          ['Clients', 'Maximum 10 clients (access point mode: regardless of combination of clients and access points)'],
+          ['Access Points', 'Maximum 2 access points (access point mode: regardless of combination of clients and access points)'],
+          ['Security', 'WPA/WPA-2 personal, WPA/WPA-2 enterprise'],
+          ['Connectors', '(1) 50 Ω SMA (center pin: male)']
+        ]
+      },
+      {
+        title: 'Software and Management*',
+        rows: [
+          ['Remote Management', 'Digi Remote Manager®; SNMP v2/v3 (user installed/managed)'],
+          ['Local Management', 'Web UI (HTTP/HTTPS); CLI (Telnet, SSH)'],
+          ['Management / Troubleshooting Tools', 'FTP client, SCP; protocol analyzer with PCAP for Wireshark; event logging with syslog and SMTP client; NTP/SNTP; Nagios, Intelliflow, IPerf, dynamic DNS, ping, traceroute'],
+          ['Memory', '256 MB RAM, 256 MB flash']
+        ]
+      },
+      {
+        title: 'Ethernet',
+        rows: [
+          ['Ports', '(2) RJ-45; 10/100 Mbps (auto-sensing)']
+        ]
+      },
+      {
+        title: 'Serial',
+        rows: [
+          ['Ports', '(1) DB9M; RS-232 DTE; signal support TXD, RXD, CTS, DTR, DCD, flow control software (XON/OFF), hardware supported (CTS/RTS)']
+        ]
+      },
+      {
+        title: 'Physical',
+        rows: [
+          ['Dimensions (L x W x H)', '107 mm x 162 mm x 35 mm (4.21 in x 6.38 in x 1.38 in)'],
+          ['Weight', '0.65 kg (1.4 lb)'],
+          ['Status LEDs', 'Power, Internet, Wi-Fi, SIM 1, SIM 2, signal strength (5), LTE'],
+          ['Enclosure', 'Glass-filled polyphenylene sulphide (PPS) / IP30']
+        ]
+      },
+      {
+        title: 'Power Requirements',
+        rows: [
+          ['Power Input', '9 - 30 VDC, reverse polarity protection, 1.0 A maximum; connector: 2-position rewireable plug with securing screws included'],
+          ['Power Consumption', '1.5 W (light traffic flow), 3.5 W (peak data transmission); 1.4 W (low power mode, idle traffic, no Ethernet WAN)']
+        ]
+      },
+      {
+        title: 'Environmental',
+        rows: [
+          ['Operating Temperature', 'Models with Wi-Fi: −20 °C to 70 °C (−4 °F to 158 °F); Models without Wi-Fi: −40 °C to 70 °C (−40 °F to 158 °F)'],
+          ['Storage Temperature', '−40 °C to 85 °C (−40 °F to 185 °F)'],
+          ['Relative Humidity', '5% to 95% (non-condensing)']
+        ]
+      },
+      {
+        title: 'Accessories',
+        rows: [
+          ['Available Accessories', 'Accessories not included. Available accessories: industrial extended temperature or commercial power supply (required); Wi-Fi, cellular and GPS antennas, Ethernet cable, DIN rail clip kit and DIN rail mounting bracket kit (recommended / optional)']
+        ]
+      },
+      {
+        title: 'Approvals**',
+        rows: [
+          ['Cellular', 'Visit product certifications for latest approvals and updates'],
+          ['Safety', 'IEC62368-1, CB, EN62311'],
+          ['Environmental', 'ROHS3'],
+          ['Emissions / Immunity', 'CE; RED; FCC Part 15, Subpart B; ICES-003; AU/NZS CISPR32']
+        ]
+      },
+      {
+        title: 'Warranty***',
+        rows: [
+          ['Product Warranty', '1-year']
+        ]
+      },
+      {
+        title: 'Enterprise Software',
+        rows: [
+          ['Protocol Support', 'HTTPS, FTP client, TLS v1.2, SCP (client and server), SFTP, SMTP client for use by scripts and the command line, SNMP (v2/v3), SSH; remote management via Digi Remote Manager®; protocol analyzer, ability to capture PCAP for use with Wireshark; DynDNS; dynamic DNS client compatible with BIND9/No-IP/DynDNS; captive portal, Intelliflow; Nagios, DNS server, NTP server, multicast, mDNS, IPerf'],
+          ['Security', 'IP filtering, stateful firewall, custom firewall rules (iptables), address and port translation, TLS 1.2 and above, FIPS 197, OpenVPN client and server, VPN tunnels; Authentication: RADIUS, TACACS+; certificates; MAC address filtering; VLAN support'],
+          ['VPN', 'IPSec with IKEv1, IKEv2, NAT Traversal; OpenVPN client and server; GRE VPN tunnels; Cryptology: SHA-1/256/384/512, MD5, RSA; Encryption: 3DES and AES up to 256-bit (CBC mode for IPsec); Diffie Hellman: DH groups 1-32 (CURVE448)'],
+          ['Routing/Failover', 'IP pass-through; NAT, NAPT with IP port forwarding; Ethernet bridging; GRE; multicast routing; Routing protocols: RIP (v1, v2) OSPF, BGP; IP failover: VRRP; automatic failover, Digi SureLink®'],
+          ['Other Protocols', 'DHCP; dynamic DNS client compatible with No-IP/DynDNS']
+        ]
+      },
+      {
+        title: 'Notes',
+        rows: [
+          ['*', 'Includes the Digi 360 solution for Digi IX20 (1-year) with Digi Remote Manager, warranty and customer care.'],
+          ['**', 'Visit product certifications for latest approvals and updates. Digi CORE plug-in LTE modem is included with the corresponding IX20 model, with the ability to upgrade or replace the modem without replacing the router. Transfer rates are network operator dependent. Digi CORE 1003-CM07-OUS and 1002-CMG4-GLB-G require two cellular antennas with option for a third GNSS/GPS antenna. Digi CORE 1002-CMG4-GLB, 1002-CM45-OEU and 1002-CMF4-OUS require two cellular antennas. Digi CORE 1002-CMM1-GLB requires only one cellular antenna. Wi-Fi antenna available for Wi-Fi enabled models.'],
+          ['***', 'Product warranty can be extended with Digi 360 extensions or renewals.']
+        ]
+      }
+    ]
+  },
+  'Digi IX25 5G Industrial Cellular Router': {
+    subtitle: 'Digi IX25 with Digi 360*',
+    sourceUrl: 'https://www.digi.com/products/networking/cellular-routers/industrial/digi-ix25#specifications',
+    sections: [
+      {
+        title: 'Wireless Interfaces',
+        rows: [
+          ['Cellular / WWAN**', 'Visit product certifications for latest approvals and updates'],
+          ['5G eMBB - IX25-5A-1G', '5G NR bands: n1, n2, n3, n5, n7, n8, n12, n13, n14, n18, n20, n25, n26, n28, n29, n30, n38, n40, n41, n48 (CBRS), n66, n71, n75, n76, n77, n78, n79 (C-band); 4G LTE-Advanced Pro bands: B1, B2, B3, B4, B5, B7, B8, B12, B13, B14 (FirstNet®), B17, B20, B25, B26, B28, B29, B30, B32, B34, B38, B39, B40, B41, B42, B43, B48 (CBRS), B66, B71, B106 (Anterix)'],
+          ['5G RedCap - IX25-RA-1G / IX25-RA-0G', '5G NR bands: n1, n2, n3, n5, n7, n8, n12, n13, n14, n18, n20, n25, n26, n28, n30, n38, n40, n41, n48 (CBRS), n66, n70, n71, n75, n77, n78, n79 (C-band); 4G LTE bands: B1, B2, B3, B4, B5, B7, B8, B12, B13, B14 (FirstNet®), B17, B20, B25, B26, B28, B29, B30, B32, B38, B40, B41, B42, B43, B46, B48 (CBRS), B66, B71, B106 (Anterix)'],
+          ['LTE - IX25-4A-1G / IX25-4A-0G', '4G LTE bands: B1, B2, B3, B4, B5, B7, B8, B8_US (Anterix), B12, B13, B14 (FirstNet®), B18, B19, B20, B25, B26, B28; 3G bands: B1, B2, B4, B5, B6, B8, B19; 2G bands: B2, B3, B5, B8'],
+          ['Connectors', 'LTE and RedCap: (3) 50 Ω SMA (center pin: female); eMBB: (5) 50 Ω SMA (center pin: female)'],
+          ['SIM Slots / eSIM Support', '(2) Nano-SIM (4FF) slots; soldered MFF2 Digi eSIM with eUICC (SGP .32) for remote provisioning and carrier switching'],
+          ['SIM Security', 'SIM slot cover plate included']
+        ]
+      },
+      {
+        title: 'GNSS',
+        rows: [
+          ['Technology', 'GNSS Gen 9 with band L1 LNA for passive antenna use'],
+          ['Antenna', 'Upper L-band: GPS L1; Glonass G1; Beidou B1; Galileo E1; IX25 supports passive GNSS antennas rated at 1.5 - 3 dBi or active antennas with 7.5 - 26 dB gain (3.3 V feed)'],
+          ['Protocol', 'NMEA 4.11 and TAIP'],
+          ['Connector', '(2) 50 Ω SMA center pin: female']
+        ]
+      },
+      {
+        title: 'Wi-Fi 6E',
+        rows: [
+          ['Technology', 'Dual band Wi-Fi 6E 802.11 a/b/g/n/ac/ax 2x2 MIMO for high-speed, reliable wireless connectivity (including 2.4 GHz, 5 GHz and 6 GHz)'],
+          ['Connector', '(2) 50 Ω RP-SMA (male)']
+        ]
+      },
+      {
+        title: 'Wired Interfaces',
+        rows: [
+          ['Ethernet Ports / Connector', '(4) RJ-45; 10/100/1000 Mbps Base-T (auto-sensing); IEEE 802.3; configurable as WAN or LAN'],
+          ['I/O Ports / Connector', '(2) Digital input/outputs'],
+          ['Serial Ports / Connector', '(1) RJ-50 (RS-232/485, software-selectable)']
+        ]
+      },
+      {
+        title: 'Software and Management*',
+        rows: [
+          ['Remote Management', 'Digi Remote Manager (cloud based); SNMP v1/v2c/v3 (user installed/managed), SMS'],
+          ['Local Management', 'WebUI (HTTPS); CLI (SSH, Serial)'],
+          ['Management / Troubleshooting Tools', 'SFTP, SCP; protocol analyzer with PCAP for Wireshark; event logging with Syslog'],
+          ['Memory', '1 GB DDR / 8 GB eMMC']
+        ]
+      },
+      {
+        title: 'Compute',
+        rows: [
+          ['Application Processor', '1.2 GHz quad-core ARM® Cortex®-A53 processor']
+        ]
+      },
+      {
+        title: 'Physical',
+        rows: [
+          ['Dimensions (L x W x H)', '146 mm x 118 mm x 38 mm (5.74 in x 4.64 in x 1.49 in)'],
+          ['Weight', '590 g (1.3 lb)'],
+          ['Status LEDs', 'PWR, WWAN, Wi-Fi, GNSS, Ethernet (link, activity)'],
+          ['Enclosure / Rating', 'ABS/PC blend; IP30; private labeling options']
+        ]
+      },
+      {
+        title: 'Power Requirements',
+        rows: [
+          ['Power Input', '9 - 30 VDC, reverse polarity protection, 9 - 30 VDC passive Power over Ethernet (PoE), USB Type-C Power Delivery (PD)'],
+          ['Power Connector', '4-pin Molex connector or USB Type-C Power Delivery (PD)'],
+          ['Power Consumption', 'Idle power: 2.3 W (197 mA at 12 VDC)** - serial enabled']
+        ]
+      },
+      {
+        title: 'Environmental',
+        rows: [
+          ['Hazardous (Class 1 Div 2)', 'Complete'],
+          ['Operating Temperature', '−40 °C to 75 °C (−40 °F to 167 °F); Wi-Fi disabled at 60 °C to 70 °C (140 °F to 158 °F)'],
+          ['Storage Temperature', '−40 °C to 85 °C (−40 °F to 185 °F)'],
+          ['Relative Humidity', '0% to 95% (non-condensing) at 25 °C (77 °F)']
+        ]
+      },
+      {
+        title: 'Approvals***',
+        rows: [
+          ['Cellular', 'PTCRB, AT&T, FirstNet Capable™, T-Mobile, Verizon, Anterix™ Active'],
+          ['Safety / Security', 'IEC 62368-1, CB scheme, FIPS 140-3'],
+          ['Environmental', 'Hazardous location: ATEX Zone 2; C1D2 (UL 121201); MIL-STD-810H (high and low temperature, vibration, shock)'],
+          ['Emissions / Immunity', 'FCC Part 15 Subpart B, ISED, CE, RED, UKCA, RCM']
+        ]
+      },
+      {
+        title: 'Warranty****',
+        rows: [
+          ['Product Warranty', '1-year']
+        ]
+      },
+      {
+        title: 'Notes',
+        rows: [
+          ['*', 'Includes the Digi 360 solution for Digi IX25 (1-year) with Digi Remote Manager, warranty and customer care.'],
+          ['**', 'Visit product certifications for latest approvals and updates.'],
+          ['***', 'Visit product certifications for latest approvals and updates.'],
+          ['****', 'Product warranty can be extended with Digi 360 extensions or renewals.']
+        ]
+      }
+    ]
+  },
+  'Digi IX30 Industrial Cellular Router': {
+    subtitle: 'Digi IX30 with Digi 360*',
+    sourceUrl: 'https://www.digi.com/products/networking/cellular-routers/industrial/digi-ix30#specifications',
+    sections: [
+      {
+        title: 'Wireless Interfaces',
+        rows: [
+          ['Certifications**', 'Visit product certifications for latest approvals and updates'],
+          ['IX30-00P7: FirstNet Capable LTE-Advanced Cat 7', 'LTE-Advanced Cat 7 - FDD: B2, B4, B5, B7, B12, B13, B14 (FirstNet®), B25, B26, B66, B71; TDD: B41, B42, B43, B48 (CBRS); WCDMA: B2, B4, B5; GNSS: GPS, GLONASS, BeiDou, Galileo, QZSS'],
+          ['IX30-0EG4: FirstNet Capable LTE Cat 4 Global / Anterix Active (select regions / carriers*)', 'LTE Cat 4 - FDD: B1, B2, B3, B4, B5, B7, B8, B8_US (Anterix), B12, B13, B14 (FirstNet®), B18, B19, B20, B25, B26, B28; WCDMA: B1, B2, B4, B5, B6, B8, B19; GSM: B2, B3, B5, B8; GNSS: GPS, GLONASS, BeiDou, Galileo, QZSS'],
+          ['Connectors', '(3) 50 Ω SMA (2x cellular, 1x GNSS); center pin: female'],
+          ['SIM Slots', '(2) Mini-SIM (2FF)'],
+          ['eSIM Support', 'Digi eSIM optional 2FF accessory (IX30-0EG4)'],
+          ['SIM Security', 'Screw-down SIM cover']
+        ]
+      },
+      {
+        title: 'GNSS',
+        rows: [
+          ['Protocol', 'NMEA 0183 V3.0'],
+          ['Acquisition Time', 'Hot Start 1 s; Warm Start 29 s; Cold Start 32 s'],
+          ['Accuracy', 'Horizontal: < 2 m (50%), < 5 m (90%); Altitude: < 4 m (50%), < 8 m (90%); Velocity: < 0.2 m/s']
+        ]
+      },
+      {
+        title: 'Software & Management*',
+        rows: [
+          ['Remote Management', 'Digi Remote Manager (cloud based); SNMP v1/v2c/v3 (user installed/managed), SMS'],
+          ['Local Management', 'WebUI (HTTP/HTTPS); CLI (Telnet, SSH, Serial)'],
+          ['Management / Troubleshooting Tools', 'FTP, SFTP, SCP; protocol analyzer with PCAP for Wireshark; event logging with Syslog and SMTP; NTP/SNTP']
+        ]
+      },
+      {
+        title: 'Wired Interfaces',
+        rows: [
+          ['Ethernet Ports', '(2) RJ-45; 10/100 Mbps (auto-sensing)'],
+          ['Serial Ports', '(1) DB-9 DTE; RS-232/422/485; signal support TXD, RXD, RTS, CTS, DTR, DCD, DSR, RI; flow control software (XON/XOFF), hardware supported'],
+          ['I/O Connector', '12-pin screw down terminal block; digital 0-30 VDC, 200 mA max.; (4) I/O, software-selectable; pulse counter input; analog (4) I/O; 4-20 mA or 0-10 V, software-selectable; 12-bit resolution'],
+          ['USB', '(1) USB 2.0 Type A; 5 V 500 mA max']
+        ]
+      },
+      {
+        title: 'Physical',
+        rows: [
+          ['Dimensions (L x W x H)', '12.8 cm x 10 cm x 5.2 cm (5.04 in x 3.94 in x 2.05 in)'],
+          ['Weight', '0.5 kg (1.1 lb)'],
+          ['Status LEDs', 'Signal Strength (5), LTE, Power'],
+          ['Enclosure / Rating', 'Aluminum / IP30'],
+          ['Mounting', 'DIN rail mount']
+        ]
+      },
+      {
+        title: 'Power Requirements',
+        rows: [
+          ['Power Input', '9 - 30 VDC, reverse polarity protection, 18 W min power source required'],
+          ['Power Connector', 'Screw down removable terminal block'],
+          ['Power Consumption', '1.5 W (light traffic flow), 3.5 W (peak data transmission); 1 W (low power mode, idle traffic, no serial/no Ethernet WAN)']
+        ]
+      },
+      {
+        title: 'Environmental',
+        rows: [
+          ['Hazardous (Class 1 Div 2)', 'Complete'],
+          ['Operating Temperature', '−34 °C to 74 °C (−29 °F to 165 °F); reduced cellular performance may occur above 60 °C (140 °F)'],
+          ['Storage Temperature', '−40 °C to 85 °C (−40 °F to 185 °F)'],
+          ['Ethernet Isolation', '1.5 kV RMS'],
+          ['Serial Port Protection (ESD)', '15 kV'],
+          ['Relative Humidity', '5% to 95% (non-condensing)']
+        ]
+      },
+      {
+        title: 'Approvals*',
+        rows: [
+          ['Cellular', 'IX30-00P7: FCC, PTCRB, Verizon, T-Mobile, AT&T, FirstNet Capable™; IX30-0EG4: FCC, PTCRB, CE, RED, UKCA, RCM, Verizon, T-Mobile, AT&T, FirstNet Capable™, Anterix™ Active'],
+          ['Safety', 'Hazardous locations: ANSI/ISA-12.12.01-2015, CAN/CSA C22.2 NO.213-15; Ordinary locations: UL 62368-1, 2nd Edition, 2014-10-14; UL 62368: 2014, 2nd Edition; ATEX standards: Protection method II 3 G Ex nA IIC T4 Gc; EN 60079-0:2012+A11:2013, EN 60079-15:2010, DEMKO 15 ATEX 1574X Rev. 1'],
+          ['IECEx Standards', 'US/UL/ExTR17.0077/00'],
+          ['Emissions / Immunity', 'CE, RED, FCC Part 15 Class B, ICES-003, AS/NZS CISPR 32'],
+          ['Environmental', 'RoHS3']
+        ]
+      },
+      {
+        title: 'Warranty***',
+        rows: [
+          ['Product Warranty', '1-year']
+        ]
+      },
+      {
+        title: 'Enterprise Software',
+        rows: [
+          ['Protocol Support', 'HTTPS, TLS, SCP (client and server), SFTP, SNMP (v3), SSH, Telnet and CLI for web management; remote management via Digi Remote Manager®; protocol analyzer, ability to capture PCAP for use with Wireshark; DynDNS, Dynamic DNS client compatible with BIND9/No-IP/DynDNS; Captive portal, Intelliflow; Nagios, DNS server, NTP server, Multicast, mDNS, IPerf'],
+          ['Security/VPN', 'IP filtering, stateful inspection firewall with scripting, address and port translation; VPN: IPSec with IKEv1, IKEv2, NAT Traversal; SSLv3, FIPS 197, Open VPN client and server; L2TP; VPN tunnels; cryptology: SHA-1, MD5, RSA; encryption: DES, 3DES and AES up to 256-bit (CBC mode for IPsec); authentication: RADIUS, TACACS+, SCEP for X.509; certificates; content filtering (via 3rd party); MAC address filtering; VLAN support'],
+          ['Routing/Failover', 'IP pass-through; NAT, NAPT with IP port forwarding; Ethernet bridging; GRE; multicast routing; routing protocols: PPP, PPPoE, RIP (v1, v2) OSPF, BGP, iGMP routing (multicast); IP failover: VRRP, VRRP+TM; automatic failover/failback to second GSM network/standby APN; Digi SureLink®'],
+          ['Other Protocols', 'DHCP; Dynamic DNS client compatible with No-IP/DynDNS; QoS via TOS/DSCP; Modbus UDP/TCP to serial; Modbus bridging for connecting diverse field assets']
+        ]
+      },
+      {
+        title: 'Notes',
+        rows: [
+          ['*', 'Includes the Digi 360 solution for Digi IX30 (1-year) with Digi Remote Manager, warranty and customer care.'],
+          ['**', 'Visit product certifications for latest approvals and updates.'],
+          ['***', 'Product warranty can be extended with Digi 360 extensions or renewals.']
+        ]
+      }
+    ]
+  },
+  'Digi IX40 5G Edge Computing Industrial IoT Solution': {
+    subtitle: 'Digi IX40 with Digi 360*',
+    sourceUrl: 'https://www.digi.com/products/networking/cellular-routers/industrial/digi-ix40#specifications',
+    sections: [
+      {
+        title: 'Wireless Interfaces',
+        rows: [
+          ['Cellular / WWAN**', 'Visit product certifications for latest approvals and updates'],
+          ['IX40-05: 5G NSA, 5G SA***, 4G LTE-Advanced Pro Cat 19', '5G NR bands: n1, n2, n3, n5, n7, n8, n12, n13, n14 FirstNet®, n18, n20, n25, n26, n28, n29, n30, n38, n40, n41, n48, n66, n71, n75, n76, n77, n78, n79; 4G LTE-Advanced Pro bands: B1, B2, B3, B4, B5, B7, B8, B12, B13, B14 FirstNet®, B17, B20, B25, B26, B28, B29, B30, B32, B38, B40, B41, B42, B43, B46, B48, B66, B71; 3G bands: B1, B2, B3, B4, B5, B6, B8, B19'],
+          ['IX40-04: 4G LTE-Advanced Pro Cat 12, 3G HSPA+', '4G LTE-Advanced Pro bands: B1, B2, B3, B4, B5, B7, B8, B12, B13, B14, B17, B18, B19, B20, B25, B26, B28, B29, B30, B38, B39, B40, B41, B42, B43, B48, B66, B71; 3G bands: B1, B2, B4, B5, B6, B8, B9, B19'],
+          ['Connectors', '(2) or (4) 50 Ω SMA; center pin: female'],
+          ['SIM Slots', '(2) Nano-SIM (4FF) holders'],
+          ['eSIM Support', 'Digi eSIM optional 2FF accessory (IX40-05)'],
+          ['SIM Security', 'SIM slot cover plate included']
+        ]
+      },
+      {
+        title: 'GNSS',
+        rows: [
+          ['Technology', 'GPS Gen 9 with band L1 LNA for passive antenna use'],
+          ['Antenna', 'Upper L-band: GPS L1; Glonass G1; Beidou B1; Galileo E1; IX40-04: supports passive GNSS antennas rated at 1.5 to 3 dBi only; IX40-05: supports passive GNSS antennas rated at 1.5 to 3 dBi or active antennas with 7.5 to 26 dB gain'],
+          ['Protocol', 'NMEA 4.11 and TAIP'],
+          ['Connector', '(1) 50 Ω SMA; center pin: female']
+        ]
+      },
+      {
+        title: 'Wired Interfaces',
+        rows: [
+          ['Ethernet Ports / Connector', '(4) RJ-45; 10/100/1000 Mbps Base-T (auto-sensing); IEEE 802.3; configurable as WAN or LAN'],
+          ['I/O Ports / Connector', '(2) Digital input/outputs; (2) analog inputs (0 - 10 V; 4 - 20 mA; 12-bit resolution)'],
+          ['SFP Ports / Connector', '(2) 1 Gb capable SFP sockets'],
+          ['Serial Ports / Connector', '(1) RS-232/422/485; DB-9 male (DTE)']
+        ]
+      },
+      {
+        title: 'Software and Management*',
+        rows: [
+          ['Remote Management', 'Digi Remote Manager (cloud based); SNMP v1/v2c/v3 (user installed/managed), SMS'],
+          ['Local Management', 'Web UI (HTTPS); CLI (SSH, serial)'],
+          ['Management Tools', 'SFTP, SCP; protocol analyzer with PCAP for Wireshark; event logging with Syslog']
+        ]
+      },
+      {
+        title: 'Processor',
+        rows: [
+          ['Application Processor', '1.6 GHz quad-core i.MX 8M Plus ARM® Cortex®-A53 processor']
+        ]
+      },
+      {
+        title: 'Memory',
+        rows: [
+          ['RAM / Flash', '1 GB / 8 GB']
+        ]
+      },
+      {
+        title: 'Physical',
+        rows: [
+          ['Dimensions (L x W x H)', '234 mm x 154 mm x 41 mm (9.21 in x 6.06 in x 1.61 in)'],
+          ['Weight', '1.14 kg (2.51 lb)'],
+          ['Status LEDs', 'Power, WWAN, Ethernet (link, activity)'],
+          ['Enclosure / Rating', 'Glass-filled polyphenylene sulphide / IP30 -40 °C to 85 °C (−40 °F to 185 °F)']
+        ]
+      },
+      {
+        title: 'Power Requirements',
+        rows: [
+          ['Power Input', '12 to 30 VDC, reverse polarity protection'],
+          ['Power Connector', 'Screw down removable terminal block'],
+          ['Power Consumption', '4.5 W (light traffic), 8 W (peak data), 3.5 W (idle traffic)']
+        ]
+      },
+      {
+        title: 'Environmental',
+        rows: [
+          ['Hazardous (Class 1 Div 2)', 'Complete'],
+          ['Operating Temperature', '−40 °C to 75 °C (−40 °F to 167 °F); reduced cellular performance may occur above 70 °C (158 °F)'],
+          ['Storage Temperature', '−45 °C to 85 °C (−49 °F to 185 °F)'],
+          ['Relative Humidity', '0% to 95% (non-condensing) at 25 °C (77 °F)']
+        ]
+      },
+      {
+        title: 'Approvals**',
+        rows: [
+          ['Cellular', 'PTCRB, AT&T, FirstNet Capable™, T-Mobile, Verizon'],
+          ['Safety / Security', 'IEC 62368-1, CB scheme, FIPS 140-2'],
+          ['Emissions / Immunity', 'FCC Part 15 Subpart B, ISED, CE, RED, UKCA']
+        ]
+      },
+      {
+        title: 'Warranty****',
+        rows: [
+          ['Product Warranty', '1-year']
+        ]
+      },
+      {
+        title: 'Enterprise Software',
+        rows: [
+          ['Protocol Support', 'HTTPS, TLS, SCP (client and server), SFTP, SNMP (v3), SSH, Telnet and CLI for web management; remote management via Digi Remote Manager®; protocol analyzer, ability to capture PCAP for use with Wireshark; DynDNS, Dynamic DNS client compatible with No-IP/DynDNS; Captive portal, Intelliflow; Nagios, DNS server, NTP server, Multicast, mDNS, IPerf'],
+          ['Security / VPN', 'IP filtering, stateful inspection firewall with scripting, address and port translation; VPN: IPSec with IKEv1, IKEv2, NAT Traversal; SSLv3, FIPS 197, Open VPN client and server; L2TP; VPN tunnels; cryptology: SHA-1, MD5, RSA; encryption: DES, 3DES and AES up to 256-bit (CBC mode for IPsec); authentication: RADIUS, TACACS+, SCEP for X.509; certificates; content filtering (via 3rd party); MAC address filtering; VLAN support'],
+          ['Routing', 'IP pass-through; NAT, NAPT with IP port forwarding; Ethernet bridging; GRE; multicast routing; routing protocols: PPP, PPPoE, RIP (v1, v2) OSPF, BGP, iGMP routing (multicast); IP failover: VRRP, VRRP+TM; automatic failover/failback to second GSM network/standby APN; Digi SureLink®'],
+          ['Other Protocols', 'DHCP; Dynamic DNS client compatible with No-IP/DynDNS; QoS via TOS/DSCP; Modbus UDP/TCP to serial; Modbus bridging for connecting diverse field assets']
+        ]
+      },
+      {
+        title: 'Notes',
+        rows: [
+          ['*', 'Includes the Digi 360 solution for Digi IX40 (1-year) with Digi Remote Manager, warranty and customer care.'],
+          ['**', 'Visit product certifications for latest approvals and updates.'],
+          ['***', 'Contact your network operator regarding 5G SA support on their network. Digi IX40-05 supports up to 2xCC (2x 5G SA Carrier Components).'],
+          ['****', 'Product warranty can be extended with Digi 360 extensions or renewals.']
+        ]
+      }
+    ]
+  },
   'Digi TX64 5G / LTE-Advanced Pro Cellular Router': {
     subtitle: 'Digi TX64 5G with Digi 360*',
     sourceUrl: 'https://www.digi.com/products/networking/cellular-routers/transportation/digi-tx64#specifications',
