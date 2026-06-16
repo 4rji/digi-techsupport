@@ -3831,6 +3831,51 @@ body.is-file-support-resizing {
   line-height: 1.25;
 }
 
+.file-support-tree-title-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--app-border, rgba(255, 255, 255, 0.14));
+}
+
+.file-support-tree-title-row .file-support-panel-title {
+  flex: 1 1 auto;
+  border-bottom: none;
+}
+
+.file-support-tree-expand-controls {
+  display: flex;
+  gap: 4px;
+  padding: 0 10px;
+  flex: 0 0 auto;
+}
+
+.file-support-tree-expand-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(var(--app-primary-rgb, 132, 195, 97), 0.48);
+  border-radius: 50%;
+  background: rgba(var(--app-primary-rgb, 132, 195, 97), 0.12);
+  color: var(--app-text, #fff);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.file-support-tree-expand-btn:hover:not(:disabled),
+.file-support-tree-expand-btn:focus-visible {
+  border-color: var(--app-primary, #84c361);
+  background: rgba(var(--app-primary-rgb, 132, 195, 97), 0.22);
+  outline: none;
+}
+
+.file-support-tree-expand-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .file-support-search {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
