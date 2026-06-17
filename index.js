@@ -2060,8 +2060,29 @@ function setupIPCHandlers() {
           username,
           password,
           tryKeyboard: true,
-          readyTimeout: 15000,
-          keepaliveInterval: 10000
+          readyTimeout: 20000,
+          keepaliveInterval: 10000,
+          // Old Digi/embedded routers only speak legacy SSH algorithms.
+          // Append them to the modern defaults so handshakes don't fail with
+          // ECONNRESET / "Timed out while waiting for handshake".
+          algorithms: {
+            kex: {
+              append: [
+                'diffie-hellman-group14-sha1',
+                'diffie-hellman-group1-sha1',
+                'diffie-hellman-group-exchange-sha1'
+              ]
+            },
+            serverHostKey: {
+              append: ['ssh-rsa', 'ssh-dss']
+            },
+            cipher: {
+              append: ['aes128-cbc', 'aes192-cbc', 'aes256-cbc', '3des-cbc']
+            },
+            hmac: {
+              append: ['hmac-sha1', 'hmac-sha1-96']
+            }
+          }
         });
       } catch (error) {
         finish({ success: false, error: error.message });

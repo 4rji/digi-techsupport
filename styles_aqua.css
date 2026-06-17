@@ -3020,15 +3020,80 @@ body {
   box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.18);
 }
 
-.template-actions {
+.template-editor-toolbar {
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
 }
 
-.template-action-button {
+.template-editor-toolbar .template-title-input {
+  flex: 1 1 auto;
   width: auto;
-  min-width: 82px;
+  min-width: 0;
+}
+
+.template-autosave-status {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: #7a8a7e;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+
+.template-autosave-status.is-saved {
+  color: #4caf50;
+}
+
+.template-autosave-status.is-draft {
+  color: #e0a33a;
+}
+
+.template-editor-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.template-action-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background: #141414;
+  color: #cfd8d0;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.template-action-chip:hover {
+  background: #1f1f1f;
+  border-color: #4caf50;
+  color: #fff;
+}
+
+.template-action-chip:active {
+  transform: translateY(1px);
+}
+
+.template-action-chip:focus-visible {
+  outline: none;
+  border-color: #4caf50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.25);
+}
+
+.template-action-chip-primary:hover {
+  background: rgba(76, 175, 80, 0.18);
+  border-color: #4caf50;
+  color: #d6ffe0;
+}
+
+.template-action-chip-danger:hover {
+  background: rgba(229, 57, 53, 0.16);
+  border-color: #e53935;
+  color: #ff8a85;
 }
 
 .template-create-row {

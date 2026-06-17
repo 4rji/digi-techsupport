@@ -3,6 +3,7 @@ import { FitAddon } from './node_modules/@xterm/addon-fit/lib/addon-fit.mjs';
 
 const PRODUCT_LINES_STORAGE_KEY = 'product_lines';
 const TEMPLATES_STORAGE_KEY = 'support_templates';
+const TEMPLATES_DEFAULT_SEEDED_KEY = 'support_templates_default_seeded';
 const TEMPLATE_DRAFTS_STORAGE_KEY = 'support_template_drafts';
 const LEGACY_MONITOR_STORAGE_KEY = 'monitor_vm_cards';
 const ACTIVE_LINE_STORAGE_KEY = 'active_product_line';
@@ -1363,6 +1364,7 @@ let templateDrafts = [];
 let activeLineId = '';
 let activeTemplateId = '';
 let templateSearchQuery = '';
+let showTemplateCreatePanel = false;
 let itemCounter = 0;
 let lineCounter = 0;
 let editingItemId = null;
@@ -1758,6 +1760,25 @@ function normalizeProductLine(line, index) {
   };
 }
 
+function getDefaultSupportTemplates() {
+  const body = [
+    'Serial: ',
+    'Case Number: ',
+    'Warranty: ',
+    'SN: ',
+    'Inquire: '
+  ].join('\n');
+
+  return [
+    {
+      id: 'support-template-default-note',
+      title: 'Case Note',
+      body,
+      hidden: false
+    }
+  ];
+}
+
 function normalizeSupportTemplate(template, index) {
   const title = String(template?.title || template?.name || `Template ${index + 1}`).trim() || `Template ${index + 1}`;
 
@@ -1784,7 +1805,15 @@ function loadSupportTemplates() {
       const parsed = JSON.parse(storedTemplates);
       if (Array.isArray(parsed)) {
         supportTemplates = normalizeSupportTemplates(parsed);
-        if (supportTemplates.length !== parsed.length) {
+        let changed = supportTemplates.length !== parsed.length;
+        // One-time seed of the default case note for existing installs.
+        if (supportTemplates.length === 0
+          && localStorage.getItem(TEMPLATES_DEFAULT_SEEDED_KEY) !== 'true') {
+          supportTemplates = getDefaultSupportTemplates();
+          changed = true;
+        }
+        localStorage.setItem(TEMPLATES_DEFAULT_SEEDED_KEY, 'true');
+        if (changed) {
           saveSupportTemplates();
         }
         return;
@@ -1794,7 +1823,8 @@ function loadSupportTemplates() {
     console.error('Error loading support templates:', error);
   }
 
-  supportTemplates = [];
+  supportTemplates = getDefaultSupportTemplates();
+  localStorage.setItem(TEMPLATES_DEFAULT_SEEDED_KEY, 'true');
   saveSupportTemplates();
 }
 
@@ -1803,23 +1833,28 @@ function saveSupportTemplates() {
     localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(supportTemplates));
   } catch (error) {
     console.error('Error saving support templates:', error);
-    showNotification('Could not save templates');
+    showNotification('Could not save notes');
   }
 }
 
 function loadTemplateDrafts() {
+  // Drafts are deprecated — everything autosaves now. Promote any leftover
+  // session drafts to permanent notes, then clear the draft store.
+  templateDrafts = [];
   try {
     const storedDrafts = sessionStorage.getItem(TEMPLATE_DRAFTS_STORAGE_KEY);
     if (storedDrafts) {
       const parsed = JSON.parse(storedDrafts);
-      templateDrafts = normalizeSupportTemplates(parsed);
-      return;
+      const promoted = normalizeSupportTemplates(parsed);
+      if (promoted.length > 0) {
+        supportTemplates.push(...promoted);
+        saveSupportTemplates();
+      }
     }
   } catch (error) {
     console.error('Error loading temporary templates:', error);
   }
-
-  templateDrafts = [];
+  sessionStorage.removeItem(TEMPLATE_DRAFTS_STORAGE_KEY);
 }
 
 function saveTemplateDrafts() {
@@ -2008,7 +2043,7 @@ function renderProductTabs() {
     tabs.appendChild(button);
   });
 
-  createBuiltInTabButton(TEMPLATES_VIEW_ID, 'Templates');
+  createBuiltInTabButton(TEMPLATES_VIEW_ID, 'Notes');
 }
 
 function renderActiveLine() {
@@ -2876,7 +2911,7 @@ function renderTemplatesView(workspace) {
 
   const title = document.createElement('h2');
   title.id = 'product-line-header-title';
-  title.textContent = 'Templates';
+  title.textContent = 'Notes';
 
   headerRow.appendChild(title);
   const controls = document.createElement('div');
@@ -2906,21 +2941,33 @@ function renderTemplatesView(workspace) {
   newButton.className = 'config-transfer-button template-new-button';
   newButton.textContent = 'New';
   newButton.addEventListener('click', () => {
-    const title = 'New Template';
-    const draft = {
+    const title = 'New Note';
+    const note = {
       id: createTemplateId(title, supportTemplates.length + templateDrafts.length),
       title,
       body: '',
       hidden: false,
       sourceName: 'manual'
     };
-    templateDrafts.push(draft);
-    activeTemplateId = draft.id;
-    saveTemplateDrafts();
+    // New notes are saved immediately so editing autosaves with no Save button.
+    supportTemplates.push(note);
+    activeTemplateId = note.id;
+    saveSupportTemplates();
+    renderProductApp();
+  });
+
+  const createToggleButton = document.createElement('button');
+  createToggleButton.type = 'button';
+  createToggleButton.className = 'config-transfer-button template-create-toggle';
+  createToggleButton.textContent = showTemplateCreatePanel ? 'Hide create' : 'Create with AI';
+  createToggleButton.setAttribute('aria-pressed', showTemplateCreatePanel ? 'true' : 'false');
+  createToggleButton.addEventListener('click', () => {
+    showTemplateCreatePanel = !showTemplateCreatePanel;
     renderProductApp();
   });
 
   controls.appendChild(newButton);
+  controls.appendChild(createToggleButton);
   controls.appendChild(importButton);
   controls.appendChild(importInput);
   headerRow.appendChild(controls);
@@ -2942,15 +2989,15 @@ function renderTemplatesView(workspace) {
 
   const listTitle = document.createElement('h3');
   listTitle.className = 'template-list-title';
-  listTitle.textContent = 'Templates';
+  listTitle.textContent = 'Notes';
   list.appendChild(listTitle);
 
   const searchInput = document.createElement('input');
   searchInput.type = 'search';
   searchInput.className = 'template-search-input';
-  searchInput.placeholder = 'Search templates';
+  searchInput.placeholder = 'Search notes';
   searchInput.value = templateSearchQuery;
-  searchInput.setAttribute('aria-label', 'Search templates');
+  searchInput.setAttribute('aria-label', 'Search notes');
   searchInput.addEventListener('input', () => {
     templateSearchQuery = searchInput.value;
     renderProductApp();
@@ -2969,12 +3016,12 @@ function renderTemplatesView(workspace) {
   if (templateDrafts.length === 0 && supportTemplates.length === 0) {
     const emptyState = document.createElement('div');
     emptyState.className = 'template-empty-state';
-    emptyState.textContent = 'No templates loaded';
+    emptyState.textContent = 'No notes loaded';
     list.appendChild(emptyState);
   } else if (matchingDrafts.length === 0 && matchingTemplates.length === 0) {
     const emptyState = document.createElement('div');
     emptyState.className = 'template-empty-state';
-    emptyState.textContent = 'No matching templates';
+    emptyState.textContent = 'No matching notes';
     list.appendChild(emptyState);
   } else {
     matchingDrafts.forEach((template) => {
@@ -2996,7 +3043,7 @@ function renderTemplatesView(workspace) {
   const createLabel = document.createElement('label');
   createLabel.className = 'template-create-label';
   createLabel.htmlFor = 'template-agent-input';
-  createLabel.textContent = 'Create template';
+  createLabel.textContent = 'Create note with AI';
 
   const createInput = document.createElement('textarea');
   createInput.id = 'template-agent-input';
@@ -3040,7 +3087,9 @@ function renderTemplatesView(workspace) {
   createControls.appendChild(createActions);
   createRow.appendChild(createLabel);
   createRow.appendChild(createControls);
-  editor.appendChild(createRow);
+  if (showTemplateCreatePanel) {
+    editor.appendChild(createRow);
+  }
 
   const activeIndex = supportTemplates.findIndex(template => template.id === activeTemplateId);
   const activeDraftIndex = templateDrafts.findIndex(template => template.id === activeTemplateId);
@@ -3051,7 +3100,7 @@ function renderTemplatesView(workspace) {
   } else {
     const placeholder = document.createElement('div');
     placeholder.className = 'template-editor-placeholder';
-    placeholder.textContent = templateDrafts.length > 0 || supportTemplates.length > 0 ? 'Select a template' : 'Load .md files';
+    placeholder.textContent = templateDrafts.length > 0 || supportTemplates.length > 0 ? 'Select a note' : 'Load .md files';
     editor.appendChild(placeholder);
   }
 
@@ -5502,7 +5551,7 @@ function getGeneratedTemplateFallbackTitle(sourceText) {
     .trim()
     .slice(0, 48);
 
-  return cleanMarkdownTitle(compactText) || 'Generated template';
+  return cleanMarkdownTitle(compactText) || 'Generated note';
 }
 
 function ensureGeneratedTemplateTitle(body, sourceText) {
@@ -5673,7 +5722,7 @@ async function handleTemplateGeneration(createInput, generateButton) {
     });
 
     if (!result || !result.success) {
-      throw new Error(result?.error || 'Could not generate template');
+      throw new Error(result?.error || 'Could not generate note');
     }
 
     const body = ensureGeneratedTemplateTitle(result.template, sourceText);
@@ -5686,15 +5735,15 @@ async function handleTemplateGeneration(createInput, generateButton) {
       sourceName: `${providerConfig.label} generated`
     };
 
-    templateDrafts.push(template);
+    supportTemplates.push(template);
     activeTemplateId = template.id;
-    saveTemplateDrafts();
+    saveSupportTemplates();
     createInput.value = '';
-    showNotification('Template generated (unsaved)');
+    showNotification('Note generated');
     renderProductApp();
   } catch (error) {
     console.error('Error generating template:', error);
-    showNotification(error.message || 'Could not generate template');
+    showNotification(error.message || 'Could not generate note');
   } finally {
     createInput.disabled = false;
     generateButton.disabled = createInput.value.trim().length === 0;
@@ -5707,6 +5756,7 @@ function createTemplateListItem(template, index, options = {}) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'template-list-button';
+  button.dataset.templateId = template.id;
   button.classList.toggle('active', template.id === activeTemplateId);
   button.addEventListener('click', () => {
     activeTemplateId = template.id;
@@ -5740,16 +5790,37 @@ function attachAutoSizingTextarea(textarea) {
   return syncHeight;
 }
 
+const TEMPLATE_ICONS = {
+  copy: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>',
+  save: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>',
+  delete: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>'
+};
+
+function createTemplateChip(icon, label, { danger = false, primary = false } = {}) {
+  const chip = document.createElement('button');
+  chip.type = 'button';
+  chip.className = 'template-action-chip';
+  if (danger) chip.classList.add('template-action-chip-danger');
+  if (primary) chip.classList.add('template-action-chip-primary');
+  chip.title = label;
+  chip.setAttribute('aria-label', label);
+  chip.innerHTML = TEMPLATE_ICONS[icon] || '';
+  return chip;
+}
+
 function createTemplateEditor(template, index, options = {}) {
   const isDraft = Boolean(options.isDraft);
   const editor = document.createElement('section');
   editor.className = 'template-editor-card';
 
+  const toolbar = document.createElement('div');
+  toolbar.className = 'template-editor-toolbar';
+
   const titleInput = document.createElement('input');
   titleInput.type = 'text';
   titleInput.className = 'template-title-input';
   titleInput.value = template.title;
-  titleInput.setAttribute('aria-label', 'Template title');
+  titleInput.setAttribute('aria-label', 'Note title');
 
   const bodyInput = document.createElement('textarea');
   bodyInput.className = 'template-body-input';
@@ -5758,7 +5829,57 @@ function createTemplateEditor(template, index, options = {}) {
   bodyInput.setAttribute('aria-label', `${template.title} body`);
   const syncBodyHeight = attachAutoSizingTextarea(bodyInput);
 
+  const status = document.createElement('span');
+  status.className = 'template-autosave-status';
+
+  const actions = document.createElement('div');
+  actions.className = 'template-editor-actions';
+
+  const copyButton = createTemplateChip('copy', 'Copy note');
+  copyButton.addEventListener('click', () => {
+    copyTemplateText(bodyInput.value);
+  });
+
+  const deleteButton = createTemplateChip('delete', isDraft ? 'Discard note' : 'Delete note', { danger: true });
+  deleteButton.addEventListener('click', () => {
+    if (isDraft) {
+      templateDrafts.splice(index, 1);
+      saveTemplateDrafts();
+      activeTemplateId = templateDrafts[index]?.id || templateDrafts[index - 1]?.id || supportTemplates[0]?.id || '';
+      showNotification('Note discarded');
+      renderProductApp();
+      return;
+    }
+
+    const templateTitle = titleInput.value.trim() || template.title || `Note ${index + 1}`;
+    const shouldDelete = window.confirm(`Delete "${templateTitle}" permanently?`);
+    if (!shouldDelete) return;
+
+    supportTemplates.splice(index, 1);
+    activeTemplateId = supportTemplates[index]?.id || supportTemplates[index - 1]?.id || '';
+    saveSupportTemplates();
+    showNotification('Note deleted');
+    renderProductApp();
+  });
+
   if (isDraft) {
+    // AI drafts stay in session storage until promoted with Save.
+    const saveButton = createTemplateChip('save', 'Save note', { primary: true });
+    saveButton.addEventListener('click', () => {
+      const savedTemplate = {
+        ...template,
+        title: titleInput.value.trim() || `Note ${supportTemplates.length + 1}`,
+        body: bodyInput.value
+      };
+      supportTemplates.push(savedTemplate);
+      templateDrafts.splice(index, 1);
+      saveTemplateDrafts();
+      activeTemplateId = savedTemplate.id;
+      saveSupportTemplates();
+      showNotification('Note saved');
+      renderProductApp();
+    });
+
     const syncDraft = () => {
       if (!templateDrafts[index]) return;
       templateDrafts[index] = {
@@ -5771,75 +5892,55 @@ function createTemplateEditor(template, index, options = {}) {
     };
     titleInput.addEventListener('input', syncDraft);
     bodyInput.addEventListener('input', syncDraft);
+
+    status.textContent = 'Unsaved draft';
+    status.classList.add('is-draft');
+    actions.appendChild(saveButton);
+  } else {
+    // Saved notes autosave on every keystroke — no Save button needed.
+    let savedTimer = null;
+    const markSaved = () => {
+      status.textContent = 'Saved';
+      status.classList.remove('is-pending');
+      status.classList.add('is-saved');
+      if (savedTimer) clearTimeout(savedTimer);
+      savedTimer = setTimeout(() => {
+        status.classList.remove('is-saved');
+        status.textContent = 'Auto-save on';
+      }, 1500);
+    };
+
+    const autoSave = () => {
+      if (!supportTemplates[index]) return;
+      const nextTitle = titleInput.value.trim() || template.title;
+      supportTemplates[index] = {
+        ...supportTemplates[index],
+        title: nextTitle,
+        body: bodyInput.value
+      };
+      saveSupportTemplates();
+      syncBodyHeight();
+      // Keep the list entry's title in sync without a full re-render.
+      const listTitle = document.querySelector(
+        `.template-list-button[data-template-id="${template.id}"] .template-list-button-title`
+      );
+      if (listTitle) listTitle.textContent = nextTitle;
+      markSaved();
+    };
+
+    status.textContent = 'Auto-save on';
+    titleInput.addEventListener('input', autoSave);
+    bodyInput.addEventListener('input', autoSave);
   }
 
-  const actions = document.createElement('div');
-  actions.className = 'template-actions';
-
-  const saveButton = document.createElement('button');
-  saveButton.type = 'button';
-  saveButton.className = 'save-button template-action-button';
-  saveButton.textContent = 'Save';
-  saveButton.addEventListener('click', () => {
-    const savedTemplate = {
-      ...template,
-      title: titleInput.value.trim() || `Template ${index + 1}`,
-      body: bodyInput.value
-    };
-    if (isDraft) {
-      savedTemplate.title = titleInput.value.trim() || `Template ${supportTemplates.length + 1}`;
-      supportTemplates.push(savedTemplate);
-      templateDrafts.splice(index, 1);
-      saveTemplateDrafts();
-      activeTemplateId = savedTemplate.id;
-    } else {
-      supportTemplates[index] = savedTemplate;
-      activeTemplateId = supportTemplates[index].id;
-    }
-    saveSupportTemplates();
-    showNotification('Template saved');
-    renderProductApp();
-  });
-
-  const copyButton = document.createElement('button');
-  copyButton.type = 'button';
-  copyButton.className = 'config-transfer-button template-action-button';
-  copyButton.textContent = 'Copy';
-  copyButton.addEventListener('click', () => {
-    copyTemplateText(bodyInput.value);
-  });
-
-  const deleteButton = document.createElement('button');
-  deleteButton.type = 'button';
-  deleteButton.className = 'delete-button template-action-button';
-  deleteButton.textContent = isDraft ? 'Discard' : 'Delete';
-  deleteButton.addEventListener('click', () => {
-    if (isDraft) {
-      templateDrafts.splice(index, 1);
-      saveTemplateDrafts();
-      activeTemplateId = templateDrafts[index]?.id || templateDrafts[index - 1]?.id || supportTemplates[0]?.id || '';
-      showNotification('Template discarded');
-      renderProductApp();
-      return;
-    }
-
-    const templateTitle = titleInput.value.trim() || template.title || `Template ${index + 1}`;
-    const shouldDelete = window.confirm(`Delete "${templateTitle}" permanently?`);
-    if (!shouldDelete) return;
-
-    supportTemplates.splice(index, 1);
-    activeTemplateId = supportTemplates[index]?.id || supportTemplates[index - 1]?.id || '';
-    saveSupportTemplates();
-    showNotification('Template deleted');
-    renderProductApp();
-  });
-
-  actions.appendChild(saveButton);
   actions.appendChild(copyButton);
   actions.appendChild(deleteButton);
-  editor.appendChild(titleInput);
+
+  toolbar.appendChild(titleInput);
+  toolbar.appendChild(status);
+  toolbar.appendChild(actions);
+  editor.appendChild(toolbar);
   editor.appendChild(bodyInput);
-  editor.appendChild(actions);
 
   return editor;
 }
@@ -5939,11 +6040,11 @@ async function handleTemplateFileSelection(event) {
     supportTemplates.push(...importedTemplates);
     activeTemplateId = importedTemplates[0]?.id || activeTemplateId;
     saveSupportTemplates();
-    showNotification(importedTemplates.length === 1 ? 'Template loaded' : `${importedTemplates.length} templates loaded`);
+    showNotification(importedTemplates.length === 1 ? 'Note loaded' : `${importedTemplates.length} notes loaded`);
     renderProductApp();
   } catch (error) {
     console.error('Error importing templates:', error);
-    showNotification('Could not load templates');
+    showNotification('Could not load notes');
   } finally {
     input.value = '';
   }
@@ -5964,10 +6065,10 @@ async function copyTemplateText(text) {
       document.execCommand('copy');
       document.body.removeChild(scratch);
     }
-    showNotification('Template copied');
+    showNotification('Note copied');
   } catch (error) {
     console.error('Error copying template:', error);
-    showNotification('Could not copy template');
+    showNotification('Could not copy note');
   }
 }
 
@@ -7359,18 +7460,18 @@ function getFileSupportSkill() {
 
 function deleteAllTemplates() {
   if (supportTemplates.length === 0) {
-    showNotification('No templates to delete');
+    showNotification('No notes to delete');
     return;
   }
 
-  const shouldDelete = window.confirm('Delete all templates permanently?');
+  const shouldDelete = window.confirm('Delete all notes permanently?');
   if (!shouldDelete) return;
 
   supportTemplates = [];
   activeTemplateId = '';
   saveSupportTemplates();
   renderProductApp();
-  showNotification('All templates deleted');
+  showNotification('All notes deleted');
 }
 
 async function handleAgentSkillFileSelection(event) {
