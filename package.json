@@ -18,6 +18,7 @@
     "appId": "com.digitechsupport.app",
     "artifactName": "digi-techsupport-${version}.${ext}",
     "npmRebuild": false,
+    "afterPack": "build/afterPack.js",
     "files": [
       "**/*",
       "!node_modules/cpu-features/**",
@@ -33,7 +34,7 @@
     },
     "mac": {
       "icon": "build/icon.icns",
-      "identity": "-"
+      "identity": null
     },
     "win": {
       "icon": "build/icon.ico"

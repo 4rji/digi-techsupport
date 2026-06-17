@@ -6263,7 +6263,7 @@ function openItemHTTPS(itemId) {
     return;
   }
 
-  window.open(url, '_blank', 'noopener,noreferrer');
+  window.open(url, '_blank', 'noopener,noreferrer,width=1280,height=860');
 }
 
 function createDocsSearchForm(item) {
