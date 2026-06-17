@@ -1388,6 +1388,35 @@ let removeSSHDataListener = null;
 let removeSSHCloseListener = null;
 let removeSSHErrorListener = null;
 let sshPasswordSaveTimer = null;
+let sshFontSize = 13;
+
+const SSH_QUICK_SCRIPTS = [
+  {
+    label: "IPs",
+    title: "Mostrar IPs IPv4 del dispositivo",
+    cmd: "ip -4 -o addr show | awk '!/127\\.0\\.0\\.1/ {split($4,a,\"/\"); print $2\": \"a[1]}'"
+  },
+  {
+    label: "Routes",
+    title: "Mostrar tabla de rutas",
+    cmd: "ip route show"
+  },
+  {
+    label: "Ports",
+    title: "Mostrar puertos en escucha",
+    cmd: "netstat -tulpn"
+  },
+  {
+    label: "CLI",
+    title: "Abrir Digi CLI",
+    cmd: "cli"
+  },
+  {
+    label: "Exit",
+    title: "Cerrar sesión",
+    cmd: "exit"
+  },
+];
 let supportFileState = {
   sessionId: '',
   fileName: '',
@@ -6598,7 +6627,7 @@ function ensureSSHTerminal() {
       cursorBlink: true,
       convertEol: true,
       fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
-      fontSize: 13,
+      fontSize: sshFontSize,
       lineHeight: 1.18,
       theme: {
         background: '#050505',
@@ -6622,6 +6651,23 @@ function ensureSSHTerminal() {
   return sshTerminal;
 }
 
+function changeSshFontSize(delta) {
+  sshFontSize = Math.max(9, Math.min(22, sshFontSize + delta));
+  if (sshTerminal) {
+    sshTerminal.options.fontSize = sshFontSize;
+    requestAnimationFrame(() => fitSSHTerminal());
+  }
+}
+
+function toggleSshMaximize() {
+  const modal = document.getElementById('ssh-terminal-modal');
+  const btn = document.getElementById('ssh-maximize');
+  if (!modal) return;
+  const isMax = modal.classList.toggle('maximized');
+  if (btn) btn.textContent = isMax ? '⊡' : '⛶';
+  requestAnimationFrame(() => fitSSHTerminal());
+}
+
 function fitSSHTerminal() {
   if (!sshTerminal || !sshFitAddon) return;
   try {
@@ -6643,6 +6689,8 @@ function setSSHStatus(message, state = 'idle') {
 }
 
 function setSSHFormState(isConnected, isConnecting = false) {
+  const form = document.getElementById('ssh-login-form');
+  const compactBar = document.getElementById('ssh-compact-bar');
   const connectButton = document.getElementById('ssh-connect-btn');
   const disconnectButton = document.getElementById('ssh-disconnect-btn');
   const usernameInput = document.getElementById('ssh-username');
@@ -6650,6 +6698,9 @@ function setSSHFormState(isConnected, isConnecting = false) {
   const portInput = document.getElementById('ssh-port');
   const saveAdminPasswordInput = document.getElementById('ssh-save-admin-password');
   const directShellInput = document.getElementById('ssh-direct-shell');
+
+  if (form) form.style.display = isConnected ? 'none' : '';
+  if (compactBar) compactBar.style.display = isConnected ? 'flex' : 'none';
 
   if (connectButton) {
     connectButton.disabled = isConnected || isConnecting;
@@ -6766,7 +6817,7 @@ function openSSHTerminalModal(itemId) {
   if (usernameInput) usernameInput.value = 'admin';
   if (passwordInput) passwordInput.value = '';
   if (saveAdminPasswordInput) saveAdminPasswordInput.checked = false;
-  if (directShellInput) directShellInput.checked = false;
+  if (directShellInput) directShellInput.checked = true;
   if (title) title.textContent = match.item.name || 'SSH Terminal';
   if (eyebrow) eyebrow.textContent = `SSH to ${match.item.ip}`;
 
@@ -6907,6 +6958,10 @@ async function connectSSHFromForm() {
 
   sshSessionId = result.sessionId;
   setSSHStatus('Connected', 'connected');
+  const compactInfo = document.getElementById('ssh-compact-info');
+  if (compactInfo) {
+    compactInfo.textContent = `${username}@${host}:${Number.isNaN(port) ? 22 : port}`;
+  }
   setSSHFormState(true);
   fitSSHTerminal();
   if (terminal) {
@@ -7026,6 +7081,55 @@ function setupSSHTerminalModal() {
 
   if (closeButton) {
     closeButton.addEventListener('click', closeSSHTerminalModal);
+  }
+
+  const fontDecreaseBtn = document.getElementById('ssh-font-decrease');
+  const fontIncreaseBtn = document.getElementById('ssh-font-increase');
+  const maximizeBtn = document.getElementById('ssh-maximize');
+  const scriptsBar = document.getElementById('ssh-scripts-bar');
+
+  const disconnectCompactBtn = document.getElementById('ssh-disconnect-compact');
+  if (disconnectCompactBtn) {
+    disconnectCompactBtn.addEventListener('click', () => disconnectSSHSession());
+  }
+
+  const keepTerminalFocus = e => e.preventDefault();
+
+  if (fontDecreaseBtn) {
+    fontDecreaseBtn.addEventListener('mousedown', keepTerminalFocus);
+    fontDecreaseBtn.addEventListener('click', () => changeSshFontSize(-1));
+  }
+  if (fontIncreaseBtn) {
+    fontIncreaseBtn.addEventListener('mousedown', keepTerminalFocus);
+    fontIncreaseBtn.addEventListener('click', () => changeSshFontSize(1));
+  }
+  if (maximizeBtn) {
+    maximizeBtn.addEventListener('mousedown', keepTerminalFocus);
+    maximizeBtn.addEventListener('click', toggleSshMaximize);
+  }
+
+  if (scriptsBar) {
+    const label = document.createElement('span');
+    label.className = 'ssh-scripts-label';
+    label.textContent = 'Quick:';
+    scriptsBar.appendChild(label);
+
+    SSH_QUICK_SCRIPTS.forEach(script => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ssh-script-btn';
+      btn.textContent = script.label;
+      btn.title = script.title;
+      btn.addEventListener('mousedown', keepTerminalFocus);
+      btn.addEventListener('click', () => {
+        if (!sshSessionId) return;
+        const networkAPI = getNetworkAPI();
+        if (networkAPI && typeof networkAPI.sshWrite === 'function') {
+          networkAPI.sshWrite(sshSessionId, script.cmd + '\n');
+        }
+      });
+      scriptsBar.appendChild(btn);
+    });
   }
 
   modal.addEventListener('click', (event) => {

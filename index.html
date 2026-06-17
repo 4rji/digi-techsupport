@@ -94,6 +94,11 @@
           <p id="ssh-terminal-eyebrow" class="ssh-terminal-eyebrow">SSH Terminal</p>
           <h2 id="ssh-terminal-title">Connect to device</h2>
         </div>
+        <div class="ssh-header-toolbar">
+          <button id="ssh-font-decrease" type="button" class="ssh-toolbar-btn" title="Decrease font size">A−</button>
+          <button id="ssh-font-increase" type="button" class="ssh-toolbar-btn" title="Increase font size">A+</button>
+          <button id="ssh-maximize" type="button" class="ssh-toolbar-btn" title="Maximize terminal">⛶</button>
+        </div>
         <button id="close-ssh-terminal" type="button" class="close-button ssh-terminal-close">×</button>
       </div>
       <form id="ssh-login-form" class="ssh-login-form">
@@ -126,7 +131,12 @@
           <button type="submit" id="ssh-connect-btn" class="save-button">Connect</button>
         </div>
       </form>
+      <div id="ssh-compact-bar" class="ssh-compact-bar" style="display:none;">
+        <span id="ssh-compact-info" class="ssh-compact-info"></span>
+        <button type="button" id="ssh-disconnect-compact" class="ssh-disconnect-compact-btn">Disconnect</button>
+      </div>
       <div id="ssh-terminal-status" class="ssh-terminal-status">Not connected</div>
+      <div id="ssh-scripts-bar" class="ssh-scripts-bar"></div>
       <div id="ssh-terminal-container" class="ssh-terminal-container"></div>
     </div>
   </div>

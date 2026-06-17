@@ -1559,21 +1559,65 @@ body {
   width: min(1080px, calc(100vw - 44px));
   height: min(760px, calc(100vh - 44px));
   display: grid;
-  grid-template-rows: auto auto auto 1fr;
+  grid-template-rows: auto auto auto auto 1fr;
   overflow: hidden;
   border: 1px solid rgba(120, 190, 240, 0.22);
   border-radius: 8px;
   background: #101010;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.52);
+  transition: width 0.18s, height 0.18s, border-radius 0.18s;
+}
+
+.ssh-terminal-modal.maximized {
+  padding: 0;
+}
+
+.ssh-terminal-modal.maximized .ssh-terminal-content {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
 }
 
 .ssh-terminal-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  padding: 22px 58px 14px 24px;
+  gap: 12px;
+  padding: 18px 58px 14px 24px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ssh-header-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.ssh-toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #c7d2dc;
+  font-size: 0.77rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.ssh-toolbar-btn:hover {
+  background: rgba(159, 215, 255, 0.16);
+  color: #9fd7ff;
+  border-color: rgba(159, 215, 255, 0.4);
 }
 
 .ssh-terminal-eyebrow {
@@ -1678,6 +1722,85 @@ body {
 
 .ssh-terminal-status[data-state="error"] {
   color: #ff9f9f;
+}
+
+.ssh-compact-bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 14px 5px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(76, 175, 80, 0.07);
+}
+
+.ssh-compact-info {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #b9ffbf;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.01em;
+}
+
+.ssh-disconnect-compact-btn {
+  padding: 3px 14px;
+  border: 1px solid rgba(255, 100, 100, 0.35);
+  border-radius: 5px;
+  background: rgba(255, 80, 80, 0.1);
+  color: #ff9f9f;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.ssh-disconnect-compact-btn:hover {
+  background: rgba(255, 80, 80, 0.22);
+  border-color: rgba(255, 100, 100, 0.6);
+}
+
+
+
+
+.ssh-scripts-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  flex-wrap: wrap;
+}
+
+.ssh-scripts-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #596570;
+  white-space: nowrap;
+  margin-right: 3px;
+}
+
+.ssh-script-btn {
+  padding: 2px 11px;
+  border: 1px solid rgba(159, 215, 255, 0.22);
+  border-radius: 11px;
+  background: rgba(159, 215, 255, 0.06);
+  color: #9fd7ff;
+  font-size: 0.73rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.ssh-script-btn:hover {
+  background: rgba(159, 215, 255, 0.18);
+  border-color: rgba(159, 215, 255, 0.55);
 }
 
 .ssh-terminal-container {
