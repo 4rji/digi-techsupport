@@ -25,12 +25,16 @@
       "!digi-support-*",
       "!digi-support-*/**"
     ],
+    "extraResources": [
+      { "from": "build/icon.png", "to": "icon.png" },
+      { "from": "build/icon.ico", "to": "icon.ico" }
+    ],
     "directories": {
       "buildResources": "build"
     },
     "mac": {
       "icon": "build/icon.icns",
-      "identity": null
+      "identity": "-"
     },
     "win": {
       "icon": "build/icon.ico"

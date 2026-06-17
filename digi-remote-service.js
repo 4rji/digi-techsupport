@@ -97,12 +97,17 @@ function pickField(entry, keys) {
 function mapDeviceDetails(entry) {
   return {
     // Device
+    serialNumber: String(pickField(entry, ['serial_number', 'serial', 'device_serial', 'sn'])),
     ip: String(pickField(entry, ['ip', 'ip_address', 'last_known_ip'])),
     publicIp: String(pickField(entry, ['public_ip', 'wan_ip', 'external_ip'])),
     privateIp: String(pickField(entry, ['private_ip', 'lan_ip', 'local_ip', 'internal_ip'])),
     connectionType: String(pickField(entry, ['connection_type', 'access_type', 'wan_type'])),
     firmwareVersion: String(pickField(entry, ['firmware_version', 'firmware', 'fw_version'])),
+    macAddress: String(pickField(entry, ['mac', 'mac_address', 'ethernet_mac', 'eth_mac'])),
+    sku: String(pickField(entry, ['sku', 'part_number', 'device_sku', 'product_id'])),
+    activationDate: String(pickField(entry, ['activation_date', 'provision_date', 'registration_date', 'date_activated', 'provisioned_at'])),
     uptime: String(pickField(entry, ['uptime', 'device_uptime', 'system_uptime'])),
+    cloudUptime: String(pickField(entry, ['cloud_uptime', 'drm_uptime', 'connection_uptime', 'last_connected_duration'])),
     lastConnect: String(pickField(entry, ['last_connect', 'last_connected', 'last_update'])),
     model: String(pickField(entry, ['type', 'model', 'device_type', 'product'])),
     // Modem / cellular

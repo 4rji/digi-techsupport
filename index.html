@@ -21,6 +21,50 @@
     </button>
   </header>
 
+  <div id="info-scratchpad" class="info-scratchpad" aria-label="Quick reference scratchpad">
+    <button id="info-scratchpad-toggle" class="info-scratchpad-toggle" type="button" title="Collapse / expand" aria-label="Collapse or expand scratchpad" aria-expanded="true">
+      <span class="info-scratchpad-chevron">▾</span>
+    </button>
+    <div class="info-scratchpad-fields">
+      <label class="scratch-field" data-key="id">
+        <span class="scratch-label">ID</span>
+        <input type="text" class="scratch-input" placeholder="Device ID" autocomplete="off" spellcheck="false">
+        <button type="button" class="scratch-copy" title="Copy ID" aria-label="Copy ID">
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1"/></svg>
+        </button>
+      </label>
+      <label class="scratch-field" data-key="sn">
+        <span class="scratch-label">SN</span>
+        <input type="text" class="scratch-input" placeholder="Serial number" autocomplete="off" spellcheck="false">
+        <button type="button" class="scratch-copy" title="Copy SN" aria-label="Copy SN">
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1"/></svg>
+        </button>
+      </label>
+      <label class="scratch-field" data-key="mac">
+        <span class="scratch-label">MAC</span>
+        <input type="text" class="scratch-input" placeholder="MAC address" autocomplete="off" spellcheck="false">
+        <button type="button" class="scratch-copy" title="Copy MAC" aria-label="Copy MAC">
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1"/></svg>
+        </button>
+      </label>
+      <label class="scratch-field" data-key="case">
+        <span class="scratch-label">Case</span>
+        <input type="text" class="scratch-input" placeholder="Case #" autocomplete="off" spellcheck="false">
+        <button type="button" class="scratch-copy" title="Copy Case" aria-label="Copy Case">
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1"/></svg>
+        </button>
+      </label>
+      <label class="scratch-field scratch-field-notes" data-key="notes">
+        <span class="scratch-label">Notes</span>
+        <input type="text" class="scratch-input" placeholder="Anything you want to keep handy" autocomplete="off" spellcheck="false">
+        <button type="button" class="scratch-copy" title="Copy Notes" aria-label="Copy Notes">
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1"/></svg>
+        </button>
+      </label>
+      <button type="button" id="info-scratchpad-clear" class="info-scratchpad-clear" title="Clear all fields">Clear</button>
+    </div>
+  </div>
+
   <main id="product-workspace" class="product-workspace"></main>
 
   <div id="product-image-modal" class="product-image-modal" style="display:none;">

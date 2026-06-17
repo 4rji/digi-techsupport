@@ -683,6 +683,30 @@ select:focus-visible,
   box-shadow: var(--ui-ring);
 }
 
+.devices-drm-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.devices-drm-search-input {
+  min-width: 220px;
+  padding: 9px 14px;
+  border-radius: var(--ui-r-pill);
+  border: 1px solid rgba(var(--ui-accent-rgb), 0.28);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font-size: 14px;
+  outline: none;
+  transition: border-color var(--ui-base) var(--ui-ease),
+              box-shadow var(--ui-base) var(--ui-ease);
+}
+
+.devices-drm-search-input:focus {
+  border-color: rgba(var(--ui-accent-rgb), 0.6);
+  box-shadow: var(--ui-ring);
+}
+
 .devices-body {
   margin-top: 18px;
 }
@@ -915,6 +939,53 @@ select:focus-visible,
   font-weight: 600;
   word-break: break-word;
   font-variant-numeric: tabular-nums;
+}
+
+.device-detail-grid dd.device-detail-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.device-detail-value-text {
+  min-width: 0;
+  word-break: break-word;
+}
+
+.device-detail-copy {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgba(var(--ui-accent-rgb), 0.28);
+  border-radius: var(--ui-r-sm, 6px);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity var(--ui-base) var(--ui-ease),
+              background var(--ui-base) var(--ui-ease),
+              border-color var(--ui-base) var(--ui-ease);
+}
+
+.device-detail-value:hover .device-detail-copy,
+.device-detail-copy:focus-visible {
+  opacity: 0.75;
+}
+
+.device-detail-copy:hover {
+  opacity: 1;
+  background: rgba(var(--ui-accent-rgb), 0.16);
+  border-color: rgba(var(--ui-accent-rgb), 0.5);
+}
+
+/* ID copy/search sit next to the status badge, so keep them visible (no row to hover). */
+.device-detail-modal-id-copy,
+.device-detail-modal-id-search {
+  opacity: 0.6;
 }
 
 .device-detail-empty {
@@ -1251,4 +1322,171 @@ select:focus-visible,
 .device-detail-modal-groups .device-detail-group {
   flex: 1 1 220px;
   min-width: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Info scratchpad — quick reference bar pinned under the top tabs.
+   Manually filled ID / SN / MAC / Case / Notes that persist locally and copy
+   with one click. Sits flush under the frosted topbar.
+   -------------------------------------------------------------------------- */
+.info-scratchpad {
+  position: sticky;
+  top: var(--topbar-h, 0px);
+  z-index: 880;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  margin: 0 0 14px;
+  background: linear-gradient(180deg, rgba(8, 9, 11, 0.88), rgba(8, 9, 11, 0.66));
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--ui-r-md);
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.info-scratchpad-toggle {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: var(--ui-r-pill);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: background var(--ui-base) var(--ui-ease),
+              color var(--ui-base) var(--ui-ease);
+}
+
+.info-scratchpad-toggle:hover {
+  background: rgba(var(--ui-accent-rgb), 0.18);
+  color: #fff;
+}
+
+.info-scratchpad-chevron {
+  font-size: 12px;
+  line-height: 1;
+  transition: transform var(--ui-base) var(--ui-ease);
+}
+
+.info-scratchpad.is-collapsed .info-scratchpad-chevron {
+  transform: rotate(-90deg);
+}
+
+.info-scratchpad.is-collapsed .info-scratchpad-fields {
+  display: none;
+}
+
+.info-scratchpad-fields {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.scratch-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 3px 4px 3px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--ui-r-pill);
+  background: rgba(255, 255, 255, 0.03);
+  transition: border-color var(--ui-base) var(--ui-ease),
+              background var(--ui-base) var(--ui-ease);
+}
+
+.scratch-field:focus-within {
+  border-color: rgba(var(--ui-accent-rgb), 0.55);
+  background: rgba(var(--ui-accent-rgb), 0.08);
+}
+
+.scratch-field-notes {
+  flex: 1 1 220px;
+}
+
+.scratch-label {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(var(--ui-accent-rgb), 0.9);
+  user-select: none;
+}
+
+.scratch-input {
+  flex: 1 1 auto;
+  min-width: 80px;
+  width: 120px;
+  padding: 4px 2px;
+  border: none;
+  background: transparent;
+  color: #f3f5f7;
+  font-size: 13px;
+  outline: none;
+}
+
+.scratch-field-notes .scratch-input {
+  width: auto;
+}
+
+.scratch-input::placeholder {
+  color: rgba(255, 255, 255, 0.32);
+}
+
+.scratch-copy {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--ui-r-pill);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition: background var(--ui-base) var(--ui-ease),
+              color var(--ui-base) var(--ui-ease);
+}
+
+.scratch-copy:hover {
+  background: rgba(var(--ui-accent-rgb), 0.22);
+  color: #fff;
+}
+
+.scratch-copy:active {
+  transform: scale(0.9);
+}
+
+.info-scratchpad-clear {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 5px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: var(--ui-r-pill);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--ui-base) var(--ui-ease),
+              color var(--ui-base) var(--ui-ease);
+}
+
+.info-scratchpad-clear:hover {
+  background: rgba(239, 83, 80, 0.22);
+  border-color: rgba(239, 83, 80, 0.45);
+  color: #fff;
 }

@@ -1456,7 +1456,96 @@ document.addEventListener('DOMContentLoaded', () => {
   setupConfigTransferControls();
   setupFileSupportKeyboardShortcuts();
   setupTabCycleShortcut();
+  setupInfoScratchpad();
 });
+
+// Quick-reference bar under the tabs: manually filled ID / SN / MAC / Case /
+// Notes fields that persist locally and can be copied with one click. Handy
+// while investigating a product or case so the values stay reachable.
+const SCRATCHPAD_STORAGE_KEY = 'info_scratchpad';
+const SCRATCHPAD_COLLAPSE_KEY = 'info_scratchpad_collapsed';
+
+function setupInfoScratchpad() {
+  const bar = document.getElementById('info-scratchpad');
+  if (!bar) return;
+
+  // Pin the bar flush below the sticky topbar by tracking its live height.
+  const topbar = document.querySelector('.product-topbar');
+  if (topbar) {
+    const syncTopOffset = () => {
+      document.documentElement.style.setProperty('--topbar-h', `${topbar.offsetHeight}px`);
+    };
+    syncTopOffset();
+    window.addEventListener('resize', syncTopOffset);
+    if (typeof ResizeObserver === 'function') {
+      new ResizeObserver(syncTopOffset).observe(topbar);
+    }
+  }
+
+  const fields = Array.from(bar.querySelectorAll('.scratch-field'));
+
+  let stored = {};
+  try {
+    stored = JSON.parse(localStorage.getItem(SCRATCHPAD_STORAGE_KEY)) || {};
+  } catch (error) {
+    stored = {};
+  }
+
+  const persist = () => {
+    const data = {};
+    fields.forEach((field) => {
+      data[field.dataset.key] = field.querySelector('.scratch-input').value;
+    });
+    localStorage.setItem(SCRATCHPAD_STORAGE_KEY, JSON.stringify(data));
+  };
+
+  fields.forEach((field) => {
+    const key = field.dataset.key;
+    const input = field.querySelector('.scratch-input');
+    const copyBtn = field.querySelector('.scratch-copy');
+    const label = field.querySelector('.scratch-label').textContent;
+
+    if (typeof stored[key] === 'string') input.value = stored[key];
+
+    input.addEventListener('input', persist);
+
+    copyBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const value = input.value.trim();
+      if (!value) {
+        showNotification(`${label} is empty`);
+        return;
+      }
+      copyDeviceValue(value, label);
+    });
+  });
+
+  const clearBtn = document.getElementById('info-scratchpad-clear');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      fields.forEach((field) => {
+        field.querySelector('.scratch-input').value = '';
+      });
+      persist();
+      showNotification('Scratchpad cleared');
+    });
+  }
+
+  const toggleBtn = document.getElementById('info-scratchpad-toggle');
+  if (toggleBtn) {
+    const applyCollapsed = (collapsed) => {
+      bar.classList.toggle('is-collapsed', collapsed);
+      toggleBtn.setAttribute('aria-expanded', String(!collapsed));
+    };
+    applyCollapsed(localStorage.getItem(SCRATCHPAD_COLLAPSE_KEY) === '1');
+    toggleBtn.addEventListener('click', () => {
+      const collapsed = !bar.classList.contains('is-collapsed');
+      applyCollapsed(collapsed);
+      localStorage.setItem(SCRATCHPAD_COLLAPSE_KEY, collapsed ? '1' : '0');
+    });
+  }
+}
 
 function setupTabCycleShortcut() {
   document.addEventListener('keydown', (event) => {
@@ -2013,12 +2102,17 @@ const DEVICE_DETAIL_GROUPS = [
   {
     title: 'Device',
     fields: [
+      ['Serial number', 'serialNumber'],
       ['IP', 'ip'],
       ['Public IP', 'publicIp'],
       ['Private IP', 'privateIp'],
+      ['MAC address', 'macAddress'],
       ['Connection type', 'connectionType'],
-      ['Firmware', 'firmwareVersion'],
+      ['Firmware version', 'firmwareVersion'],
+      ['SKU', 'sku'],
+      ['Activation date', 'activationDate'],
       ['Uptime', 'uptime'],
+      ['Cloud uptime', 'cloudUptime'],
       ['Last connect', 'lastConnect'],
       ['Model', 'model']
     ]
@@ -2153,6 +2247,67 @@ function createDeviceStatusBadge(status) {
   return badge;
 }
 
+async function copyDeviceValue(value, label) {
+  const text = String(value ?? '');
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const scratch = document.createElement('textarea');
+      scratch.value = text;
+      scratch.setAttribute('readonly', '');
+      scratch.style.position = 'fixed';
+      scratch.style.opacity = '0';
+      document.body.appendChild(scratch);
+      scratch.select();
+      document.execCommand('copy');
+      document.body.removeChild(scratch);
+    }
+    showNotification(`${label} copied`);
+  } catch (error) {
+    console.error('Error copying value:', error);
+    showNotification('Could not copy value');
+  }
+}
+
+// Open Digi Remote Manager filtered to a device id.
+// DRM expects: ...?filter=id contains '<id>' (single quotes encoded as %27).
+function openDrmDeviceSearch(rawId) {
+  const id = String(rawId ?? '').trim();
+  if (!id) {
+    showNotification('Enter a device ID to search');
+    return;
+  }
+  const filter = encodeURIComponent(`id contains '${id}'`).replace(/'/g, '%27');
+  window.open(`https://remotemanager.digi.com/ui/devices?filter=${filter}`, '_blank', 'noopener,noreferrer');
+}
+
+// Build a <dd> that shows a detail value plus a button to copy it.
+function createDeviceDetailValueCell(label, value) {
+  const dd = document.createElement('dd');
+  dd.className = 'device-detail-value';
+
+  const text = document.createElement('span');
+  text.className = 'device-detail-value-text';
+  text.textContent = value;
+  dd.appendChild(text);
+
+  const copyBtn = document.createElement('button');
+  copyBtn.type = 'button';
+  copyBtn.className = 'device-detail-copy';
+  copyBtn.title = `Copy ${label}`;
+  copyBtn.setAttribute('aria-label', `Copy ${label}`);
+  copyBtn.innerHTML = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1"/></svg>';
+  copyBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    copyDeviceValue(value, label);
+  });
+  dd.appendChild(copyBtn);
+
+  return dd;
+}
+
 function createDeviceDetailPanel(device) {
   const details = device.details || {};
   const panel = document.createElement('div');
@@ -2189,10 +2344,8 @@ function createDeviceDetailPanel(device) {
     group.rows.forEach(([label, value]) => {
       const dt = document.createElement('dt');
       dt.textContent = label;
-      const dd = document.createElement('dd');
-      dd.textContent = value;
       grid.appendChild(dt);
-      grid.appendChild(dd);
+      grid.appendChild(createDeviceDetailValueCell(label, value));
     });
     section.appendChild(grid);
     panel.appendChild(section);
@@ -2314,6 +2467,32 @@ function openDeviceDetailModal(device) {
       idEl.className = 'device-detail-modal-id';
       idEl.textContent = device.id;
       statusLine.appendChild(idEl);
+
+      const idCopyBtn = document.createElement('button');
+      idCopyBtn.type = 'button';
+      idCopyBtn.className = 'device-detail-copy device-detail-modal-id-copy';
+      idCopyBtn.title = 'Copy device ID';
+      idCopyBtn.setAttribute('aria-label', 'Copy device ID');
+      idCopyBtn.innerHTML = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1"/></svg>';
+      idCopyBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        copyDeviceValue(device.id, 'Device ID');
+      });
+      statusLine.appendChild(idCopyBtn);
+
+      const idSearchBtn = document.createElement('button');
+      idSearchBtn.type = 'button';
+      idSearchBtn.className = 'device-detail-copy device-detail-modal-id-search';
+      idSearchBtn.title = 'Search this device in Digi Remote Manager';
+      idSearchBtn.setAttribute('aria-label', 'Search this device in Digi Remote Manager');
+      idSearchBtn.innerHTML = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>';
+      idSearchBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openDrmDeviceSearch(device.id);
+      });
+      statusLine.appendChild(idSearchBtn);
     }
     bodyEl.appendChild(statusLine);
 
@@ -2346,10 +2525,8 @@ function openDeviceDetailModal(device) {
         group.rows.forEach(([label, value]) => {
           const dt = document.createElement('dt');
           dt.textContent = label;
-          const dd = document.createElement('dd');
-          dd.textContent = value;
           grid.appendChild(dt);
-          grid.appendChild(dd);
+          grid.appendChild(createDeviceDetailValueCell(label, value));
         });
         section.appendChild(grid);
         groupsWrap.appendChild(section);
@@ -2632,6 +2809,40 @@ function renderDevicesView(workspace) {
     'Grid view'
   ));
   actions.appendChild(viewToggle);
+
+  // Manual DRM portal search: paste an ID and look it up in Digi Remote Manager.
+  const drmSearchForm = document.createElement('form');
+  drmSearchForm.className = 'devices-drm-search';
+
+  const drmSearchInput = document.createElement('input');
+  drmSearchInput.type = 'search';
+  drmSearchInput.className = 'devices-drm-search-input';
+  drmSearchInput.placeholder = 'Search ID in DRM…';
+  drmSearchInput.title = 'Paste a device ID to search in Digi Remote Manager';
+  drmSearchForm.appendChild(drmSearchInput);
+
+  const drmSearchButton = document.createElement('button');
+  drmSearchButton.type = 'submit';
+  drmSearchButton.className = 'config-transfer-button settings-action-button devices-drm-search-button';
+  drmSearchButton.textContent = 'Search DRM';
+  drmSearchButton.title = 'Search this ID in Digi Remote Manager';
+  drmSearchForm.appendChild(drmSearchButton);
+
+  drmSearchForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    openDrmDeviceSearch(drmSearchInput.value);
+  });
+  actions.appendChild(drmSearchForm);
+
+  const openWebButton = document.createElement('button');
+  openWebButton.type = 'button';
+  openWebButton.className = 'config-transfer-button settings-action-button devices-open-web-button';
+  openWebButton.textContent = 'Open DRM';
+  openWebButton.title = 'Open Digi Remote Manager in your browser';
+  openWebButton.addEventListener('click', () => {
+    window.open('https://remotemanager.digi.com/', '_blank', 'noopener,noreferrer');
+  });
+  actions.appendChild(openWebButton);
 
   const refreshButton = document.createElement('button');
   refreshButton.type = 'button';

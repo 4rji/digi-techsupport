@@ -11,7 +11,10 @@ const tar = require('tar-stream');
 const { generateSupportTemplate, analyzeSupportFiles } = require('./template-generator');
 const digiRemoteService = require('./digi-remote-service');
 
-const APP_ICON_PATH = path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+const APP_ICON_NAME = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
+const APP_ICON_PATH = app.isPackaged
+  ? path.join(process.resourcesPath, APP_ICON_NAME)
+  : path.join(__dirname, 'build', APP_ICON_NAME);
 const sshSessions = new Map();
 const supportArchiveSessions = new Map();
 const SSH_ADMIN_PASSWORD_FILE = 'ssh-admin-password.json';
