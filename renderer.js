@@ -6186,7 +6186,7 @@ function createProductCard(item, line) {
   const httpsButton = document.createElement('button');
   httpsButton.type = 'button';
   httpsButton.className = 'product-link-button product-https-button';
-  httpsButton.textContent = 'Web';
+  httpsButton.textContent = 'Web Console';
   httpsButton.title = item.ip ? `Open https://${item.ip}` : 'Configure an IP before opening HTTPS';
   httpsButton.addEventListener('click', (event) => {
     event.stopPropagation();

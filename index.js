@@ -150,15 +150,122 @@ function autofillRouterWebLogin(webContents) {
   });
 }
 
+function injectFindBar(webContents) {
+  if (!webContents || webContents.isDestroyed()) return;
+  const script = `
+(function() {
+  if (document.getElementById('__digi_findbar__')) return;
+  const bar = document.createElement('div');
+  bar.id = '__digi_findbar__';
+  bar.style.cssText = 'position:fixed;top:0;right:0;z-index:2147483647;display:none;background:#2b2b2b;border-bottom-left-radius:6px;padding:6px 10px;box-shadow:0 2px 8px rgba(0,0,0,0.5);align-items:center;gap:6px;font-family:sans-serif;font-size:13px;';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Buscar en página…';
+  input.style.cssText = 'background:#3c3c3c;color:#fff;border:1px solid #555;border-radius:3px;padding:3px 7px;font-size:13px;outline:none;width:200px;';
+  const info = document.createElement('span');
+  info.style.cssText = 'color:#aaa;font-size:12px;min-width:40px;';
+  const btnPrev = document.createElement('button');
+  btnPrev.textContent = '↑';
+  btnPrev.title = 'Anterior';
+  btnPrev.style.cssText = 'background:#555;color:#fff;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;font-size:13px;';
+  const btnNext = document.createElement('button');
+  btnNext.textContent = '↓';
+  btnNext.title = 'Siguiente';
+  btnNext.style.cssText = 'background:#555;color:#fff;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;font-size:13px;';
+  const btnClose = document.createElement('button');
+  btnClose.textContent = '✕';
+  btnClose.style.cssText = 'background:none;color:#aaa;border:none;cursor:pointer;font-size:14px;padding:2px 4px;';
+  bar.appendChild(input);
+  bar.appendChild(btnPrev);
+  bar.appendChild(btnNext);
+  bar.appendChild(info);
+  bar.appendChild(btnClose);
+  document.body.appendChild(bar);
+
+  // Bridge to the main process (no preload/IPC in this window): main listens
+  // to console messages prefixed with __DIGI_FIND__ and drives native findInPage,
+  // which highlights matches WITHOUT stealing focus from this input.
+  function send(payload) { console.info('__DIGI_FIND__' + JSON.stringify(payload)); }
+
+  let lastText = '';
+  function doFind(backward) {
+    const text = input.value;
+    if (!text) { lastText = ''; info.textContent = ''; send({ action: 'stop' }); return; }
+    // findNext=false starts a fresh search; true navigates between matches.
+    const findNext = text === lastText;
+    lastText = text;
+    send({ action: 'find', text: text, forward: !backward, findNext: findNext });
+  }
+
+  function show() { bar.style.display = 'flex'; input.focus(); input.select(); if (input.value) doFind(false); }
+  function hide() { bar.style.display = 'none'; lastText = ''; send({ action: 'stop' }); }
+
+  // Main pushes match counts back by calling __digiFindResult__.
+  window.__digiFindResult__ = function(active, total) {
+    info.textContent = total > 0 ? (active + '/' + total) : 'Sin resultados';
+  };
+
+  input.addEventListener('input', () => doFind(false));
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { doFind(e.shiftKey); e.preventDefault(); }
+    else if (e.key === 'Escape') { hide(); e.preventDefault(); }
+  });
+  btnNext.addEventListener('click', () => { doFind(false); input.focus(); });
+  btnPrev.addEventListener('click', () => { doFind(true); input.focus(); });
+  btnClose.addEventListener('click', hide);
+
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); show(); }
+    else if (e.key === 'Escape' && bar.style.display !== 'none') { hide(); }
+  });
+})();
+  `;
+  webContents.executeJavaScript(script, true).catch(() => {});
+}
+
 function configureRouterWebWindow(webContents) {
   if (!webContents) return;
 
   webContents.on('did-finish-load', () => {
     autofillRouterWebLogin(webContents);
+    injectFindBar(webContents);
   });
 
   webContents.on('did-navigate', () => {
     autofillRouterWebLogin(webContents);
+    injectFindBar(webContents);
+  });
+
+  // Receive search requests from the injected find bar (console-message bridge).
+  webContents.on('console-message', (event) => {
+    const message = (event && typeof event.message === 'string') ? event.message : '';
+    if (!message.startsWith('__DIGI_FIND__')) return;
+    let payload;
+    try {
+      payload = JSON.parse(message.slice('__DIGI_FIND__'.length));
+    } catch (_e) {
+      return;
+    }
+    if (webContents.isDestroyed()) return;
+    if (payload.action === 'stop') {
+      webContents.stopFindInPage('clearSelection');
+    } else if (payload.action === 'find' && payload.text) {
+      webContents.findInPage(payload.text, {
+        forward: payload.forward !== false,
+        findNext: !!payload.findNext
+      });
+    }
+  });
+
+  // Native search results -> push match counts back into the find bar.
+  webContents.on('found-in-page', (_event, result) => {
+    if (webContents.isDestroyed() || !result || result.finalUpdate === false) return;
+    const active = Number(result.activeMatchOrdinal) || 0;
+    const total = Number(result.matches) || 0;
+    webContents.executeJavaScript(
+      `window.__digiFindResult__ && window.__digiFindResult__(${active}, ${total});`,
+      true
+    ).catch(() => {});
   });
 }
 
