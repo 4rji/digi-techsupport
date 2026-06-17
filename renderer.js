@@ -6668,6 +6668,32 @@ function toggleSshMaximize() {
   requestAnimationFrame(() => fitSSHTerminal());
 }
 
+async function copySSHSelection() {
+  if (!sshTerminal) return;
+  const text = sshTerminal.getSelection();
+  if (!text) {
+    showNotification('No text selected in terminal');
+    return;
+  }
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    showNotification('Copied to clipboard');
+  } catch (e) {
+    showNotification('Could not copy selection');
+  }
+}
+
 function fitSSHTerminal() {
   if (!sshTerminal || !sshFitAddon) return;
   try {
@@ -7085,6 +7111,7 @@ function setupSSHTerminalModal() {
 
   const fontDecreaseBtn = document.getElementById('ssh-font-decrease');
   const fontIncreaseBtn = document.getElementById('ssh-font-increase');
+  const copySelectionBtn = document.getElementById('ssh-copy-selection');
   const maximizeBtn = document.getElementById('ssh-maximize');
   const scriptsBar = document.getElementById('ssh-scripts-bar');
 
@@ -7102,6 +7129,10 @@ function setupSSHTerminalModal() {
   if (fontIncreaseBtn) {
     fontIncreaseBtn.addEventListener('mousedown', keepTerminalFocus);
     fontIncreaseBtn.addEventListener('click', () => changeSshFontSize(1));
+  }
+  if (copySelectionBtn) {
+    copySelectionBtn.addEventListener('mousedown', keepTerminalFocus);
+    copySelectionBtn.addEventListener('click', () => copySSHSelection());
   }
   if (maximizeBtn) {
     maximizeBtn.addEventListener('mousedown', keepTerminalFocus);
@@ -7141,6 +7172,10 @@ function setupSSHTerminalModal() {
   document.addEventListener('keydown', (event) => {
     if (modal.style.display === 'flex' && event.key === 'Escape') {
       closeSSHTerminalModal();
+    }
+    if (modal.style.display === 'flex' && event.key === 'C' && event.ctrlKey && event.shiftKey) {
+      event.preventDefault();
+      copySSHSelection();
     }
   });
 
