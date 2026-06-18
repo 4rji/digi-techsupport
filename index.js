@@ -10,6 +10,7 @@ const { Client } = require('ssh2');
 const tar = require('tar-stream');
 const { generateSupportTemplate, analyzeSupportFiles } = require('./template-generator');
 const digiRemoteService = require('./digi-remote-service');
+const { searchSupportArchiveSession } = require('./support-search');
 
 const APP_ICON_NAME = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
 const APP_ICON_PATH = app.isPackaged
@@ -1914,6 +1915,18 @@ function setupIPCHandlers() {
       text: content.text,
       truncated: content.truncated
     };
+  });
+
+  ipcMain.handle('search-support-archive', async (event, sessionId, options = {}) => {
+    const session = supportArchiveSessions.get(sessionId);
+    if (!session || session.ownerId !== event.sender.id) {
+      return { success: false, error: 'Support file session is no longer available.' };
+    }
+    try {
+      return searchSupportArchiveSession(session, options);
+    } catch (error) {
+      return { success: false, error: error.message || 'Search failed' };
+    }
   });
 
   ipcMain.handle('list-saved-support-files', async () => {

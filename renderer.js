@@ -1466,6 +1466,22 @@ let supportGrepEnabled = false;
 let supportGrepIgnoreCase = false;
 let supportGrepCutMatches = false;
 let expandedSupportFolders = new Set();
+let supportAdvancedSearch = {
+  active: false,
+  query: '',
+  grepEnabled: false,
+  ignoreCase: false,
+  cut: false,
+  fileFilters: new Set(),
+  scope: 'all',
+  loading: false,
+  error: '',
+  results: null,
+  viewingResult: false
+};
+let supportAdvancedSearchToken = 0;
+let supportAdvancedSearchDebounce = null;
+let supportAdvancedResultClickTimer = null;
 
 const portStatuses = new Map();
 const hostStatuses = new Map();
@@ -3907,6 +3923,11 @@ function applySupportViewerSelectionToSearch(container, fallbackTarget) {
   const selectedText = getSupportViewerSelectionText(container, fallbackTarget);
   if (!selectedText) return;
 
+  if (supportAdvancedSearch.active) {
+    addTermToAdvancedSearch(selectedText);
+    return;
+  }
+
   supportContentSearchQuery = selectedText;
   renderProductApp();
   requestAnimationFrame(() => {
@@ -3915,6 +3936,394 @@ function applySupportViewerSelectionToSearch(container, fallbackTarget) {
     nextInput.focus();
     nextInput.setSelectionRange(nextInput.value.length, nextInput.value.length);
   });
+}
+
+// --- Advanced cross-file search (renderer) ----------------------------------
+
+function parseAdvancedSearchTerms(query) {
+  const tokens = String(query || '').trim().split(/\s+/).filter(Boolean);
+  const include = [];
+  const exclude = [];
+  tokens.forEach(token => {
+    if ((token.startsWith('-') || token.startsWith('!')) && token.length > 1) {
+      exclude.push(token.slice(1));
+    } else if (token.startsWith('+') && token.length > 1) {
+      include.push(token.slice(1));
+    } else {
+      include.push(token);
+    }
+  });
+  return { include, exclude };
+}
+
+function refocusAdvancedSearchInput() {
+  if (!supportAdvancedSearch.active || supportAdvancedSearch.viewingResult) return;
+  requestAnimationFrame(() => {
+    const input = document.getElementById('file-support-advanced-search');
+    if (!input || input.disabled) return;
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  });
+}
+
+function scheduleAdvancedSearch() {
+  if (supportAdvancedSearchDebounce) clearTimeout(supportAdvancedSearchDebounce);
+  supportAdvancedSearchDebounce = setTimeout(() => {
+    supportAdvancedSearchDebounce = null;
+    runAdvancedSearch();
+  }, 250);
+}
+
+function runAdvancedSearch() {
+  const api = getNetworkAPI();
+  const sessionId = supportFileState.sessionId;
+  if (!api || typeof api.searchSupportArchive !== 'function' || !sessionId) {
+    supportAdvancedSearch = { ...supportAdvancedSearch, results: null, loading: false };
+    return;
+  }
+
+  const query = supportAdvancedSearch.query;
+  if (!normalizeSearchQuery(query)) {
+    supportAdvancedSearch = { ...supportAdvancedSearch, results: null, error: '', loading: false };
+    renderProductApp();
+    refocusAdvancedSearchInput();
+    return;
+  }
+
+  const { include, exclude } = parseAdvancedSearchTerms(query);
+  const token = ++supportAdvancedSearchToken;
+  supportAdvancedSearch = { ...supportAdvancedSearch, loading: true, error: '' };
+
+  const options = {
+    query,
+    include,
+    exclude,
+    grep: supportAdvancedSearch.grepEnabled,
+    ignoreCase: supportAdvancedSearch.ignoreCase,
+    cut: supportAdvancedSearch.cut,
+    fileFilters: Array.from(supportAdvancedSearch.fileFilters),
+    scope: supportAdvancedSearch.scope,
+    currentFileId: supportFileState.selectedFileId
+  };
+
+  api.searchSupportArchive(sessionId, options).then(result => {
+    if (token !== supportAdvancedSearchToken) return;
+    if (!result || !result.success) {
+      supportAdvancedSearch = { ...supportAdvancedSearch, loading: false, results: null, error: result?.error || 'Search failed' };
+    } else {
+      supportAdvancedSearch = { ...supportAdvancedSearch, loading: false, results: result, error: result.grepError || '' };
+    }
+    renderProductApp();
+    refocusAdvancedSearchInput();
+  }).catch(error => {
+    if (token !== supportAdvancedSearchToken) return;
+    supportAdvancedSearch = { ...supportAdvancedSearch, loading: false, results: null, error: error.message || 'Search failed' };
+    renderProductApp();
+    refocusAdvancedSearchInput();
+  });
+}
+
+function setAdvancedSearchActive(active) {
+  supportAdvancedSearch = { ...supportAdvancedSearch, active, viewingResult: false };
+  renderProductApp();
+  if (active) {
+    refocusAdvancedSearchInput();
+    if (normalizeSearchQuery(supportAdvancedSearch.query) && !supportAdvancedSearch.results) {
+      runAdvancedSearch();
+    }
+  }
+}
+
+function addTermToAdvancedSearch(word) {
+  const term = String(word || '').replace(/\s+/g, ' ').trim();
+  if (!term) return;
+  const existing = supportAdvancedSearch.query.trim();
+  const tokens = existing ? existing.split(/\s+/) : [];
+  if (tokens.includes(term)) return;
+  supportAdvancedSearch = {
+    ...supportAdvancedSearch,
+    query: existing ? `${existing} ${term}` : term
+  };
+  renderProductApp();
+  scheduleAdvancedSearch();
+  refocusAdvancedSearchInput();
+}
+
+async function openAdvancedSearchResult(file, lineNumber) {
+  if (!file) return;
+  const { include } = parseAdvancedSearchTerms(supportAdvancedSearch.query);
+  const pattern = supportAdvancedSearch.grepEnabled
+    ? supportAdvancedSearch.query
+    : include.map(escapeRegExp).filter(Boolean).join('|');
+
+  supportAdvancedSearch = { ...supportAdvancedSearch, viewingResult: true };
+  supportGrepEnabled = true;
+  supportGrepCutMatches = false;
+  supportGrepIgnoreCase = supportAdvancedSearch.ignoreCase;
+  supportContentSearchQuery = pattern;
+
+  const node = findSupportNodeById(supportFileState.tree, file.id) || { id: file.id, path: file.path, type: 'file' };
+  await handleSupportFileSelection(node);
+  requestAnimationFrame(() => scrollSupportViewerToMatch(lineNumber));
+}
+
+function scrollSupportViewerToMatch(lineNumber) {
+  const body = document.querySelector('.file-support-viewer-body');
+  if (!body) return;
+  if (lineNumber) {
+    const numbers = body.querySelectorAll('.support-grep-line-number');
+    for (const el of numbers) {
+      if (parseInt(el.textContent, 10) === lineNumber) {
+        el.scrollIntoView({ block: 'center' });
+        return;
+      }
+    }
+  }
+  const mark = body.querySelector('.support-content-match');
+  if (mark) mark.scrollIntoView({ block: 'center' });
+}
+
+function highlightAdvancedSearchLine(text) {
+  const raw = String(text || '');
+  if (supportAdvancedSearch.grepEnabled) {
+    const { pattern } = parseSupportGrepQuery(supportAdvancedSearch.query);
+    const { regex } = createSupportGrepRegex(pattern, supportAdvancedSearch.ignoreCase);
+    return regex ? highlightSupportGrepLine(raw, regex) : escapeHTML(raw);
+  }
+  const { include } = parseAdvancedSearchTerms(supportAdvancedSearch.query);
+  const escaped = include.map(escapeRegExp).filter(Boolean);
+  if (escaped.length === 0) return escapeHTML(raw);
+  let regex;
+  try {
+    regex = new RegExp(`(${escaped.join('|')})`, supportAdvancedSearch.ignoreCase ? 'gi' : 'g');
+  } catch (_error) {
+    return escapeHTML(raw);
+  }
+  return highlightSupportGrepLine(raw, regex);
+}
+
+function makeAdvancedToggleButton(label, pressed, title, onToggle) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'file-support-grep-button';
+  button.textContent = label;
+  button.title = title;
+  button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+  button.addEventListener('click', () => {
+    onToggle();
+    renderProductApp();
+    runAdvancedSearch();
+    refocusAdvancedSearchInput();
+  });
+  return button;
+}
+
+function makeAdvancedFilterChip(label, active, title, onToggle, disabled = false) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'file-support-advanced-chip';
+  button.textContent = label;
+  if (title) button.title = title;
+  button.disabled = disabled;
+  button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  button.addEventListener('click', () => {
+    onToggle();
+    renderProductApp();
+    runAdvancedSearch();
+    refocusAdvancedSearchInput();
+  });
+  return button;
+}
+
+function buildAdvancedSearchBar() {
+  const wrap = document.createElement('div');
+  wrap.className = 'file-support-search file-support-advanced-search';
+
+  const row = document.createElement('div');
+  row.className = 'file-support-advanced-row';
+
+  const input = document.createElement('input');
+  input.type = 'search';
+  input.id = 'file-support-advanced-search';
+  input.className = 'file-support-search-input';
+  input.placeholder = supportAdvancedSearch.grepEnabled
+    ? 'grep across files, e.g. -i error|fail'
+    : 'Search across files: words = AND, -word = exclude';
+  input.value = supportAdvancedSearch.query;
+  input.setAttribute('aria-label', 'Advanced search across files');
+  input.addEventListener('input', () => {
+    supportAdvancedSearch = { ...supportAdvancedSearch, query: input.value };
+    renderProductApp();
+    refocusAdvancedSearchInput();
+    scheduleAdvancedSearch();
+  });
+  row.appendChild(input);
+
+  const grepControls = document.createElement('div');
+  grepControls.className = 'file-support-grep-controls';
+  grepControls.appendChild(makeAdvancedToggleButton('grep', supportAdvancedSearch.grepEnabled, 'Treat the query as a regular expression', () => {
+    supportAdvancedSearch.grepEnabled = !supportAdvancedSearch.grepEnabled;
+  }));
+  grepControls.appendChild(makeAdvancedToggleButton('-i', supportAdvancedSearch.ignoreCase, 'Ignore uppercase and lowercase differences', () => {
+    supportAdvancedSearch.ignoreCase = !supportAdvancedSearch.ignoreCase;
+  }));
+  grepControls.appendChild(makeAdvancedToggleButton('Cut', supportAdvancedSearch.cut, 'Show lines that do NOT match', () => {
+    supportAdvancedSearch.cut = !supportAdvancedSearch.cut;
+  }));
+  row.appendChild(grepControls);
+  wrap.appendChild(row);
+
+  const filters = document.createElement('div');
+  filters.className = 'file-support-advanced-filters';
+  filters.appendChild(makeAdvancedFilterChip('All files', supportAdvancedSearch.scope === 'all', 'Search every file in the archive', () => {
+    supportAdvancedSearch.scope = 'all';
+  }));
+  filters.appendChild(makeAdvancedFilterChip('Current file', supportAdvancedSearch.scope === 'current', 'Search only the currently open file', () => {
+    supportAdvancedSearch.scope = 'current';
+  }, !supportFileState.selectedFileId));
+
+  const separator = document.createElement('span');
+  separator.className = 'file-support-advanced-sep';
+  filters.appendChild(separator);
+
+  [['json', 'JSON'], ['logs', 'Logs'], ['config', 'Config']].forEach(([key, label]) => {
+    const active = supportAdvancedSearch.fileFilters.has(key);
+    filters.appendChild(makeAdvancedFilterChip(label, active, `Only ${label} files`, () => {
+      if (supportAdvancedSearch.fileFilters.has(key)) supportAdvancedSearch.fileFilters.delete(key);
+      else supportAdvancedSearch.fileFilters.add(key);
+    }));
+  });
+  wrap.appendChild(filters);
+
+  const status = document.createElement('div');
+  status.className = 'file-support-advanced-status';
+  if (supportAdvancedSearch.loading) {
+    status.textContent = 'Searching...';
+  } else if (supportAdvancedSearch.error) {
+    status.textContent = supportAdvancedSearch.error;
+    status.classList.add('is-error');
+  } else if (supportAdvancedSearch.results && normalizeSearchQuery(supportAdvancedSearch.query)) {
+    const result = supportAdvancedSearch.results;
+    const matchLabel = result.totalMatches === 1 ? '1 match' : `${result.totalMatches} matches`;
+    const fileLabel = result.totalFiles === 1 ? '1 file' : `${result.totalFiles} files`;
+    status.textContent = `${matchLabel} in ${fileLabel}${result.truncated ? ' (truncated)' : ''}`;
+  } else {
+    status.textContent = 'Type to search across the archive. Double-click a result word to add it.';
+  }
+  wrap.appendChild(status);
+
+  return wrap;
+}
+
+function renderAdvancedSearchResults(parent) {
+  if (supportFileState.tree.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'file-support-empty-state';
+    empty.textContent = 'Import a file';
+    parent.appendChild(empty);
+    return;
+  }
+  if (!normalizeSearchQuery(supportAdvancedSearch.query)) {
+    const empty = document.createElement('div');
+    empty.className = 'file-support-empty-state';
+    empty.textContent = 'Type a query to search across all files in this archive.';
+    parent.appendChild(empty);
+    return;
+  }
+  if (supportAdvancedSearch.loading && !supportAdvancedSearch.results) {
+    const loading = document.createElement('div');
+    loading.className = 'file-support-empty-state';
+    loading.textContent = 'Searching...';
+    parent.appendChild(loading);
+    return;
+  }
+
+  const results = supportAdvancedSearch.results;
+  if (!results || results.files.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'file-support-empty-state';
+    empty.textContent = supportAdvancedSearch.error || 'No matches found.';
+    parent.appendChild(empty);
+    return;
+  }
+
+  const container = document.createElement('div');
+  container.className = 'file-support-advanced-results';
+
+  results.files.forEach(file => {
+    const group = document.createElement('div');
+    group.className = 'file-support-result-group';
+
+    const head = document.createElement('button');
+    head.type = 'button';
+    head.className = 'file-support-result-head';
+    head.title = `Open ${file.path}`;
+    const pathSpan = document.createElement('span');
+    pathSpan.className = 'file-support-result-path';
+    pathSpan.textContent = file.path;
+    head.appendChild(pathSpan);
+    (file.tags || []).forEach(tag => {
+      const badge = document.createElement('span');
+      badge.className = `file-support-result-badge badge-${tag}`;
+      badge.textContent = tag;
+      head.appendChild(badge);
+    });
+    const count = document.createElement('span');
+    count.className = 'file-support-result-count';
+    count.textContent = file.matchCount === 1 ? '1 match' : `${file.matchCount} matches`;
+    head.appendChild(count);
+    head.addEventListener('click', () => openAdvancedSearchResult(file, file.lines[0]?.n || 1));
+    group.appendChild(head);
+
+    const lines = document.createElement('div');
+    lines.className = 'file-support-result-lines';
+    file.lines.forEach(line => {
+      const lineEl = document.createElement('div');
+      lineEl.className = 'file-support-result-line';
+      const number = document.createElement('span');
+      number.className = 'file-support-result-line-number';
+      number.textContent = line.n;
+      const lineText = document.createElement('span');
+      lineText.className = 'file-support-result-line-text';
+      lineText.innerHTML = highlightAdvancedSearchLine(line.text);
+      lineEl.appendChild(number);
+      lineEl.appendChild(lineText);
+      lineEl.addEventListener('click', () => {
+        if (supportAdvancedResultClickTimer) clearTimeout(supportAdvancedResultClickTimer);
+        supportAdvancedResultClickTimer = setTimeout(() => {
+          supportAdvancedResultClickTimer = null;
+          openAdvancedSearchResult(file, line.n);
+        }, 220);
+      });
+      lineEl.addEventListener('dblclick', (event) => {
+        if (supportAdvancedResultClickTimer) {
+          clearTimeout(supportAdvancedResultClickTimer);
+          supportAdvancedResultClickTimer = null;
+        }
+        const selected = getSupportViewerSelectionText(lineEl, event.target);
+        if (selected) addTermToAdvancedSearch(selected);
+      });
+      lines.appendChild(lineEl);
+    });
+    group.appendChild(lines);
+
+    if (file.truncated) {
+      const more = document.createElement('div');
+      more.className = 'file-support-result-more';
+      more.textContent = 'More matches in this file not shown';
+      group.appendChild(more);
+    }
+    container.appendChild(group);
+  });
+
+  if (results.truncated) {
+    const note = document.createElement('div');
+    note.className = 'file-support-warning';
+    note.textContent = 'Results truncated. Refine your query or add filters to narrow down.';
+    container.appendChild(note);
+  }
+
+  parent.appendChild(container);
 }
 
 function findSupportNodeById(nodes, entryId) {
@@ -4954,6 +5363,7 @@ function renderFileSupportView(workspace) {
   const treeSearchResult = filterSupportTreeNodes(supportFileState.tree, supportTreeSearchQuery);
   const treeSearchActive = normalizeSearchQuery(supportTreeSearchQuery).length > 0;
   const isViewerFullscreen = supportFileViewerFullscreen && Boolean(supportFileState.selectedFileId);
+  const advancedActive = supportAdvancedSearch.active && supportFileState.tree.length > 0;
   const selectedContentPresentation = supportFileState.selectedFileId
     && !supportFileState.selectedLoading
     && !supportFileState.selectedError
@@ -5232,6 +5642,17 @@ function renderFileSupportView(workspace) {
     renderProductApp();
   });
   viewerTitleRow.appendChild(aiScanButton);
+
+  const advancedSearchButton = document.createElement('button');
+  advancedSearchButton.type = 'button';
+  advancedSearchButton.className = 'file-support-fullscreen-button file-support-advanced-toggle';
+  advancedSearchButton.textContent = 'Advanced Search';
+  advancedSearchButton.disabled = supportFileState.tree.length === 0;
+  advancedSearchButton.setAttribute('aria-pressed', advancedActive ? 'true' : 'false');
+  advancedSearchButton.setAttribute('aria-label', advancedActive ? 'Exit advanced search' : 'Search across all files in the archive');
+  advancedSearchButton.addEventListener('click', () => setAdvancedSearchActive(!supportAdvancedSearch.active));
+  viewerTitleRow.appendChild(advancedSearchButton);
+
   viewerHeader.appendChild(viewerTitleRow);
   const contentSearch = document.createElement('div');
   contentSearch.className = 'file-support-search';
@@ -5319,56 +5740,79 @@ function renderFileSupportView(workspace) {
     }
     contentSearch.appendChild(contentSearchStatus);
   }
-  viewerHeader.appendChild(contentSearch);
-  if (supportSmartScanState.visible) {
-    viewerHeader.appendChild(createSupportSmartScanControls());
+  if (advancedActive) {
+    viewerHeader.appendChild(buildAdvancedSearchBar());
+  } else {
+    viewerHeader.appendChild(contentSearch);
+    if (supportSmartScanState.visible) {
+      viewerHeader.appendChild(createSupportSmartScanControls());
+    }
   }
   viewerPanel.appendChild(viewerHeader);
 
   const viewerBody = document.createElement('div');
   viewerBody.className = 'file-support-viewer-body';
-  const dashboard = renderSupportSummaryDashboard();
-  if (dashboard) {
-    viewerBody.appendChild(dashboard);
-  }
-  if (supportSmartScanState.visible) {
-    renderSupportSmartScanResult(viewerBody);
-  }
 
-  if (supportFileState.selectedLoading) {
-    const loading = document.createElement('div');
-    loading.className = 'file-support-empty-state';
-    loading.textContent = 'Loading file';
-    viewerBody.appendChild(loading);
-  } else if (supportFileState.selectedError) {
-    const error = document.createElement('div');
-    error.className = 'file-support-alert';
-    error.textContent = supportFileState.selectedError;
-    viewerBody.appendChild(error);
-  } else if (supportFileState.selectedFileId) {
-    if (supportFileState.selectedTruncated) {
-      const truncated = document.createElement('div');
-      truncated.className = 'file-support-warning';
-      truncated.textContent = 'Preview truncated';
-      viewerBody.appendChild(truncated);
-    }
-    const pre = document.createElement('pre');
-    const presentation = selectedContentPresentation || getSupportContentPresentation(
-      supportFileState.selectedPath,
-      supportFileState.selectedContent,
-      supportContentViewMode
-    );
-    pre.className = `file-support-content mode-${presentation.mode}`;
-    pre.innerHTML = presentation.html;
-    pre.addEventListener('dblclick', (event) => {
-      requestAnimationFrame(() => applySupportViewerSelectionToSearch(pre, event.target));
-    });
-    viewerBody.appendChild(pre);
+  if (advancedActive && !supportAdvancedSearch.viewingResult) {
+    renderAdvancedSearchResults(viewerBody);
   } else {
-    const emptyViewer = document.createElement('div');
-    emptyViewer.className = 'file-support-empty-state';
-    emptyViewer.textContent = supportFileState.tree.length === 0 ? 'Import a file' : 'Select a file';
-    viewerBody.appendChild(emptyViewer);
+    if (advancedActive && supportAdvancedSearch.viewingResult) {
+      const backButton = document.createElement('button');
+      backButton.type = 'button';
+      backButton.className = 'file-support-advanced-back';
+      const backCount = supportAdvancedSearch.results?.totalMatches || 0;
+      backButton.textContent = `← Back to results (${backCount})`;
+      backButton.addEventListener('click', () => {
+        supportAdvancedSearch = { ...supportAdvancedSearch, viewingResult: false };
+        renderProductApp();
+        refocusAdvancedSearchInput();
+      });
+      viewerBody.appendChild(backButton);
+    } else {
+      const dashboard = renderSupportSummaryDashboard();
+      if (dashboard) {
+        viewerBody.appendChild(dashboard);
+      }
+      if (supportSmartScanState.visible) {
+        renderSupportSmartScanResult(viewerBody);
+      }
+    }
+
+    if (supportFileState.selectedLoading) {
+      const loading = document.createElement('div');
+      loading.className = 'file-support-empty-state';
+      loading.textContent = 'Loading file';
+      viewerBody.appendChild(loading);
+    } else if (supportFileState.selectedError) {
+      const error = document.createElement('div');
+      error.className = 'file-support-alert';
+      error.textContent = supportFileState.selectedError;
+      viewerBody.appendChild(error);
+    } else if (supportFileState.selectedFileId) {
+      if (supportFileState.selectedTruncated) {
+        const truncated = document.createElement('div');
+        truncated.className = 'file-support-warning';
+        truncated.textContent = 'Preview truncated';
+        viewerBody.appendChild(truncated);
+      }
+      const pre = document.createElement('pre');
+      const presentation = selectedContentPresentation || getSupportContentPresentation(
+        supportFileState.selectedPath,
+        supportFileState.selectedContent,
+        supportContentViewMode
+      );
+      pre.className = `file-support-content mode-${presentation.mode}`;
+      pre.innerHTML = presentation.html;
+      pre.addEventListener('dblclick', (event) => {
+        requestAnimationFrame(() => applySupportViewerSelectionToSearch(pre, event.target));
+      });
+      viewerBody.appendChild(pre);
+    } else if (!advancedActive) {
+      const emptyViewer = document.createElement('div');
+      emptyViewer.className = 'file-support-empty-state';
+      emptyViewer.textContent = supportFileState.tree.length === 0 ? 'Import a file' : 'Select a file';
+      viewerBody.appendChild(emptyViewer);
+    }
   }
 
   viewerPanel.appendChild(viewerBody);
