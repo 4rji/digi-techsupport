@@ -681,6 +681,46 @@ select:focus-visible,
   cursor: text;
 }
 
+.case-note-generated-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.case-note-copy-generated-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 13px;
+  border: 1px solid rgba(var(--ui-accent-rgb), 0.46);
+  border-radius: 8px;
+  background:
+    var(--glass-sheen),
+    rgba(var(--ui-accent-rgb), 0.16);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--glass-bead), var(--ui-shadow-sm);
+}
+
+.case-note-copy-generated-button:hover {
+  border-color: rgba(var(--ui-accent-rgb), 0.7);
+  background:
+    var(--glass-sheen),
+    rgba(var(--ui-accent-rgb), 0.24);
+}
+
+.case-note-copy-generated-button:active {
+  transform: translateY(1px);
+}
+
+.case-note-copy-generated-button svg {
+  flex: 0 0 auto;
+}
+
 /* --- Pills & count badges → simulated glass chips (no backdrop-filter) -- */
 .product-count,
 .product-top-controls,

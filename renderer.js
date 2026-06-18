@@ -1350,6 +1350,7 @@ const LEGACY_SUPPORT_TEMPLATE_IDS = new Set([
 ]);
 const DEFAULT_CASE_NOTE_TEMPLATE_ID = 'support-template-default-note';
 const CASE_NOTE_TEMPLATE_MODE = 'case-note';
+const DEFAULT_CASE_NOTE_TITLE = 'Untitled note';
 const CASE_NOTE_FIELDS = [
   {
     key: 'caseNumber',
@@ -1954,7 +1955,7 @@ function extractMarkdownRemainderNotes(markdown) {
     .split(/\r?\n/)
     .filter((line) => {
       const trimmed = line.trim();
-      if (!trimmed || /^#{1,6}\s+case note\s*$/i.test(trimmed)) return false;
+      if (!trimmed || /^#{1,6}\s+(case note|support notes)\s*$/i.test(trimmed)) return false;
 
       const cleanedLine = line
         .replace(/^\s*(?:[-*]\s*)?/, '')
@@ -2007,7 +2008,7 @@ function buildCaseNoteMarkdown(fields) {
   ];
 
   return [
-    '# Case Note',
+    '# Support Notes',
     '',
     ...rows.map(([label, value]) => `- **${label}:** ${value || ''}`),
     '',
@@ -2024,7 +2025,7 @@ function normalizeSupportTemplateMode(template) {
 
 function createCaseNoteTemplate(index = 0, options = {}) {
   const fields = normalizeCaseNoteFields(options.fields);
-  const title = String(options.title || 'Case Note').trim() || 'Case Note';
+  const title = String(options.title || DEFAULT_CASE_NOTE_TITLE).trim() || DEFAULT_CASE_NOTE_TITLE;
 
   return {
     id: options.id || (index === 0 ? DEFAULT_CASE_NOTE_TEMPLATE_ID : createTemplateId(title, index)),
@@ -2072,9 +2073,12 @@ function getDefaultSupportTemplates() {
 }
 
 function normalizeSupportTemplate(template, index) {
-  const title = String(template?.title || template?.name || `Template ${index + 1}`).trim() || `Template ${index + 1}`;
+  const rawTitle = String(template?.title || template?.name || `Template ${index + 1}`).trim() || `Template ${index + 1}`;
   const rawBody = String(template?.body ?? template?.content ?? template?.text ?? '');
   const mode = normalizeSupportTemplateMode(template);
+  const title = mode === CASE_NOTE_TEMPLATE_MODE && /^case note$/i.test(rawTitle)
+    ? DEFAULT_CASE_NOTE_TITLE
+    : rawTitle;
   const fields = mode === CASE_NOTE_TEMPLATE_MODE
     ? normalizeCaseNoteFields(template?.fields, rawBody)
     : null;
@@ -6706,7 +6710,8 @@ function createTemplateEditor(template, index, options = {}) {
   titleInput.type = 'text';
   titleInput.className = 'template-title-input';
   titleInput.value = template.title;
-  titleInput.setAttribute('aria-label', 'Note title');
+  titleInput.placeholder = 'File name';
+  titleInput.setAttribute('aria-label', 'File name');
 
   const bodyInput = document.createElement('textarea');
   bodyInput.className = 'template-body-input';
@@ -6738,6 +6743,23 @@ function createTemplateEditor(template, index, options = {}) {
     : null;
   if (isCaseNote && Object.values(caseNoteFields).some(value => String(value || '').trim())) {
     syncScratchpadFromCaseNoteFields(caseNoteFields);
+  }
+
+  const copyGeneratedRow = isCaseNote ? document.createElement('div') : null;
+  if (copyGeneratedRow) {
+    copyGeneratedRow.className = 'case-note-generated-actions';
+
+    const copyGeneratedButton = document.createElement('button');
+    copyGeneratedButton.type = 'button';
+    copyGeneratedButton.className = 'case-note-copy-generated-button';
+    copyGeneratedButton.title = 'Copy generated note';
+    copyGeneratedButton.setAttribute('aria-label', 'Copy generated note');
+    copyGeneratedButton.innerHTML = `${TEMPLATE_ICONS.copy}<span>Copy all</span>`;
+    copyGeneratedButton.addEventListener('click', () => {
+      copyTemplateText(bodyInput.value);
+    });
+
+    copyGeneratedRow.appendChild(copyGeneratedButton);
   }
 
   const copyButton = createTemplateChip('copy', 'Copy note');
@@ -6774,7 +6796,7 @@ function createTemplateEditor(template, index, options = {}) {
       const nextBody = isCaseNote ? buildCaseNoteMarkdown(caseNoteFields) : bodyInput.value;
       const savedTemplate = {
         ...template,
-        title: titleInput.value.trim() || `Note ${supportTemplates.length + 1}`,
+        title: titleInput.value.trim() || (isCaseNote ? DEFAULT_CASE_NOTE_TITLE : `Note ${supportTemplates.length + 1}`),
         body: nextBody
       };
       if (isCaseNote) {
@@ -6795,7 +6817,7 @@ function createTemplateEditor(template, index, options = {}) {
       const nextBody = isCaseNote ? buildCaseNoteMarkdown(caseNoteFields) : bodyInput.value;
       templateDrafts[index] = {
         ...templateDrafts[index],
-        title: titleInput.value.trim() || template.title,
+        title: titleInput.value.trim() || (isCaseNote ? DEFAULT_CASE_NOTE_TITLE : template.title),
         body: nextBody
       };
       if (isCaseNote) {
@@ -6830,7 +6852,7 @@ function createTemplateEditor(template, index, options = {}) {
 
     const autoSave = () => {
       if (!supportTemplates[index]) return;
-      const nextTitle = titleInput.value.trim() || template.title;
+      const nextTitle = titleInput.value.trim() || (isCaseNote ? DEFAULT_CASE_NOTE_TITLE : template.title);
       const nextBody = isCaseNote ? buildCaseNoteMarkdown(caseNoteFields) : bodyInput.value;
       supportTemplates[index] = {
         ...supportTemplates[index],
@@ -6870,6 +6892,9 @@ function createTemplateEditor(template, index, options = {}) {
     editor.appendChild(caseNotePanel);
   }
   editor.appendChild(bodyInput);
+  if (copyGeneratedRow) {
+    editor.appendChild(copyGeneratedRow);
+  }
 
   return editor;
 }
