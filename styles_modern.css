@@ -93,6 +93,10 @@ body {
   background-repeat: no-repeat;
 }
 
+body.is-file-support-fullscreen {
+  overflow: hidden;
+}
+
 /* scroll-behavior: smooth intentionally omitted — native apps don't animate
    scrolls; smooth-scroll is a browser/web convention and makes the app feel
    like webpage navigation instead of an instant panel switch. */

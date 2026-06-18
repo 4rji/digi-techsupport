@@ -3925,6 +3925,10 @@ body.is-file-support-view .file-support-viewer-body {
   overscroll-behavior: contain;
 }
 
+body.is-file-support-fullscreen {
+  overflow: hidden;
+}
+
 body.is-templates-view .templates-library {
   height: auto;
   min-height: max(420px, calc(100vh - 184px));
@@ -3956,6 +3960,7 @@ body.is-templates-view .template-body-input {
   z-index: 1000;
   grid-template-columns: minmax(0, 1fr);
   height: 100vh;
+  height: 100dvh;
   padding: 12px;
   background: var(--app-background, #121417);
 }
@@ -3967,6 +3972,17 @@ body.is-templates-view .template-body-input {
 
 .file-support-layout.is-viewer-fullscreen .file-support-viewer-panel {
   border-radius: 8px;
+  height: 100%;
+  min-height: 0;
+}
+
+.file-support-layout.is-viewer-fullscreen .file-support-viewer-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.file-support-layout.is-viewer-fullscreen .file-support-content {
+  min-height: 100%;
 }
 
 .file-support-panel {

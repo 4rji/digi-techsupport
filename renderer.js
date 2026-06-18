@@ -2097,6 +2097,7 @@ function renderActiveLine() {
 
   workspace.innerHTML = '';
   document.body.classList.remove('is-file-support-view');
+  document.body.classList.remove('is-file-support-fullscreen');
   document.body.classList.remove('is-templates-view');
   document.body.classList.remove('is-devices-view');
 
@@ -2112,6 +2113,7 @@ function renderActiveLine() {
 
   if (activeLineId === FILE_SUPPORT_VIEW_ID) {
     document.body.classList.add('is-file-support-view');
+    document.body.classList.toggle('is-file-support-fullscreen', supportFileViewerFullscreen && Boolean(supportFileState.selectedFileId));
     renderFileSupportView(workspace);
     return;
   }
@@ -5361,6 +5363,11 @@ function setupFileSupportShortcutsModal() {
 
 function renderFileSupportView(workspace) {
   const isViewerFullscreen = supportFileViewerFullscreen && Boolean(supportFileState.selectedFileId);
+  const fullscreenViewportHeight = isViewerFullscreen
+    ? Math.max(document.documentElement?.clientHeight || 0, window.innerHeight || 0)
+    : 0;
+  const fullscreenLayoutHeight = fullscreenViewportHeight > 0 ? `${fullscreenViewportHeight}px` : '100vh';
+  const fullscreenPanelHeight = fullscreenViewportHeight > 24 ? `${fullscreenViewportHeight - 24}px` : 'calc(100vh - 24px)';
   const advancedActive = supportAdvancedSearch.active && supportFileState.tree.length > 0;
   const selectedContentPresentation = supportFileState.selectedFileId
     && !supportFileState.selectedLoading
@@ -5445,6 +5452,21 @@ function renderFileSupportView(workspace) {
   const layout = document.createElement('section');
   layout.className = `file-support-layout${isViewerFullscreen ? ' is-viewer-fullscreen' : ''}`;
   layout.style.setProperty('--file-support-tree-width', `${supportFileTreeWidth}px`);
+  if (isViewerFullscreen) {
+    Object.assign(layout.style, {
+      position: 'fixed',
+      inset: '0',
+      zIndex: '1000',
+      width: '100vw',
+      height: fullscreenLayoutHeight,
+      minHeight: fullscreenLayoutHeight,
+      padding: '12px',
+      boxSizing: 'border-box',
+      display: 'grid',
+      gridTemplateColumns: 'minmax(0, 1fr)',
+      overflow: 'hidden'
+    });
+  }
 
   const treePanel = document.createElement('div');
   treePanel.className = 'file-support-panel file-support-tree-panel';
@@ -5462,6 +5484,14 @@ function renderFileSupportView(workspace) {
 
   const viewerPanel = document.createElement('div');
   viewerPanel.className = 'file-support-panel file-support-viewer-panel';
+  if (isViewerFullscreen) {
+    Object.assign(viewerPanel.style, {
+      height: '100%',
+      minHeight: '0',
+      maxHeight: fullscreenPanelHeight,
+      overflow: 'hidden'
+    });
+  }
   const viewerHeader = document.createElement('div');
   viewerHeader.className = 'file-support-viewer-header';
   const viewerTitleRow = document.createElement('div');
@@ -5646,6 +5676,14 @@ function renderFileSupportView(workspace) {
 
   const viewerBody = document.createElement('div');
   viewerBody.className = 'file-support-viewer-body';
+  if (isViewerFullscreen) {
+    Object.assign(viewerBody.style, {
+      flex: '1 1 auto',
+      minHeight: '0',
+      height: '100%',
+      overflow: 'auto'
+    });
+  }
 
   if (advancedActive && !supportAdvancedSearch.viewingResult) {
     renderAdvancedSearchResults(viewerBody);
@@ -5697,6 +5735,12 @@ function renderFileSupportView(workspace) {
       );
       pre.className = `file-support-content mode-${presentation.mode}`;
       pre.innerHTML = presentation.html;
+      if (isViewerFullscreen) {
+        Object.assign(pre.style, {
+          minHeight: '100%',
+          height: 'auto'
+        });
+      }
       pre.addEventListener('dblclick', (event) => {
         requestAnimationFrame(() => applySupportViewerSelectionToSearch(pre, event.target));
       });
