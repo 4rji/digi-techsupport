@@ -3917,19 +3917,22 @@ body {
 }
 
 body.is-file-support-view .file-support-layout {
-  height: auto;
-  min-height: max(420px, calc(100vh - 184px));
+  height: max(420px, calc(100vh - 184px));
+  min-height: 0;
+  overflow: hidden;
 }
 
 body.is-file-support-view .file-support-panel {
-  height: auto;
-  overflow: visible;
+  height: 100%;
+  overflow: hidden;
 }
 
 body.is-file-support-view .file-support-tree,
 body.is-file-support-view .file-support-viewer-body {
-  flex: none;
-  overflow: visible;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 body.is-templates-view .templates-library {

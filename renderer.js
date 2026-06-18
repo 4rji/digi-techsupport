@@ -5360,8 +5360,6 @@ function setupFileSupportShortcutsModal() {
 }
 
 function renderFileSupportView(workspace) {
-  const treeSearchResult = filterSupportTreeNodes(supportFileState.tree, supportTreeSearchQuery);
-  const treeSearchActive = normalizeSearchQuery(supportTreeSearchQuery).length > 0;
   const isViewerFullscreen = supportFileViewerFullscreen && Boolean(supportFileState.selectedFileId);
   const advancedActive = supportAdvancedSearch.active && supportFileState.tree.length > 0;
   const selectedContentPresentation = supportFileState.selectedFileId
@@ -5450,111 +5448,7 @@ function renderFileSupportView(workspace) {
 
   const treePanel = document.createElement('div');
   treePanel.className = 'file-support-panel file-support-tree-panel';
-  const treeTitleRow = document.createElement('div');
-  treeTitleRow.className = 'file-support-tree-title-row';
-  const treeTitle = document.createElement('h3');
-  treeTitle.className = 'file-support-panel-title';
-  treeTitle.textContent = 'Archive Tree';
-  treeTitleRow.appendChild(treeTitle);
-  const treeExpandControls = document.createElement('div');
-  treeExpandControls.className = 'file-support-tree-expand-controls';
-  const expandAllBtn = document.createElement('button');
-  expandAllBtn.type = 'button';
-  expandAllBtn.className = 'file-support-tree-expand-btn';
-  expandAllBtn.textContent = '+';
-  expandAllBtn.title = 'Expand all folders';
-  expandAllBtn.setAttribute('aria-label', 'Expand all folders');
-  expandAllBtn.disabled = supportFileState.tree.length === 0;
-  expandAllBtn.addEventListener('click', () => {
-    getAllSupportDirIds(supportFileState.tree).forEach(id => expandedSupportFolders.add(id));
-    renderProductApp();
-  });
-  const collapseAllBtn = document.createElement('button');
-  collapseAllBtn.type = 'button';
-  collapseAllBtn.className = 'file-support-tree-expand-btn';
-  collapseAllBtn.textContent = '−';
-  collapseAllBtn.title = 'Collapse all folders';
-  collapseAllBtn.setAttribute('aria-label', 'Collapse all folders');
-  collapseAllBtn.disabled = supportFileState.tree.length === 0;
-  collapseAllBtn.addEventListener('click', () => {
-    expandedSupportFolders.clear();
-    renderProductApp();
-  });
-  treeExpandControls.appendChild(expandAllBtn);
-  treeExpandControls.appendChild(collapseAllBtn);
-  treeTitleRow.appendChild(treeExpandControls);
-  treePanel.appendChild(treeTitleRow);
-
-  const treeSearch = document.createElement('div');
-  treeSearch.className = 'file-support-search';
-  const treeSearchInput = document.createElement('input');
-  treeSearchInput.type = 'search';
-  treeSearchInput.id = 'file-support-tree-search';
-  treeSearchInput.className = 'file-support-search-input';
-  treeSearchInput.placeholder = 'Search files and folders';
-  treeSearchInput.value = supportTreeSearchQuery;
-  treeSearchInput.disabled = supportFileState.tree.length === 0;
-  treeSearchInput.setAttribute('aria-label', 'Search archive tree');
-  treeSearchInput.addEventListener('input', () => {
-    supportTreeSearchQuery = treeSearchInput.value;
-    renderProductApp();
-    requestAnimationFrame(() => {
-      const nextInput = document.getElementById('file-support-tree-search');
-      if (!nextInput) return;
-      nextInput.focus();
-      nextInput.setSelectionRange(nextInput.value.length, nextInput.value.length);
-    });
-  });
-  treeSearch.appendChild(treeSearchInput);
-  if (treeSearchActive) {
-    const treeSearchStatus = document.createElement('span');
-    treeSearchStatus.className = 'file-support-search-status';
-    treeSearchStatus.textContent = treeSearchResult.matchCount === 1
-      ? '1 match'
-      : `${treeSearchResult.matchCount} matches`;
-    treeSearch.appendChild(treeSearchStatus);
-  }
-  treePanel.appendChild(treeSearch);
-
-  const quickSearches = document.createElement('div');
-  quickSearches.className = 'file-support-quick-searches';
-  FILE_SUPPORT_QUICK_SEARCHES.forEach(searchTerm => {
-    const quickButton = document.createElement('button');
-    quickButton.type = 'button';
-    quickButton.className = 'file-support-quick-search-button';
-    quickButton.textContent = searchTerm;
-    quickButton.disabled = supportFileState.tree.length === 0;
-    quickButton.title = `Search ${searchTerm}`;
-    quickButton.addEventListener('click', () => {
-      supportTreeSearchQuery = searchTerm;
-      renderProductApp();
-      requestAnimationFrame(() => {
-        const nextInput = document.getElementById('file-support-tree-search');
-        if (!nextInput) return;
-        nextInput.focus();
-        nextInput.setSelectionRange(nextInput.value.length, nextInput.value.length);
-      });
-    });
-    quickSearches.appendChild(quickButton);
-  });
-  treePanel.appendChild(quickSearches);
-
-  if (supportFileState.tree.length === 0) {
-    const emptyState = document.createElement('div');
-    emptyState.className = 'file-support-empty-state';
-    emptyState.textContent = supportFileState.importing ? 'Importing support file' : 'No support file imported';
-    treePanel.appendChild(emptyState);
-  } else if (treeSearchActive && treeSearchResult.nodes.length === 0) {
-    const emptyState = document.createElement('div');
-    emptyState.className = 'file-support-empty-state';
-    emptyState.textContent = 'No matching paths';
-    treePanel.appendChild(emptyState);
-  } else {
-    const tree = document.createElement('div');
-    tree.className = 'file-support-tree';
-    renderSupportTreeNodes(treeSearchActive ? treeSearchResult.nodes : supportFileState.tree, tree);
-    treePanel.appendChild(tree);
-  }
+  renderFileSupportTreePanel(treePanel);
 
   const resizer = document.createElement('div');
   resizer.className = 'file-support-resizer';
@@ -5822,6 +5716,130 @@ function renderFileSupportView(workspace) {
   workspace.appendChild(layout);
 }
 
+function getFileSupportTreePanel() {
+  return document.querySelector('.file-support-tree-panel');
+}
+
+function focusFileSupportTreeSearchInput() {
+  requestAnimationFrame(() => {
+    const nextInput = document.getElementById('file-support-tree-search');
+    if (!nextInput) return;
+    nextInput.focus();
+    nextInput.setSelectionRange(nextInput.value.length, nextInput.value.length);
+  });
+}
+
+function renderFileSupportTreePanel(treePanel, options = {}) {
+  if (!treePanel) return;
+
+  const { focusSearch = false, preserveScroll = false } = options;
+  const treeSearchResult = filterSupportTreeNodes(supportFileState.tree, supportTreeSearchQuery);
+  const treeSearchActive = normalizeSearchQuery(supportTreeSearchQuery).length > 0;
+  const previousTree = preserveScroll ? treePanel.querySelector('.file-support-tree') : null;
+  const previousScrollTop = previousTree ? previousTree.scrollTop : 0;
+
+  treePanel.replaceChildren();
+
+  const treeTitleRow = document.createElement('div');
+  treeTitleRow.className = 'file-support-tree-title-row';
+  const treeTitle = document.createElement('h3');
+  treeTitle.className = 'file-support-panel-title';
+  treeTitle.textContent = 'Archive Tree';
+  treeTitleRow.appendChild(treeTitle);
+  const treeExpandControls = document.createElement('div');
+  treeExpandControls.className = 'file-support-tree-expand-controls';
+  const expandAllBtn = document.createElement('button');
+  expandAllBtn.type = 'button';
+  expandAllBtn.className = 'file-support-tree-expand-btn';
+  expandAllBtn.textContent = '+';
+  expandAllBtn.title = 'Expand all folders';
+  expandAllBtn.setAttribute('aria-label', 'Expand all folders');
+  expandAllBtn.disabled = supportFileState.tree.length === 0;
+  expandAllBtn.addEventListener('click', () => {
+    getAllSupportDirIds(supportFileState.tree).forEach(id => expandedSupportFolders.add(id));
+    renderFileSupportTreePanel(treePanel, { preserveScroll: true });
+  });
+  const collapseAllBtn = document.createElement('button');
+  collapseAllBtn.type = 'button';
+  collapseAllBtn.className = 'file-support-tree-expand-btn';
+  collapseAllBtn.textContent = '−';
+  collapseAllBtn.title = 'Collapse all folders';
+  collapseAllBtn.setAttribute('aria-label', 'Collapse all folders');
+  collapseAllBtn.disabled = supportFileState.tree.length === 0;
+  collapseAllBtn.addEventListener('click', () => {
+    expandedSupportFolders.clear();
+    renderFileSupportTreePanel(treePanel, { preserveScroll: true });
+  });
+  treeExpandControls.appendChild(expandAllBtn);
+  treeExpandControls.appendChild(collapseAllBtn);
+  treeTitleRow.appendChild(treeExpandControls);
+  treePanel.appendChild(treeTitleRow);
+
+  const treeSearch = document.createElement('div');
+  treeSearch.className = 'file-support-search';
+  const treeSearchInput = document.createElement('input');
+  treeSearchInput.type = 'search';
+  treeSearchInput.id = 'file-support-tree-search';
+  treeSearchInput.className = 'file-support-search-input';
+  treeSearchInput.placeholder = 'Search files and folders';
+  treeSearchInput.value = supportTreeSearchQuery;
+  treeSearchInput.disabled = supportFileState.tree.length === 0;
+  treeSearchInput.setAttribute('aria-label', 'Search archive tree');
+  treeSearchInput.addEventListener('input', () => {
+    supportTreeSearchQuery = treeSearchInput.value;
+    renderFileSupportTreePanel(treePanel, { focusSearch: true });
+  });
+  treeSearch.appendChild(treeSearchInput);
+  if (treeSearchActive) {
+    const treeSearchStatus = document.createElement('span');
+    treeSearchStatus.className = 'file-support-search-status';
+    treeSearchStatus.textContent = treeSearchResult.matchCount === 1
+      ? '1 match'
+      : `${treeSearchResult.matchCount} matches`;
+    treeSearch.appendChild(treeSearchStatus);
+  }
+  treePanel.appendChild(treeSearch);
+
+  const quickSearches = document.createElement('div');
+  quickSearches.className = 'file-support-quick-searches';
+  FILE_SUPPORT_QUICK_SEARCHES.forEach(searchTerm => {
+    const quickButton = document.createElement('button');
+    quickButton.type = 'button';
+    quickButton.className = 'file-support-quick-search-button';
+    quickButton.textContent = searchTerm;
+    quickButton.disabled = supportFileState.tree.length === 0;
+    quickButton.title = `Search ${searchTerm}`;
+    quickButton.addEventListener('click', () => {
+      supportTreeSearchQuery = searchTerm;
+      renderFileSupportTreePanel(treePanel, { focusSearch: true });
+    });
+    quickSearches.appendChild(quickButton);
+  });
+  treePanel.appendChild(quickSearches);
+
+  if (supportFileState.tree.length === 0) {
+    const emptyState = document.createElement('div');
+    emptyState.className = 'file-support-empty-state';
+    emptyState.textContent = supportFileState.importing ? 'Importing support file' : 'No support file imported';
+    treePanel.appendChild(emptyState);
+  } else if (treeSearchActive && treeSearchResult.nodes.length === 0) {
+    const emptyState = document.createElement('div');
+    emptyState.className = 'file-support-empty-state';
+    emptyState.textContent = 'No matching paths';
+    treePanel.appendChild(emptyState);
+  } else {
+    const tree = document.createElement('div');
+    tree.className = 'file-support-tree';
+    renderSupportTreeNodes(treeSearchActive ? treeSearchResult.nodes : supportFileState.tree, tree);
+    treePanel.appendChild(tree);
+    if (preserveScroll) tree.scrollTop = previousScrollTop;
+  }
+
+  if (focusSearch) {
+    focusFileSupportTreeSearchInput();
+  }
+}
+
 function getAllSupportDirIds(nodes, ids = []) {
   nodes.forEach(node => {
     if (node.type === 'directory') {
@@ -5874,6 +5892,11 @@ function createSupportTreeNode(node) {
         expandedSupportFolders.delete(node.id);
       } else {
         expandedSupportFolders.add(node.id);
+      }
+      const treePanel = getFileSupportTreePanel();
+      if (treePanel) {
+        renderFileSupportTreePanel(treePanel, { preserveScroll: true });
+        return;
       }
       renderProductApp();
     });
