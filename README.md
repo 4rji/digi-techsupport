@@ -43,7 +43,7 @@ Main Features
 - TCP port checks and ping polling on a configurable interval per card.
 - SSH terminal sessions directly from a product card using xterm.js.
 - Digi Remote Manager (DRM) integration to fetch and display cloud-managed devices.
-- Support archive viewer: import Digi `.bin` files, browse the file tree, and run AI analysis on selected entries.
+- Support file viewer: import Digi support archives or readable text files, browse the file tree, and run AI analysis on selected entries.
 - Templates workspace for creating, loading, editing, searching, copying, and deleting support templates.
 - AI-assisted template generation using either OpenAI or Claude.
 - Configuration import/export through the Settings modal.
@@ -83,7 +83,7 @@ The DRM panel fetches the device inventory from the Digi Remote Manager cloud AP
 
 Support Archive Viewer
 -----------------------
-The File Support view imports Digi `.bin` support archives (gzip/tar format). After import:
+The File Support view imports Digi support archives (`.bin`, `.gz`, `.tgz`, or `.tar`) and readable text files such as `.txt`, `.md`, `.log`, and ASCII files without a special extension. After import:
 - A file tree shows all entries inside the archive.
 - Selecting a file displays its raw content.
 - Grep mode (`Ctrl+G`) filters content by keyword; cut mode (`Ctrl+C`) trims surrounding blank lines.

@@ -451,6 +451,16 @@ function normalizeSupportLibraryText(value, maxLength = 4000) {
   return String(value || '').replace(/\0/g, '').trim().slice(0, maxLength);
 }
 
+function getSupportFileDisplayName(fileName) {
+  return String(fileName || 'Support file').replace(/\.(bin|gz|tgz|tar|txt|md|markdown|log)$/i, '') || 'Support file';
+}
+
+function getSupportLibrarySavedFileName(id, originalFileName) {
+  const extension = path.extname(String(originalFileName || '')).toLowerCase();
+  const safeExtension = /^[.][a-z0-9]{1,12}$/i.test(extension) ? extension : '.bin';
+  return `${id}${safeExtension}`;
+}
+
 function getSupportLibraryItemPath(item) {
   const safeFileName = path.basename(String(item?.savedFileName || ''));
   return safeFileName ? path.join(getSupportLibraryFilesPath(), safeFileName) : '';
@@ -462,11 +472,12 @@ function normalizeSupportLibraryItem(item) {
   const savedFileName = path.basename(String(item.savedFileName || ''));
   const originalFileName = path.basename(String(item.originalFileName || 'support-file.bin'));
   if (!id || !savedFileName) return null;
+  const displayName = getSupportFileDisplayName(originalFileName);
 
   return {
     id,
-    alias: normalizeSupportLibraryText(item.alias || originalFileName.replace(/\.bin$/i, ''), 96),
-    title: normalizeSupportLibraryText(item.title || item.alias || originalFileName.replace(/\.bin$/i, ''), 160),
+    alias: normalizeSupportLibraryText(item.alias || displayName, 96),
+    title: normalizeSupportLibraryText(item.title || item.alias || displayName, 160),
     notes: normalizeSupportLibraryText(item.notes || '', 8000),
     originalFileName,
     savedFileName,
@@ -554,14 +565,14 @@ async function saveSupportFileToLibrary(sourceFilePath, compressedFile, stats) {
     }
   } else {
     const id = crypto.randomUUID();
-    const alias = originalFileName.replace(/\.bin$/i, '') || 'Support file';
+    const alias = getSupportFileDisplayName(originalFileName);
     item = {
       id,
       alias,
       title: alias,
       notes: '',
       originalFileName,
-      savedFileName: `${id}.bin`,
+      savedFileName: getSupportLibrarySavedFileName(id, originalFileName),
       hash,
       size: Math.max(0, Number(stats?.size) || compressedFile.length),
       importedAt: now,
@@ -1531,6 +1542,52 @@ function parseSupportTarArchive(tarBuffer) {
   });
 }
 
+function createPlainTextSupportArchive(filePath, fileBuffer, stats) {
+  const fileName = path.basename(filePath);
+  const entryPath = normalizeSupportEntryPath(fileName) || 'text-file.txt';
+  const previewBuffer = fileBuffer.subarray(0, Math.min(fileBuffer.length, MAX_TEXT_PREVIEW_BYTES));
+  const isText = bufferLooksLikeText(previewBuffer, entryPath);
+
+  if (!isText) {
+    return null;
+  }
+
+  const id = 'support-entry-0';
+  const truncated = fileBuffer.length > previewBuffer.length;
+  const metadata = {
+    id,
+    name: path.posix.basename(entryPath),
+    path: entryPath,
+    type: 'file',
+    kind: 'text-file',
+    size: Math.max(0, Number(stats?.size) || fileBuffer.length),
+    mode: typeof stats?.mode === 'number' ? stats.mode : null,
+    mtime: stats?.mtime instanceof Date ? stats.mtime.toISOString() : null,
+    isText: true,
+    textAvailable: true,
+    truncated
+  };
+  const entries = [metadata];
+  const filesById = new Map([[id, metadata]]);
+  const text = previewBuffer.toString('utf8').replace(/^\uFEFF/, '');
+  const contentById = new Map([[id, { text, truncated }]]);
+  const tree = buildSupportArchiveTree(entries);
+
+  return {
+    entries,
+    tree,
+    filesById,
+    contentById,
+    summary: null,
+    stats: {
+      entryCount: 1,
+      fileCount: 1,
+      directoryCount: 0,
+      textFileCount: 1
+    }
+  };
+}
+
 function pruneSupportArchiveSessions() {
   const sessions = [...supportArchiveSessions.entries()]
     .sort((a, b) => b[1].createdAt - a[1].createdAt);
@@ -1647,10 +1704,6 @@ function getSupportAnalysisFiles(session, options = {}) {
 }
 
 async function readSupportArchiveFromFilePath(filePath) {
-  if (path.extname(filePath).toLowerCase() !== '.bin') {
-    return createSupportFileFailure('invalid-file', 'Select a .bin support file.');
-  }
-
   let stats;
   try {
     stats = await fs.promises.stat(filePath);
@@ -1672,33 +1725,62 @@ async function readSupportArchiveFromFilePath(filePath) {
     return createSupportFileFailure('unreadable-file', error);
   }
 
-  let tarBuffer;
+  let archiveError = null;
   try {
-    tarBuffer = await gunzipBuffer(compressedFile, {
+    const tarBuffer = await gunzipBuffer(compressedFile, {
       maxOutputLength: MAX_UNCOMPRESSED_ARCHIVE_BYTES
     });
+    const archive = await parseSupportTarArchive(tarBuffer);
+    if (!archive.entries.length) {
+      archiveError = new Error('The tar archive did not contain any readable entries.');
+    } else {
+      return {
+        success: true,
+        fileName: path.basename(filePath),
+        compressedFile,
+        stats,
+        archive
+      };
+    }
   } catch (error) {
-    return createSupportFileFailure('gzip-failure', error);
+    archiveError = error;
   }
 
-  let archive;
-  try {
-    archive = await parseSupportTarArchive(tarBuffer);
-  } catch (error) {
-    return createSupportFileFailure('tar-parsing-failure', error);
+  if (path.extname(filePath).toLowerCase() === '.tar') {
+    try {
+      const archive = await parseSupportTarArchive(compressedFile);
+      if (!archive.entries.length) {
+        archiveError = new Error('The tar archive did not contain any readable entries.');
+      } else {
+        return {
+          success: true,
+          fileName: path.basename(filePath),
+          compressedFile,
+          stats,
+          archive
+        };
+      }
+    } catch (error) {
+      archiveError = error;
+    }
   }
 
-  if (!archive.entries.length) {
-    return createSupportFileFailure('tar-parsing-failure', 'The tar archive did not contain any readable entries.');
+  const textArchive = createPlainTextSupportArchive(filePath, compressedFile, stats);
+  if (textArchive) {
+    return {
+      success: true,
+      fileName: path.basename(filePath),
+      compressedFile,
+      stats,
+      archive: textArchive
+    };
   }
 
-  return {
-    success: true,
-    fileName: path.basename(filePath),
-    compressedFile,
-    stats,
-    archive
-  };
+  const fileTypeHint = path.extname(filePath).toLowerCase() === '.bin' ? archiveError : null;
+  return createSupportFileFailure(
+    'invalid-file',
+    fileTypeHint || 'Select a Digi support archive or a readable text file.'
+  );
 }
 
 function createSupportArchiveSession(webContents, parsedArchive, savedFile = null) {
@@ -1729,13 +1811,9 @@ function createSupportArchiveSession(webContents, parsedArchive, savedFile = nul
 async function importSupportFileFromDialog(webContents) {
   const browserWindow = BrowserWindow.fromWebContents(webContents);
   const dialogResult = await dialog.showOpenDialog(browserWindow || undefined, {
-    title: 'Import Digi Support File',
+    title: 'Import Support or Text File',
     buttonLabel: 'Import Support File',
-    properties: ['openFile'],
-    filters: [
-      { name: 'Digi support files', extensions: ['bin'] },
-      { name: 'All files', extensions: ['*'] }
-    ]
+    properties: ['openFile']
   });
 
   if (dialogResult.canceled || !dialogResult.filePaths.length) {

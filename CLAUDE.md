@@ -51,7 +51,7 @@ The renderer communicates with the main process only through `window.appAPI`. Ke
 - `ssh-connect`, `ssh-write`, `ssh-resize`, `ssh-disconnect` — SSH session lifecycle
 - `generate-support-template`, `analyze-support-file` — AI calls
 - `digi-get-credentials`, `digi-save-credentials`, `digi-get-devices` — Digi Remote Manager (secret stays in main; only `keyId`/`hasCredentials` returned). HTTP server mirrors `GET /api/digi/devices`.
-- `import-support-file`, `get-support-file-entry-content` — support archive (.bin/.gz) parsing
+- `import-support-file`, `get-support-file-entry-content` — support archive (.bin/.gz/.tgz/.tar) and text-file parsing
 - `list/open/update/delete-saved-support-files` — support library CRUD
 - `save-text-file` — native save dialog
 - Push events back to renderer: `ssh-data`, `ssh-close`, `ssh-error`
@@ -61,7 +61,7 @@ The renderer communicates with the main process only through `window.appAPI`. Ke
 `renderer.js` is a large single-file ES module (~200 KB). Key areas:
 - **Product lines/cards** — stored in `localStorage` under `product_lines`. Built-in lines (IX, TX, EX) have locked items with preset images and default IPs. Cards poll TCP ports and ping on `PORT_POLL_INTERVAL` (2 s).
 - **Templates workspace** (`__templates__` view) — CRUD for support templates stored in `localStorage`. AI generation posts to main via `generateSupportTemplate`. Drafts are kept separately in `support_template_drafts`.
-- **File support** (`__file_support__` view) — imports Digi `.bin` support archives (gzip/tar), displays a file tree, and can call AI analysis on selected entries.
+- **File support** (`__file_support__` view) — imports Digi support archives (gzip/tar) and readable text files, displays a file tree, and can call AI analysis on selected entries.
 - **SSH terminal** — xterm.js with `FitAddon`, backed by the `ssh2` npm package in the main process.
 - **Settings modal** — theme switching, config import/export (JSON), API key storage, agent skill file loading.
 
