@@ -564,6 +564,123 @@ select:focus-visible,
   box-shadow: var(--glass-bead), var(--ui-shadow-sm);
 }
 
+/* --- Case note builder --------------------------------------------------- */
+.case-note-editor-card {
+  gap: 14px;
+}
+
+.case-note-fields-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: var(--ui-r-sm);
+  background:
+    var(--glass-sheen),
+    rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.case-note-fields-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.case-note-fields-header h3 {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.case-note-clear-button {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 5px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--ui-r-pill);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.72);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.case-note-clear-button:hover {
+  border-color: rgba(239, 83, 80, 0.45);
+  background: rgba(239, 83, 80, 0.18);
+  color: #fff;
+}
+
+.case-note-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.case-note-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.case-note-field-wide {
+  grid-column: 1 / -1;
+}
+
+.case-note-field span {
+  color: rgba(var(--ui-accent-rgb), 0.9);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.case-note-field input,
+.case-note-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  font: inherit;
+  line-height: 1.4;
+  outline: none;
+}
+
+.case-note-field input {
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.case-note-field textarea {
+  min-height: 78px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.case-note-field input:focus,
+.case-note-field textarea:focus {
+  border-color: rgba(var(--ui-accent-rgb), 0.62);
+  box-shadow: var(--ui-ring);
+}
+
+.case-note-generated-markdown {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.case-note-generated-markdown[readonly] {
+  color: rgba(255, 255, 255, 0.82);
+  cursor: text;
+}
+
 /* --- Pills & count badges → simulated glass chips (no backdrop-filter) -- */
 .product-count,
 .product-top-controls,
@@ -1414,6 +1531,12 @@ select:focus-visible,
   background: rgba(var(--ui-accent-rgb), 0.08);
 }
 
+.scratch-field[data-key="product"],
+.scratch-field[data-key="firmware"] {
+  flex: 1 1 150px;
+}
+
+.scratch-field-error,
 .scratch-field-notes {
   flex: 1 1 220px;
 }

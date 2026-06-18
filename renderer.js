@@ -1348,6 +1348,56 @@ const LEGACY_SUPPORT_TEMPLATE_IDS = new Set([
   'remote-access',
   'case-follow-up'
 ]);
+const DEFAULT_CASE_NOTE_TEMPLATE_ID = 'support-template-default-note';
+const CASE_NOTE_TEMPLATE_MODE = 'case-note';
+const CASE_NOTE_FIELDS = [
+  {
+    key: 'caseNumber',
+    label: 'Case Number',
+    scratchKey: 'case',
+    placeholder: 'Case #'
+  },
+  {
+    key: 'serialNumber',
+    label: 'SN',
+    scratchKey: 'sn',
+    placeholder: 'Serial number'
+  },
+  {
+    key: 'product',
+    label: 'Product',
+    scratchKey: 'product',
+    placeholder: 'Device model'
+  },
+  {
+    key: 'firmware',
+    label: 'Firmware',
+    scratchKey: 'firmware',
+    placeholder: 'Firmware version'
+  },
+  {
+    key: 'deviceId',
+    label: 'ID',
+    scratchKey: 'id',
+    placeholder: 'Device ID'
+  },
+  {
+    key: 'mainError',
+    label: 'Main Error',
+    scratchKey: 'error',
+    placeholder: 'Primary symptom or error',
+    multiline: true,
+    rows: 2
+  },
+  {
+    key: 'notes',
+    label: 'Notes',
+    scratchKey: 'notes',
+    placeholder: 'Troubleshooting notes',
+    multiline: true,
+    rows: 3
+  }
+];
 
 const FILE_SUPPORT_QUICK_SEARCHES = [
   'config_dump',
@@ -1512,6 +1562,60 @@ document.addEventListener('DOMContentLoaded', () => {
 const SCRATCHPAD_STORAGE_KEY = 'info_scratchpad';
 const SCRATCHPAD_COLLAPSE_KEY = 'info_scratchpad_collapsed';
 
+function readScratchpadData() {
+  try {
+    return JSON.parse(localStorage.getItem(SCRATCHPAD_STORAGE_KEY)) || {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function writeScratchpadData(data) {
+  localStorage.setItem(SCRATCHPAD_STORAGE_KEY, JSON.stringify(data || {}));
+}
+
+function getScratchpadFields() {
+  const bar = document.getElementById('info-scratchpad');
+  return bar ? Array.from(bar.querySelectorAll('.scratch-field')) : [];
+}
+
+function collectScratchpadDataFromDom() {
+  const data = readScratchpadData();
+  getScratchpadFields().forEach((field) => {
+    const input = field.querySelector('.scratch-input');
+    if (input) {
+      data[field.dataset.key] = input.value;
+    }
+  });
+  return data;
+}
+
+function updateScratchpadValues(values) {
+  const data = collectScratchpadDataFromDom();
+  Object.entries(values || {}).forEach(([key, value]) => {
+    const normalizedValue = String(value || '');
+    data[key] = normalizedValue;
+    const field = getScratchpadFields().find(candidate => candidate.dataset.key === key);
+    const input = field?.querySelector('.scratch-input');
+    if (input && input.value !== normalizedValue) {
+      input.value = normalizedValue;
+    }
+  });
+  writeScratchpadData(data);
+}
+
+function syncScratchpadFromCaseNoteFields(fields) {
+  const normalized = normalizeCaseNoteFields(fields);
+  updateScratchpadValues(
+    CASE_NOTE_FIELDS.reduce((values, field) => {
+      if (field.scratchKey) {
+        values[field.scratchKey] = normalized[field.key];
+      }
+      return values;
+    }, {})
+  );
+}
+
 function setupInfoScratchpad() {
   const bar = document.getElementById('info-scratchpad');
   if (!bar) return;
@@ -1531,19 +1635,10 @@ function setupInfoScratchpad() {
 
   const fields = Array.from(bar.querySelectorAll('.scratch-field'));
 
-  let stored = {};
-  try {
-    stored = JSON.parse(localStorage.getItem(SCRATCHPAD_STORAGE_KEY)) || {};
-  } catch (error) {
-    stored = {};
-  }
+  const stored = readScratchpadData();
 
   const persist = () => {
-    const data = {};
-    fields.forEach((field) => {
-      data[field.dataset.key] = field.querySelector('.scratch-input').value;
-    });
-    localStorage.setItem(SCRATCHPAD_STORAGE_KEY, JSON.stringify(data));
+    writeScratchpadData(collectScratchpadDataFromDom());
   };
 
   fields.forEach((field) => {
@@ -1805,34 +1900,204 @@ function normalizeProductLine(line, index) {
   };
 }
 
-function getDefaultSupportTemplates() {
-  const body = [
-    'Serial: ',
-    'Case Number: ',
-    'Warranty: ',
-    'SN: ',
-    'Inquire: '
-  ].join('\n');
+function createEmptyCaseNoteFields() {
+  return CASE_NOTE_FIELDS.reduce((fields, field) => {
+    fields[field.key] = '';
+    return fields;
+  }, {});
+}
+
+function extractMarkdownLabelValue(markdown, labels) {
+  const lines = String(markdown || '').split(/\r?\n/);
+  const normalizedLabels = labels.map(label => String(label).toLowerCase());
+
+  for (const line of lines) {
+    const cleanedLine = line
+      .replace(/^\s*(?:[-*]\s*)?/, '')
+      .replace(/^\*\*/, '')
+      .replace(/\*\*\s*:\s*/, ': ')
+      .replace(/:\s*\*\*/, ': ')
+      .trim();
+    const separatorIndex = cleanedLine.indexOf(':');
+    if (separatorIndex < 0) continue;
+    const label = cleanedLine.slice(0, separatorIndex).replace(/\*\*/g, '').trim().toLowerCase();
+    if (normalizedLabels.includes(label)) {
+      return cleanedLine.slice(separatorIndex + 1).replace(/\*\*/g, '').trim();
+    }
+  }
+
+  return '';
+}
+
+function extractMarkdownNotes(markdown) {
+  const match = String(markdown || '').match(/^##\s+Notes\s*\n([\s\S]*?)(?=\n##\s+|$)/im);
+  return match ? match[1].trim() : '';
+}
+
+function extractMarkdownRemainderNotes(markdown) {
+  const knownLabels = new Set([
+    'case',
+    'case number',
+    'device id',
+    'error',
+    'firmware',
+    'firmware version',
+    'id',
+    'main error',
+    'product',
+    'serial',
+    'serial number',
+    'sn'
+  ]);
+
+  return String(markdown || '')
+    .split(/\r?\n/)
+    .filter((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || /^#{1,6}\s+case note\s*$/i.test(trimmed)) return false;
+
+      const cleanedLine = line
+        .replace(/^\s*(?:[-*]\s*)?/, '')
+        .replace(/^\*\*/, '')
+        .replace(/\*\*\s*:\s*/, ': ')
+        .replace(/:\s*\*\*/, ': ')
+        .trim();
+      const separatorIndex = cleanedLine.indexOf(':');
+      if (separatorIndex < 0) return true;
+
+      const label = cleanedLine.slice(0, separatorIndex).replace(/\*\*/g, '').trim().toLowerCase();
+      return !knownLabels.has(label);
+    })
+    .join('\n')
+    .trim();
+}
+
+function normalizeCaseNoteFields(fields, body = '') {
+  const source = fields && typeof fields === 'object' ? fields : {};
+  const normalized = createEmptyCaseNoteFields();
+
+  CASE_NOTE_FIELDS.forEach((field) => {
+    if (typeof source[field.key] === 'string') {
+      normalized[field.key] = source[field.key];
+    }
+  });
+
+  if (!fields || typeof fields !== 'object') {
+    normalized.caseNumber = extractMarkdownLabelValue(body, ['Case Number', 'Case']);
+    normalized.serialNumber = extractMarkdownLabelValue(body, ['SN', 'Serial', 'Serial Number']);
+    normalized.product = extractMarkdownLabelValue(body, ['Product']);
+    normalized.firmware = extractMarkdownLabelValue(body, ['Firmware', 'Firmware Version']);
+    normalized.deviceId = extractMarkdownLabelValue(body, ['ID', 'Device ID']);
+    normalized.mainError = extractMarkdownLabelValue(body, ['Main Error', 'Error']);
+    normalized.notes = extractMarkdownNotes(body) || extractMarkdownRemainderNotes(body);
+  }
+
+  return normalized;
+}
+
+function buildCaseNoteMarkdown(fields) {
+  const normalized = normalizeCaseNoteFields(fields);
+  const rows = [
+    ['Case Number', normalized.caseNumber],
+    ['SN', normalized.serialNumber],
+    ['Product', normalized.product],
+    ['Firmware', normalized.firmware],
+    ['ID', normalized.deviceId],
+    ['Main Error', normalized.mainError]
+  ];
 
   return [
-    {
-      id: 'support-template-default-note',
-      title: 'Case Note',
-      body,
-      hidden: false
+    '# Case Note',
+    '',
+    ...rows.map(([label, value]) => `- **${label}:** ${value || ''}`),
+    '',
+    '## Notes',
+    normalized.notes || ''
+  ].join('\n');
+}
+
+function normalizeSupportTemplateMode(template) {
+  if (template?.mode === CASE_NOTE_TEMPLATE_MODE) return CASE_NOTE_TEMPLATE_MODE;
+  if (String(template?.id || '') === DEFAULT_CASE_NOTE_TEMPLATE_ID) return CASE_NOTE_TEMPLATE_MODE;
+  return '';
+}
+
+function createCaseNoteTemplate(index = 0, options = {}) {
+  const fields = normalizeCaseNoteFields(options.fields);
+  const title = String(options.title || 'Case Note').trim() || 'Case Note';
+
+  return {
+    id: options.id || (index === 0 ? DEFAULT_CASE_NOTE_TEMPLATE_ID : createTemplateId(title, index)),
+    title,
+    body: buildCaseNoteMarkdown(fields),
+    mode: CASE_NOTE_TEMPLATE_MODE,
+    fields,
+    hidden: false
+  };
+}
+
+function isEmptyCaseNoteFields(fields) {
+  const normalized = normalizeCaseNoteFields(fields);
+  return CASE_NOTE_FIELDS.every((field) => String(normalized[field.key] || '').trim().length === 0);
+}
+
+function createManualCaseNoteTemplate() {
+  return {
+    ...createCaseNoteTemplate(supportTemplates.length + templateDrafts.length),
+    sourceName: 'manual'
+  };
+}
+
+function openBlankCaseNote({ reuseEmpty = false } = {}) {
+  if (reuseEmpty) {
+    const emptyTemplate = supportTemplates.find((template) => (
+      template.mode === CASE_NOTE_TEMPLATE_MODE
+      && isEmptyCaseNoteFields(normalizeCaseNoteFields(template.fields, template.body))
+    ));
+    if (emptyTemplate) {
+      activeTemplateId = emptyTemplate.id;
+      return emptyTemplate;
     }
-  ];
+  }
+
+  const note = createManualCaseNoteTemplate();
+  supportTemplates.push(note);
+  activeTemplateId = note.id;
+  saveSupportTemplates();
+  return note;
+}
+
+function getDefaultSupportTemplates() {
+  return [createCaseNoteTemplate(0)];
 }
 
 function normalizeSupportTemplate(template, index) {
   const title = String(template?.title || template?.name || `Template ${index + 1}`).trim() || `Template ${index + 1}`;
+  const rawBody = String(template?.body ?? template?.content ?? template?.text ?? '');
+  const mode = normalizeSupportTemplateMode(template);
+  const fields = mode === CASE_NOTE_TEMPLATE_MODE
+    ? normalizeCaseNoteFields(template?.fields, rawBody)
+    : null;
 
-  return {
+  const normalized = {
     id: String(template?.id || createTemplateId(title, index)),
     title,
-    body: String(template?.body ?? template?.content ?? template?.text ?? ''),
     hidden: false
   };
+
+  if (mode === CASE_NOTE_TEMPLATE_MODE) {
+    normalized.mode = mode;
+    normalized.fields = fields;
+    normalized.body = buildCaseNoteMarkdown(fields);
+  } else {
+    normalized.body = rawBody;
+  }
+
+  if (template?.sourceName) {
+    normalized.sourceName = String(template.sourceName);
+  }
+
+  return normalized;
 }
 
 function normalizeSupportTemplates(templates) {
@@ -2063,7 +2328,11 @@ function renderProductTabs() {
     button.textContent = label;
     button.classList.toggle('active', activeLineId === viewId);
     button.addEventListener('click', () => {
+      const wasInTemplatesView = activeLineId === TEMPLATES_VIEW_ID;
       activeLineId = viewId;
+      if (viewId === TEMPLATES_VIEW_ID && !wasInTemplatesView) {
+        activeTemplateId = '';
+      }
       saveProductLines();
       renderProductApp();
     });
@@ -2988,18 +3257,8 @@ function renderTemplatesView(workspace) {
   newButton.className = 'config-transfer-button template-new-button';
   newButton.textContent = 'New';
   newButton.addEventListener('click', () => {
-    const title = 'New Note';
-    const note = {
-      id: createTemplateId(title, supportTemplates.length + templateDrafts.length),
-      title,
-      body: '',
-      hidden: false,
-      sourceName: 'manual'
-    };
     // New notes are saved immediately so editing autosaves with no Save button.
-    supportTemplates.push(note);
-    activeTemplateId = note.id;
-    saveSupportTemplates();
+    openBlankCaseNote();
     renderProductApp();
   });
 
@@ -3026,6 +3285,9 @@ function renderTemplatesView(workspace) {
     && !templateDrafts.some(template => template.id === activeTemplateId)
     && !supportTemplates.some(template => template.id === activeTemplateId)) {
     activeTemplateId = '';
+  }
+  if (!activeTemplateId) {
+    openBlankCaseNote({ reuseEmpty: true });
   }
 
   const library = document.createElement('section');
@@ -6348,10 +6610,94 @@ function createTemplateChip(icon, label, { danger = false, primary = false } = {
   return chip;
 }
 
+function createCaseNoteFieldsPanel(initialFields, onChange) {
+  let fields = normalizeCaseNoteFields(initialFields);
+  const panel = document.createElement('section');
+  panel.className = 'case-note-fields-panel';
+
+  const header = document.createElement('div');
+  header.className = 'case-note-fields-header';
+
+  const title = document.createElement('h3');
+  title.textContent = 'Case fields';
+
+  const clearButton = document.createElement('button');
+  clearButton.type = 'button';
+  clearButton.className = 'case-note-clear-button';
+  clearButton.textContent = 'Clear fields';
+
+  header.appendChild(title);
+  header.appendChild(clearButton);
+  panel.appendChild(header);
+
+  const grid = document.createElement('div');
+  grid.className = 'case-note-fields-grid';
+
+  const inputs = new Map();
+  const emitChange = () => {
+    fields = normalizeCaseNoteFields(fields);
+    onChange(fields);
+  };
+
+  CASE_NOTE_FIELDS.forEach((field) => {
+    const label = document.createElement('label');
+    label.className = 'case-note-field';
+    if (field.multiline) {
+      label.classList.add('case-note-field-wide');
+    }
+
+    const labelText = document.createElement('span');
+    labelText.textContent = field.label;
+    label.appendChild(labelText);
+
+    const input = field.multiline
+      ? document.createElement('textarea')
+      : document.createElement('input');
+    if (!field.multiline) {
+      input.type = 'text';
+    } else {
+      input.rows = field.rows || 3;
+    }
+    input.value = fields[field.key] || '';
+    input.placeholder = field.placeholder || field.label;
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    input.addEventListener('input', () => {
+      fields = {
+        ...fields,
+        [field.key]: input.value
+      };
+      emitChange();
+    });
+
+    inputs.set(field.key, input);
+    label.appendChild(input);
+    grid.appendChild(label);
+  });
+
+  clearButton.addEventListener('click', () => {
+    fields = createEmptyCaseNoteFields();
+    inputs.forEach((input, key) => {
+      input.value = fields[key] || '';
+    });
+    emitChange();
+  });
+
+  panel.appendChild(grid);
+  return panel;
+}
+
 function createTemplateEditor(template, index, options = {}) {
   const isDraft = Boolean(options.isDraft);
+  const isCaseNote = template.mode === CASE_NOTE_TEMPLATE_MODE;
+  let caseNoteFields = isCaseNote
+    ? normalizeCaseNoteFields(template.fields, template.body)
+    : null;
   const editor = document.createElement('section');
   editor.className = 'template-editor-card';
+  if (isCaseNote) {
+    editor.classList.add('case-note-editor-card');
+  }
 
   const toolbar = document.createElement('div');
   toolbar.className = 'template-editor-toolbar';
@@ -6364,9 +6710,13 @@ function createTemplateEditor(template, index, options = {}) {
 
   const bodyInput = document.createElement('textarea');
   bodyInput.className = 'template-body-input';
-  bodyInput.value = template.body;
+  bodyInput.value = isCaseNote ? buildCaseNoteMarkdown(caseNoteFields) : template.body;
   bodyInput.rows = 1;
   bodyInput.setAttribute('aria-label', `${template.title} body`);
+  if (isCaseNote) {
+    bodyInput.readOnly = true;
+    bodyInput.classList.add('case-note-generated-markdown');
+  }
   const syncBodyHeight = attachAutoSizingTextarea(bodyInput);
 
   const status = document.createElement('span');
@@ -6374,6 +6724,21 @@ function createTemplateEditor(template, index, options = {}) {
 
   const actions = document.createElement('div');
   actions.className = 'template-editor-actions';
+  let persistCaseNoteFields = null;
+  const caseNotePanel = isCaseNote
+    ? createCaseNoteFieldsPanel(caseNoteFields, (nextFields) => {
+      caseNoteFields = normalizeCaseNoteFields(nextFields);
+      bodyInput.value = buildCaseNoteMarkdown(caseNoteFields);
+      syncBodyHeight();
+      syncScratchpadFromCaseNoteFields(caseNoteFields);
+      if (typeof persistCaseNoteFields === 'function') {
+        persistCaseNoteFields();
+      }
+    })
+    : null;
+  if (isCaseNote && Object.values(caseNoteFields).some(value => String(value || '').trim())) {
+    syncScratchpadFromCaseNoteFields(caseNoteFields);
+  }
 
   const copyButton = createTemplateChip('copy', 'Copy note');
   copyButton.addEventListener('click', () => {
@@ -6406,11 +6771,16 @@ function createTemplateEditor(template, index, options = {}) {
     // AI drafts stay in session storage until promoted with Save.
     const saveButton = createTemplateChip('save', 'Save note', { primary: true });
     saveButton.addEventListener('click', () => {
+      const nextBody = isCaseNote ? buildCaseNoteMarkdown(caseNoteFields) : bodyInput.value;
       const savedTemplate = {
         ...template,
         title: titleInput.value.trim() || `Note ${supportTemplates.length + 1}`,
-        body: bodyInput.value
+        body: nextBody
       };
+      if (isCaseNote) {
+        savedTemplate.mode = CASE_NOTE_TEMPLATE_MODE;
+        savedTemplate.fields = caseNoteFields;
+      }
       supportTemplates.push(savedTemplate);
       templateDrafts.splice(index, 1);
       saveTemplateDrafts();
@@ -6422,16 +6792,24 @@ function createTemplateEditor(template, index, options = {}) {
 
     const syncDraft = () => {
       if (!templateDrafts[index]) return;
+      const nextBody = isCaseNote ? buildCaseNoteMarkdown(caseNoteFields) : bodyInput.value;
       templateDrafts[index] = {
         ...templateDrafts[index],
         title: titleInput.value.trim() || template.title,
-        body: bodyInput.value
+        body: nextBody
       };
+      if (isCaseNote) {
+        templateDrafts[index].mode = CASE_NOTE_TEMPLATE_MODE;
+        templateDrafts[index].fields = caseNoteFields;
+      }
       saveTemplateDrafts();
       syncBodyHeight();
     };
     titleInput.addEventListener('input', syncDraft);
-    bodyInput.addEventListener('input', syncDraft);
+    if (!isCaseNote) {
+      bodyInput.addEventListener('input', syncDraft);
+    }
+    persistCaseNoteFields = syncDraft;
 
     status.textContent = 'Unsaved draft';
     status.classList.add('is-draft');
@@ -6453,11 +6831,16 @@ function createTemplateEditor(template, index, options = {}) {
     const autoSave = () => {
       if (!supportTemplates[index]) return;
       const nextTitle = titleInput.value.trim() || template.title;
+      const nextBody = isCaseNote ? buildCaseNoteMarkdown(caseNoteFields) : bodyInput.value;
       supportTemplates[index] = {
         ...supportTemplates[index],
         title: nextTitle,
-        body: bodyInput.value
+        body: nextBody
       };
+      if (isCaseNote) {
+        supportTemplates[index].mode = CASE_NOTE_TEMPLATE_MODE;
+        supportTemplates[index].fields = caseNoteFields;
+      }
       saveSupportTemplates();
       syncBodyHeight();
       // Keep the list entry's title in sync without a full re-render.
@@ -6470,7 +6853,10 @@ function createTemplateEditor(template, index, options = {}) {
 
     status.textContent = 'Auto-save on';
     titleInput.addEventListener('input', autoSave);
-    bodyInput.addEventListener('input', autoSave);
+    if (!isCaseNote) {
+      bodyInput.addEventListener('input', autoSave);
+    }
+    persistCaseNoteFields = autoSave;
   }
 
   actions.appendChild(copyButton);
@@ -6480,6 +6866,9 @@ function createTemplateEditor(template, index, options = {}) {
   toolbar.appendChild(status);
   toolbar.appendChild(actions);
   editor.appendChild(toolbar);
+  if (caseNotePanel) {
+    editor.appendChild(caseNotePanel);
+  }
   editor.appendChild(bodyInput);
 
   return editor;
