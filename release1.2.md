@@ -1,83 +1,62 @@
-# Release 2.0
+Digi TechSupport — Release 1.3
+==============================
 
-**Fecha:** 2026-06-17
+Release date: 2026-06-18
 
-Resumen de todos los cambios incluidos en esta versión. Agrupados por área funcional.
+This release focuses on two areas: a redesigned **Case Notes** workflow and a new **Advanced (cross-file) Search** for support archives. It also bundles a tree-view file browser, broader file-type support, and assorted UI/bug fixes.
 
----
+Highlights
+----------
+- **Case Notes** — structured, field-based notes for each support case.
+- **Advanced Search** — search across *every* file inside a support archive at once, not just the open file.
+- **Tree-view** file browser for imported archives.
+- **Plain text files** (`.txt`, `.log`, `.md`) importable directly, without needing an archive.
+- UI polish across all four themes plus the modern layer.
 
-## 🔍 Web Console: barra de búsqueda (Ctrl/Cmd+F)
+Case Notes
+----------
+The notes workflow was rebuilt around a structured **case note** template (`case-note` mode) instead of a single free-text blob.
 
-Al abrir el portal HTTPS de configuración del equipo (botón **Web Console**) ahora se
-puede buscar texto dentro de la página.
+- Dedicated fields per case, each persisted locally and copyable with one click:
+  - **Case Number**
+  - **SN** (serial number)
+  - **Product** (device model)
+  - **Firmware** version
+  - **ID** (device ID)
+  - **Main Error** (primary symptom)
+  - **Notes** (free-form troubleshooting notes)
+- Fields sync with the quick-reference scratchpad bar under the tabs (ID / SN / MAC / Case), so values entered once are reused.
+- Notes are stored as Markdown (`# Support Notes` with a `## Notes` section) and can round-trip: existing Markdown notes are parsed back into the structured fields on load.
+- New case notes start from a default template (`Untitled note`) ready to fill in.
 
-- Se inyecta una barra de búsqueda flotante que aparece con **Ctrl+F** (o **Cmd+F** en Mac).
-- Navegación entre coincidencias con **Enter / Shift+Enter** y botones ↑ / ↓.
-- Contador de resultados (`actual/total`) y aviso de "Sin resultados".
-- Cierre con **Escape** o el botón ✕, limpiando el resaltado.
-- Implementada sobre la búsqueda **nativa de Electron** (`findInPage` + evento
-  `found-in-page`), comunicada con el proceso principal mediante un puente por
-  `console-message` (la ventana del portal no tiene preload/IPC). Esto evita el
-  problema de pérdida de foco que tenía el enfoque con `window.find()`.
+Advanced Search
+---------------
+A new cross-file search engine (`support-search.js`) lets you query the entire contents of an imported support archive in one pass, isolated from the Electron main process so it stays fast and testable.
 
-El botón que abre el portal se renombró de **"Web"** a **"Web Console"** para dejar
-claro que abre la configuración del equipo.
+- **Cross-file matching** — searches across all entries in the archive instead of only the file currently open.
+- **Grep / regex mode** — accepts raw patterns and tolerates pasted `rg`, `ripgrep`, or `grep` prefixes and flags (e.g. `-i`); falls back to a literal match if the regex is invalid.
+- **Case-insensitive** toggle and include/exclude term matching per line.
+- **File-type filters** — narrow results to `json`, `logs`, or `config` entries, auto-classified by path and name (e.g. `var/log/`, `config_dump`, `config_json`, `*_json`).
+- **Quick searches** — one-click presets: `config_dump`, `config_json`, `mmcli`, `ip_route`, `ip_addr`, `runt_j`.
+- **Cut mode** to trim surrounding blank lines in results.
+- **Safety limits** to keep large archives responsive: up to 80 files, 200 lines/file, 5000 total lines, 1000 chars/line.
+- Debounced input and result navigation so typing stays smooth; click a result to jump to that file.
 
-*(commit `search-bar-fixed-bug` + ajuste de etiqueta)*
+Wired through `searchSupportArchive` in the preload bridge → `searchSupportArchiveSession` in the main process.
 
----
+Other Changes
+-------------
+- **Tree-view file browser** — imported archives now render as a navigable file tree across all themes.
+- **Plain text files importable directly** — `.txt`, `.log`, `.md`, and other readable files can now be opened in the support viewer without needing to be inside an archive.
+- **View-screen bug fix** and general layout fixes applied consistently to `styles.css`, `styles_aqua.css`, `styles_dark.css`, `styles_grey.css`, and `styles_modern.css`.
 
-## 🖥️ Terminal SSH: mejoras de usabilidad
+Files Touched
+-------------
+- `support-search.js` (new) — advanced cross-file search engine.
+- `renderer.js` — case notes UI, advanced search UI/state, tree view.
+- `index.js`, `preload.js` — `searchSupportArchive` IPC channel.
+- `index.html`, all theme stylesheets, `styles_modern.css` — UI for notes, search, and tree view.
 
-*(commits `ssh-fixed-after-protocol-changed` y `new-features`)*
-
-- **Tamaño de fuente ajustable** en la terminal (rango 9–22) con botones +/−.
-- **Modo maximizado** de la ventana de terminal con re-ajuste automático del tamaño.
-- **Barra compacta** con información de la sesión y desconexión rápida.
-- **Scripts rápidos** (`SSH_QUICK_SCRIPTS`): barra de comandos predefinidos.
-- **Copiar selección** de la terminal al portapapeles:
-  - Botón dedicado "Copy selection".
-  - Atajo **Ctrl+Shift+C**.
-  - Mantiene el foco en la terminal al usar el botón.
-- Correcciones de conexión SSH tras el cambio de protocolo.
-
----
-
-## 📝 Plantillas / Notas
-
-*(commit `fix.notes-template`)*
-
-- Nueva plantilla por defecto **"Case Note"**, sembrada automáticamente en instalaciones
-  nuevas y existentes (control con `support_templates_default_seeded`).
-- **Autoguardado**: los borradores (`drafts`) quedan obsoletos — todo se guarda
-  automáticamente. Los borradores de sesión existentes se promueven a notas permanentes
-  y se limpia el almacén de borradores.
-- Ajustes de estilos en los cuatro temas (`styles.css`, `styles_aqua.css`,
-  `styles_dark.css`, `styles_grey.css`) para los componentes de notas.
-
----
-
-## 🔢 Información del dispositivo / Serial / DRM
-
-*(commit `serial`)*
-
-- **Scratchpad de información** del dispositivo con `ResizeObserver`.
-- **Copiar valores del dispositivo** al portapapeles (número de serie, etc.) con botones
-  de copia individuales.
-- **Búsqueda de dispositivo en Digi Remote Manager** por ID: abre DRM filtrado
-  (`openDrmDeviceSearch`).
-- **Celdas de detalle del dispositivo** (`createDeviceDetailValueCell`) con botón de copia.
-- Nuevo `styles_modern.css`: capa de estilo estructural sobre los cuatro temas.
-- `error.png` añadido para estados de error.
-
----
-
-## Resumen de commits
-
-| Commit | Hora | Descripción |
-|--------|------|-------------|
-| `4de7291` | 09:48 | serial — info del dispositivo, copia de valores, DRM, estilos modern |
-| `ffc394e` | 10:20 | fix.notes-template — plantilla Case Note + autoguardado |
-| `90e66d4` | 10:42 | ssh-fixed-after-protocol-changed — mejoras de terminal SSH |
-| `3d3240b` | 13:01 | new-features — copiar selección de terminal SSH |
-| `fcbb9ca` | 13:13 | search-bar-fixed-bug — barra de búsqueda en Web Console |
+Upgrade Notes
+-------------
+- No migration required. Existing free-text notes are parsed into the new structured fields automatically when opened.
