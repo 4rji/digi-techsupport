@@ -27,9 +27,22 @@ const THEME_STYLESHEETS = [
   { href: 'styles_grey.css', label: 'Grey' }
 ];
 const DEFAULT_LINE_NAMES = ['IX', 'TX', 'EX'];
+const USB_LINE_NAMES = ['AnywhereUSB', 'Edgeport'];
+const MY_OWN_DEVICES_LINE_NAME = 'My Own Devices';
+const REQUIRED_LINE_NAMES = [...DEFAULT_LINE_NAMES, MY_OWN_DEVICES_LINE_NAME, ...USB_LINE_NAMES];
+const PRODUCT_CATEGORIES = [
+  { id: 'cellular', label: 'Cellular', lineKeys: ['IX', 'TX', 'EX', 'MY OWN DEVICES'] },
+  { id: 'usb', label: 'USB', lineKeys: ['ANYWHEREUSB', 'EDGEPORT'] }
+];
 const FILE_SUPPORT_VIEW_ID = '__file_support__';
 const DEVICES_VIEW_ID = '__devices__';
-const BUILT_IN_VIEW_IDS = new Set([TEMPLATES_VIEW_ID, FILE_SUPPORT_VIEW_ID, DEVICES_VIEW_ID]);
+const CELLULAR_ALL_VIEW_ID = '__cellular_all__';
+const BUILT_IN_VIEW_IDS = new Set([
+  TEMPLATES_VIEW_ID,
+  FILE_SUPPORT_VIEW_ID,
+  DEVICES_VIEW_ID,
+  CELLULAR_ALL_VIEW_ID
+]);
 const DEVICES_AUTO_REFRESH_INTERVAL = 45000;
 const DEFAULT_FILE_SUPPORT_TREE_WIDTH = 220;
 const MIN_FILE_SUPPORT_TREE_WIDTH = 120;
@@ -64,6 +77,18 @@ const LOCKED_LINE_ITEMS = {
     'Digi EX15 Cellular Extender',
     'Digi EX50 5G Cellular Extender',
     'Digi CORE plug-in LTE modem'
+  ],
+  ANYWHEREUSB: [
+    '2 Plus',
+    '8 Plus',
+    '24 Plus'
+  ],
+  EDGEPORT: [
+    '1',
+    '2',
+    '4',
+    '8',
+    '16'
   ]
 };
 const DEFAULT_ITEM_IPS = {
@@ -1410,6 +1435,7 @@ const FILE_SUPPORT_QUICK_SEARCHES = [
 ];
 
 let productLines = [];
+let lastActiveLineByCategory = {};
 let supportTemplates = [];
 let templateDrafts = [];
 let activeLineId = '';
@@ -1805,6 +1831,25 @@ function getLineKey(line) {
   return String(line?.name || '').trim().toUpperCase();
 }
 
+function getCategoryForLine(line) {
+  const lineKey = getLineKey(line);
+  return PRODUCT_CATEGORIES.find(category => category.lineKeys.includes(lineKey)) || null;
+}
+
+function getActiveProductCategory() {
+  if (activeLineId === CELLULAR_ALL_VIEW_ID) {
+    return PRODUCT_CATEGORIES.find(category => category.id === 'cellular') || null;
+  }
+  return getCategoryForLine(getActiveLine());
+}
+
+function getCategoryLines(category) {
+  if (!category) return [];
+  return category.lineKeys
+    .map(lineKey => productLines.find(line => getLineKey(line) === lineKey))
+    .filter(Boolean);
+}
+
 function isLineLockedForManualItems(line) {
   return Object.prototype.hasOwnProperty.call(LOCKED_LINE_ITEMS, getLineKey(line));
 }
@@ -1813,6 +1858,9 @@ function getDefaultItemsForLine(line) {
   const lockedItems = LOCKED_LINE_ITEMS[getLineKey(line)];
   if (lockedItems) {
     return lockedItems.map(itemName => createNamedProductItem(itemName));
+  }
+  if (getLineKey(line) === MY_OWN_DEVICES_LINE_NAME.toUpperCase()) {
+    return Array.from({ length: 4 }, (_, index) => createNamedProductItem(`VM ${index + 1}`));
   }
   return [createProductItem(line)];
 }
@@ -2195,7 +2243,7 @@ function templateMatchesSearch(template, query) {
 }
 
 function createDefaultProductLines(legacyItems = []) {
-  return DEFAULT_LINE_NAMES.map((name, index) => {
+  return REQUIRED_LINE_NAMES.map((name, index) => {
     const line = createProductLine(name, { items: [] });
     if (index === 0 && legacyItems.length > 0) {
       line.items = legacyItems.map((item, itemIndex) => normalizeProductItem(item, itemIndex, name));
@@ -2203,6 +2251,15 @@ function createDefaultProductLines(legacyItems = []) {
       line.items = getDefaultItemsForLine(line);
     }
     return line;
+  });
+}
+
+function ensureRequiredProductLines() {
+  const existingKeys = new Set(productLines.map(getLineKey));
+  REQUIRED_LINE_NAMES.forEach(name => {
+    if (existingKeys.has(name.toUpperCase())) return;
+    productLines.push(createProductLine(name));
+    existingKeys.add(name.toUpperCase());
   });
 }
 
@@ -2271,6 +2328,7 @@ function initializeProductLines() {
   }
 
   recalculateCounters();
+  ensureRequiredProductLines();
   syncLockedLineItems();
   recalculateCounters();
 
@@ -2346,7 +2404,38 @@ function renderProductTabs() {
   createBuiltInTabButton(FILE_SUPPORT_VIEW_ID, 'File Support');
   createBuiltInTabButton(DEVICES_VIEW_ID, 'DRM');
 
-  productLines.forEach(line => {
+  PRODUCT_CATEGORIES.forEach(category => {
+    const categoryLines = getCategoryLines(category);
+    if (categoryLines.length === 0) return;
+
+    const activeCategory = getActiveProductCategory();
+    if (activeCategory?.id === category.id) {
+      lastActiveLineByCategory[category.id] = activeLineId;
+    }
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'tab-button';
+    button.dataset.categoryId = category.id;
+    button.textContent = category.label;
+    button.classList.toggle('active', activeCategory?.id === category.id);
+    button.addEventListener('click', () => {
+      if (category.id === 'cellular' && lastActiveLineByCategory[category.id] === CELLULAR_ALL_VIEW_ID) {
+        activeLineId = CELLULAR_ALL_VIEW_ID;
+        saveProductLines();
+        renderProductApp();
+        return;
+      }
+      const rememberedLine = categoryLines.find(line => line.id === lastActiveLineByCategory[category.id]);
+      activeLineId = rememberedLine?.id || categoryLines[0].id;
+      lastActiveLineByCategory[category.id] = activeLineId;
+      saveProductLines();
+      renderProductApp();
+    });
+    tabs.appendChild(button);
+  });
+
+  productLines.filter(line => !getCategoryForLine(line)).forEach(line => {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'tab-button';
@@ -2362,6 +2451,45 @@ function renderProductTabs() {
   });
 
   createBuiltInTabButton(TEMPLATES_VIEW_ID, 'Notes');
+}
+
+function renderProductCategoryTabs(workspace, category) {
+  if (!category) return;
+
+  const nav = document.createElement('nav');
+  nav.className = 'product-subtabs';
+  nav.setAttribute('aria-label', `${category.label} product categories`);
+
+  const label = document.createElement('span');
+  label.className = 'product-subtabs-label';
+  label.textContent = category.label;
+  nav.appendChild(label);
+
+  const appendSubtab = (labelText, viewId) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'product-subtab-button';
+    button.textContent = labelText;
+    button.classList.toggle('active', viewId === activeLineId);
+    button.setAttribute('aria-pressed', String(viewId === activeLineId));
+    button.addEventListener('click', () => {
+      activeLineId = viewId;
+      lastActiveLineByCategory[category.id] = viewId;
+      saveProductLines();
+      renderProductApp();
+    });
+    nav.appendChild(button);
+  };
+
+  if (category.id === 'cellular') {
+    appendSubtab('All', CELLULAR_ALL_VIEW_ID);
+  }
+
+  getCategoryLines(category).forEach(line => {
+    appendSubtab(line.name, line.id);
+  });
+
+  workspace.appendChild(nav);
 }
 
 function renderActiveLine() {
@@ -2397,6 +2525,16 @@ function renderActiveLine() {
     return;
   }
 
+  if (activeLineId === CELLULAR_ALL_VIEW_ID) {
+    const cellularCategory = PRODUCT_CATEGORIES.find(category => category.id === 'cellular');
+    renderProductCategoryTabs(workspace, cellularCategory);
+    const cellularLines = getCategoryLines(cellularCategory)
+      .filter(line => DEFAULT_LINE_NAMES.includes(getLineKey(line)));
+    const entries = cellularLines.flatMap(line => line.items.map(item => ({ line, item })));
+    renderProductCollection(workspace, 'All Cellular Devices', entries);
+    return;
+  }
+
   const line = getActiveLine();
 
   if (!line) {
@@ -2407,6 +2545,17 @@ function renderActiveLine() {
     return;
   }
 
+  renderProductCategoryTabs(workspace, getCategoryForLine(line));
+
+  renderProductCollection(
+    workspace,
+    line.name,
+    line.items.map(item => ({ line, item }))
+  );
+}
+
+function renderProductCollection(workspace, titleText, entries) {
+
   const header = document.createElement('div');
   header.className = 'vm-header monitor-header product-line-header';
   const headerText = document.createElement('div');
@@ -2415,7 +2564,7 @@ function renderActiveLine() {
   headerRow.className = 'monitor-header-row';
   const title = document.createElement('h2');
   title.id = 'product-line-header-title';
-  title.textContent = line.name;
+  title.textContent = titleText;
   headerRow.appendChild(title);
   headerText.appendChild(headerRow);
   header.appendChild(headerText);
@@ -2425,14 +2574,14 @@ function renderActiveLine() {
   grid.className = 'vm-grid monitor-grid product-grid';
   grid.id = 'product-grid';
 
-  if (line.items.length === 0) {
+  if (entries.length === 0) {
     grid.classList.add('empty');
     const emptyState = document.createElement('div');
     emptyState.className = 'monitor-placeholder-card';
     emptyState.innerHTML = '<h3>No products yet</h3>';
     grid.appendChild(emptyState);
   } else {
-    line.items.forEach(item => {
+    entries.forEach(({ line, item }) => {
       grid.appendChild(createProductCard(item, line));
     });
   }
@@ -9041,11 +9190,16 @@ function invalidatePortStatuses(itemId) {
 }
 
 function pollActiveLineStatuses() {
-  const line = getActiveLine();
-  if (!line) return;
-  line.items.forEach(item => {
-    scheduleHostCheck(item);
-    schedulePortChecks(item);
+  const lines = activeLineId === CELLULAR_ALL_VIEW_ID
+    ? getCategoryLines(PRODUCT_CATEGORIES.find(category => category.id === 'cellular'))
+      .filter(line => DEFAULT_LINE_NAMES.includes(getLineKey(line)))
+    : [getActiveLine()].filter(Boolean);
+
+  lines.forEach(line => {
+    line.items.forEach(item => {
+      scheduleHostCheck(item);
+      schedulePortChecks(item);
+    });
   });
 }
 
@@ -9124,6 +9278,7 @@ function applyImportedConfiguration(configData) {
   }
 
   recalculateCounters();
+  ensureRequiredProductLines();
   syncLockedLineItems();
   recalculateCounters();
   activeLineId = (

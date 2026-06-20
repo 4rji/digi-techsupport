@@ -239,6 +239,67 @@ select:focus-visible,
               var(--ui-shadow-sm);
 }
 
+.product-subtabs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 22px 20px 10px;
+  padding: 11px;
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--ui-r-pill);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.product-subtabs-label {
+  flex: 0 0 auto;
+  padding: 0 14px;
+  color: var(--app-muted, #9c9c9c);
+  font-size: 0.84rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.product-subtab-button {
+  flex: 0 0 auto;
+  min-width: 92px;
+  padding: 11px 20px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-r-pill);
+  background: transparent;
+  color: var(--app-text, #fff);
+  font: inherit;
+  font-size: 0.94rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--ui-base) var(--ui-ease),
+              border-color var(--ui-base) var(--ui-ease),
+              color var(--ui-base) var(--ui-ease);
+}
+
+.product-subtab-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.product-subtab-button.active {
+  border-color: rgba(var(--ui-accent-rgb), 0.65);
+  background: rgba(var(--ui-accent-rgb), 0.18);
+  color: var(--ui-accent, #4caf50);
+}
+
+@media (max-width: 720px) {
+  .product-subtabs {
+    margin-inline: 0;
+  }
+
+  .product-subtabs-label {
+    display: none;
+  }
+}
+
 /* --------------------------------------------------------------------------
    Cards
    -------------------------------------------------------------------------- */
