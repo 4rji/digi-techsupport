@@ -31,6 +31,8 @@ const CELLULAR_LEGACY_LINE_NAME = 'WR (Legacy)';
 const CELLULAR_CATALOG_LINE_NAMES = [...DEFAULT_LINE_NAMES, CELLULAR_LEGACY_LINE_NAME];
 const CELLULAR_CATALOG_LINE_KEYS = CELLULAR_CATALOG_LINE_NAMES.map(name => name.toUpperCase());
 const USB_LINE_NAMES = ['AnywhereUSB', 'Edgeport'];
+const SERIAL_LINE_NAMES = ['EZ', 'Legacy Products'];
+const SERIAL_CONNECTIVITY_URL = 'https://www.digi.com/products/networking/infrastructure-management/serial-connectivity';
 const MY_OWN_DEVICES_LINE_NAME = 'My Own Devices';
 const USB_MY_OWN_DEVICES_LINE_NAME = 'USB My Own Devices';
 const REQUIRED_LINE_NAMES = [
@@ -38,7 +40,8 @@ const REQUIRED_LINE_NAMES = [
   CELLULAR_LEGACY_LINE_NAME,
   MY_OWN_DEVICES_LINE_NAME,
   ...USB_LINE_NAMES,
-  USB_MY_OWN_DEVICES_LINE_NAME
+  USB_MY_OWN_DEVICES_LINE_NAME,
+  ...SERIAL_LINE_NAMES
 ];
 const PRODUCT_CATEGORIES = [
   {
@@ -46,7 +49,8 @@ const PRODUCT_CATEGORIES = [
     label: 'Cellular',
     lineKeys: ['IX', 'TX', 'EX', 'WR (LEGACY)', 'MY OWN DEVICES']
   },
-  { id: 'usb', label: 'USB', lineKeys: ['ANYWHEREUSB', 'EDGEPORT', 'USB MY OWN DEVICES'] }
+  { id: 'usb', label: 'USB', lineKeys: ['ANYWHEREUSB', 'EDGEPORT', 'USB MY OWN DEVICES'] },
+  { id: 'serial', label: 'Serial', lineKeys: ['EZ', 'LEGACY PRODUCTS'] }
 ];
 const FILE_SUPPORT_VIEW_ID = '__file_support__';
 const DEVICES_VIEW_ID = '__devices__';
@@ -110,6 +114,18 @@ const LOCKED_LINE_ITEMS = {
     'WR31',
     'WR44',
     'WR54'
+  ],
+  EZ: [
+    'EZ WS',
+    'EZ TS',
+    'EZ Mini/2/4',
+    'EZ 8',
+    'EZ 16/32'
+  ],
+  'LEGACY PRODUCTS': [
+    'ConnectPort TS',
+    'PortServer TS',
+    'Digi One'
   ]
 };
 const DEFAULT_ITEM_IPS = {
@@ -126,6 +142,20 @@ const DEFAULT_ITEM_IPS = {
   'Digi EX50 5G Cellular Extender': '10.10.65.72'
 };
 const LOCKED_ITEM_IMAGES = {
+  '2 Plus': 'https://www.digi.com/products/assets/anywhereusb-plus/anywhereusb_2plus_hero',
+  '8 Plus': 'https://www.digi.com/products/assets/anywhereusb-plus/anywhereusb_8plus_hero',
+  '24 Plus': 'https://www.digi.com/products/assets/anywhereusb-plus/anywhereusb_24plus_hero',
+  'Edgeport 1': 'https://www.digi.com/products/assets/products/edgeport',
+  'Edgeport 2': 'https://www.digi.com/products/assets/products/edgeport',
+  'Edgeport 4': 'https://www.digi.com/products/assets/products/edgeport',
+  'Edgeport 8': 'https://www.digi.com/products/assets/digi-edgeport/edgeport-8-db-9-8-rs-232',
+  'Edgeport 16': 'https://www.digi.com/products/assets/products/edgeport',
+  'Edgeport 32': 'https://www.digi.com/products/assets/products/edgeport',
+  'EZ WS': 'https://hub.digi.com/dp/image/path=/marketing/asset/digi-connect-ez-4-ws-jpg?q=70&_gl=1*1983me9*_gcl_au*MTQyNjM3NTM4NS4xNzgxMTE4NTUz*_ga*OTQ1MTkzNDczLjE3ODExMTg1NTQ.*_ga_RZXDK3PM3B*czE3ODE5NTQ1MDMkbzckZzEkdDE3ODE5NTY3NDUkajIwJGwwJGgxNjc2MTk2ODI3',
+  'EZ TS': 'https://assets.digi.com/asset/27facd36-05e1-4bc9-9809-b602d68852a9/Web-JPG/Digi-Connect-EZ-8-TS.jpg',
+  'EZ Mini/2/4': 'https://hub.digi.com/dp/image/path=/marketing/asset/digi-connect-ez-family-jpg/?q=70&_gl=1*pet188*_gcl_au*MTQyNjM3NTM4NS4xNzgxMTE4NTUz*_ga*OTQ1MTkzNDczLjE3ODExMTg1NTQ.*_ga_RZXDK3PM3B*czE3ODE5NTQ1MDMkbzckZzEkdDE3ODE5NTY5MjkkajUyJGwwJGgxNjc2MTk2ODI3',
+  'EZ 8': 'https://www.digi.com/products/assets/digi-connect-ez/digi-connect-ez-8',
+  'EZ 16/32': 'https://www.digi.com/products/assets/digi-connect-ez/digi-connect-ez-16',
   'Digi IX10 Industrial Cellular Router': 'img/digi-ix10.png',
   'Digi IX20 Industrial 4G LTE Router': 'img/digi-ix20.png',
   'Digi IX25 5G Industrial Cellular Router': 'img/digi-ix25.png',
@@ -270,6 +300,94 @@ const PRODUCT_LINKS = {
     {
       label: 'Website',
       url: 'https://www.digi.com/products/networking/cellular-routers/enterprise/digi-core-plug-in-lte-modem'
+    }
+  ],
+  '2 Plus': [
+    {
+      label: 'G300',
+      url: 'https://www.digi.com/products/models/aw02-g300'
+    },
+    {
+      label: 'G300-GLB',
+      url: 'https://www.digi.com/products/models/aw02-g300-glb'
+    }
+  ],
+  '8 Plus': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/models/aw08-g300'
+    }
+  ],
+  '24 Plus': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/models/aw24-g300'
+    }
+  ],
+  'Edgeport 1': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/infrastructure-management/usb-connectivity/usb-to-serial/edgeport'
+    }
+  ],
+  'Edgeport 2': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/infrastructure-management/usb-connectivity/usb-to-serial/edgeport'
+    }
+  ],
+  'Edgeport 4': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/infrastructure-management/usb-connectivity/usb-to-serial/edgeport'
+    }
+  ],
+  'Edgeport 8': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/infrastructure-management/usb-connectivity/usb-to-serial/edgeport'
+    }
+  ],
+  'Edgeport 16': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/infrastructure-management/usb-connectivity/usb-to-serial/edgeport'
+    }
+  ],
+  'Edgeport 32': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/infrastructure-management/usb-connectivity/usb-to-serial/edgeport'
+    }
+  ],
+  'EZ WS': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/infrastructure-management/serial-connectivity/device-servers/digi-connect-ez-ws'
+    }
+  ],
+  'EZ TS': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/infrastructure-management/serial-connectivity/device-servers/digi-connect-ez-ts'
+    }
+  ],
+  'EZ Mini/2/4': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/infrastructure-management/serial-connectivity/device-servers/digi-connect-ez'
+    }
+  ],
+  'EZ 8': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/infrastructure-management/serial-connectivity/terminal-servers/digi-connect-ez-8'
+    }
+  ],
+  'EZ 16/32': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/infrastructure-management/serial-connectivity/terminal-servers/digi-connect-ez-16-32'
     }
   ]
 };
@@ -2541,6 +2659,17 @@ function renderProductCategoryTabs(workspace, category) {
   getCategoryLines(category).forEach(line => {
     appendSubtab(getLineDisplayName(line), line.id);
   });
+
+  if (category.id === 'serial') {
+    const productLink = document.createElement('a');
+    productLink.className = 'product-category-link';
+    productLink.href = SERIAL_CONNECTIVITY_URL;
+    productLink.target = '_blank';
+    productLink.rel = 'noopener noreferrer';
+    productLink.textContent = 'Serial Connectivity ↗';
+    productLink.title = 'Open Digi Serial Connectivity products';
+    nav.appendChild(productLink);
+  }
 
   workspace.appendChild(nav);
 }
@@ -7295,7 +7424,12 @@ function createProductCard(item, line) {
     anchor.href = link.url;
     anchor.target = '_blank';
     anchor.rel = 'noopener noreferrer';
-    anchor.textContent = link.label;
+    const webIcon = document.createElement('span');
+    webIcon.className = 'product-web-icon';
+    webIcon.setAttribute('aria-hidden', 'true');
+    webIcon.textContent = '🌐';
+    anchor.appendChild(webIcon);
+    anchor.appendChild(document.createTextNode(link.label));
     anchor.addEventListener('click', (event) => {
       event.stopPropagation();
     });
@@ -7391,7 +7525,11 @@ function openItemHTTPS(itemId) {
     return;
   }
 
-  window.open(url, '_blank', 'noopener,noreferrer,width=1280,height=860');
+  window.open(
+    url,
+    `digi-web-console-${itemId}`,
+    'noopener,noreferrer,width=1280,height=860'
+  );
 }
 
 function createDocsSearchForm(item) {

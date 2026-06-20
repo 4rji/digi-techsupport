@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 const path = require('path');
 const net = require('net');
 const fs = require('fs');
@@ -66,6 +66,19 @@ function isRouterCertificateURL(url) {
   try {
     const parsedURL = new URL(url);
     return parsedURL.protocol === 'https:' && isPrivateOrLocalHost(parsedURL.hostname);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function openInDefaultBrowser(rawURL) {
+  try {
+    const parsedURL = new URL(rawURL);
+    if (!['http:', 'https:'].includes(parsedURL.protocol)) return false;
+    shell.openExternal(parsedURL.toString()).catch(error => {
+      console.error('Could not open URL in the default browser:', error);
+    });
+    return true;
   } catch (_error) {
     return false;
   }
@@ -2341,8 +2354,27 @@ function createWindow() {
     mainWindow = null;
   });
 
+  mainWindow.webContents.setWindowOpenHandler((details) => {
+    const frameName = String(details?.frameName || '');
+    const isWebConsole = frameName.startsWith('digi-web-console-')
+      || isRouterCertificateURL(details?.url);
+
+    if (isWebConsole) {
+      return { action: 'allow' };
+    }
+
+    openInDefaultBrowser(details?.url);
+    return { action: 'deny' };
+  });
+
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!openInDefaultBrowser(url)) return;
+    event.preventDefault();
+  });
+
   mainWindow.webContents.on('did-create-window', (childWindow, details) => {
-    if (!details || !isRouterCertificateURL(details.url)) return;
+    const frameName = String(details?.frameName || '');
+    if (!details || (!frameName.startsWith('digi-web-console-') && !isRouterCertificateURL(details.url))) return;
     configureRouterWebWindow(childWindow.webContents);
   });
 
