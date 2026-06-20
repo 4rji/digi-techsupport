@@ -27,12 +27,26 @@ const THEME_STYLESHEETS = [
   { href: 'styles_grey.css', label: 'Grey' }
 ];
 const DEFAULT_LINE_NAMES = ['IX', 'TX', 'EX'];
+const CELLULAR_LEGACY_LINE_NAME = 'WR (Legacy)';
+const CELLULAR_CATALOG_LINE_NAMES = [...DEFAULT_LINE_NAMES, CELLULAR_LEGACY_LINE_NAME];
+const CELLULAR_CATALOG_LINE_KEYS = CELLULAR_CATALOG_LINE_NAMES.map(name => name.toUpperCase());
 const USB_LINE_NAMES = ['AnywhereUSB', 'Edgeport'];
 const MY_OWN_DEVICES_LINE_NAME = 'My Own Devices';
-const REQUIRED_LINE_NAMES = [...DEFAULT_LINE_NAMES, MY_OWN_DEVICES_LINE_NAME, ...USB_LINE_NAMES];
+const USB_MY_OWN_DEVICES_LINE_NAME = 'USB My Own Devices';
+const REQUIRED_LINE_NAMES = [
+  ...DEFAULT_LINE_NAMES,
+  CELLULAR_LEGACY_LINE_NAME,
+  MY_OWN_DEVICES_LINE_NAME,
+  ...USB_LINE_NAMES,
+  USB_MY_OWN_DEVICES_LINE_NAME
+];
 const PRODUCT_CATEGORIES = [
-  { id: 'cellular', label: 'Cellular', lineKeys: ['IX', 'TX', 'EX', 'MY OWN DEVICES'] },
-  { id: 'usb', label: 'USB', lineKeys: ['ANYWHEREUSB', 'EDGEPORT'] }
+  {
+    id: 'cellular',
+    label: 'Cellular',
+    lineKeys: ['IX', 'TX', 'EX', 'WR (LEGACY)', 'MY OWN DEVICES']
+  },
+  { id: 'usb', label: 'USB', lineKeys: ['ANYWHEREUSB', 'EDGEPORT', 'USB MY OWN DEVICES'] }
 ];
 const FILE_SUPPORT_VIEW_ID = '__file_support__';
 const DEVICES_VIEW_ID = '__devices__';
@@ -84,11 +98,18 @@ const LOCKED_LINE_ITEMS = {
     '24 Plus'
   ],
   EDGEPORT: [
-    '1',
-    '2',
-    '4',
-    '8',
-    '16'
+    'Edgeport 1',
+    'Edgeport 2',
+    'Edgeport 4',
+    'Edgeport 8',
+    'Edgeport 16',
+    'Edgeport 32'
+  ],
+  'WR (LEGACY)': [
+    'WR21',
+    'WR31',
+    'WR44',
+    'WR54'
   ]
 };
 const DEFAULT_ITEM_IPS = {
@@ -1839,6 +1860,12 @@ function getCategoryForLine(line) {
   return PRODUCT_CATEGORIES.find(category => category.lineKeys.includes(lineKey)) || null;
 }
 
+function getLineDisplayName(line) {
+  return line?.name === USB_MY_OWN_DEVICES_LINE_NAME
+    ? MY_OWN_DEVICES_LINE_NAME
+    : line?.name || '';
+}
+
 function getActiveProductCategory() {
   if (activeLineId === CELLULAR_ALL_VIEW_ID) {
     return PRODUCT_CATEGORIES.find(category => category.id === 'cellular') || null;
@@ -1862,7 +1889,9 @@ function getDefaultItemsForLine(line) {
   if (lockedItems) {
     return lockedItems.map(itemName => createNamedProductItem(itemName));
   }
-  if (getLineKey(line) === MY_OWN_DEVICES_LINE_NAME.toUpperCase()) {
+  if ([MY_OWN_DEVICES_LINE_NAME, USB_MY_OWN_DEVICES_LINE_NAME]
+    .map(name => name.toUpperCase())
+    .includes(getLineKey(line))) {
     return Array.from({ length: 4 }, (_, index) => createNamedProductItem(`VM ${index + 1}`));
   }
   return [createProductItem(line)];
@@ -2260,6 +2289,12 @@ function createDefaultProductLines(legacyItems = []) {
 }
 
 function ensureRequiredProductLines() {
+  const previousWrLine = productLines.find(line => getLineKey(line) === 'WR SERIES (LEGACY)');
+  const currentWrLine = productLines.find(line => getLineKey(line) === 'WR (LEGACY)');
+  if (previousWrLine && !currentWrLine) {
+    previousWrLine.name = CELLULAR_LEGACY_LINE_NAME;
+  }
+
   const existingKeys = new Set(productLines.map(getLineKey));
   REQUIRED_LINE_NAMES.forEach(name => {
     if (existingKeys.has(name.toUpperCase())) return;
@@ -2277,7 +2312,18 @@ function syncLockedLineItems() {
       (line.items || []).map(item => [item.defaultName || item.name, item])
     );
     line.items = lockedNames.map((name, index) => {
-      const existingItem = existingByName.get(name);
+      let existingItem = existingByName.get(name);
+      if (!existingItem && getLineKey(line) === 'EDGEPORT') {
+        const legacyName = name.replace(/^Edgeport\s+/i, '');
+        existingItem = existingByName.get(legacyName);
+        if (existingItem) {
+          const previousDefaultName = existingItem.defaultName || existingItem.name;
+          if (existingItem.name === previousDefaultName) {
+            existingItem.name = name;
+          }
+          existingItem.defaultName = name;
+        }
+      }
       const item = normalizeProductItem(existingItem || createNamedProductItem(name), index, line.name);
       item.imageUrl = LOCKED_ITEM_IMAGES[name] || item.imageUrl;
       if (!item.ip && DEFAULT_ITEM_IPS[name]) {
@@ -2493,7 +2539,7 @@ function renderProductCategoryTabs(workspace, category) {
   }
 
   getCategoryLines(category).forEach(line => {
-    appendSubtab(line.name, line.id);
+    appendSubtab(getLineDisplayName(line), line.id);
   });
 
   workspace.appendChild(nav);
@@ -2536,7 +2582,7 @@ function renderActiveLine() {
     const cellularCategory = PRODUCT_CATEGORIES.find(category => category.id === 'cellular');
     renderProductCategoryTabs(workspace, cellularCategory);
     const cellularLines = getCategoryLines(cellularCategory)
-      .filter(line => DEFAULT_LINE_NAMES.includes(getLineKey(line)));
+      .filter(line => CELLULAR_CATALOG_LINE_KEYS.includes(getLineKey(line)));
     const entries = cellularLines.flatMap(line => line.items.map(item => ({ line, item })));
     renderProductCollection(workspace, 'All Cellular Devices', entries);
     return;
@@ -2556,7 +2602,7 @@ function renderActiveLine() {
 
   renderProductCollection(
     workspace,
-    line.name,
+    getLineDisplayName(line),
     line.items.map(item => ({ line, item }))
   );
 }
@@ -9228,7 +9274,7 @@ function invalidatePortStatuses(itemId) {
 function pollActiveLineStatuses() {
   const lines = activeLineId === CELLULAR_ALL_VIEW_ID
     ? getCategoryLines(PRODUCT_CATEGORIES.find(category => category.id === 'cellular'))
-      .filter(line => DEFAULT_LINE_NAMES.includes(getLineKey(line)))
+      .filter(line => CELLULAR_CATALOG_LINE_KEYS.includes(getLineKey(line)))
     : [getActiveLine()].filter(Boolean);
 
   lines.forEach(line => {
