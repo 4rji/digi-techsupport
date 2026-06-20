@@ -1792,9 +1792,11 @@ function getNextItemName(line) {
 }
 
 function createProductItem(line) {
+  const name = getNextItemName(line);
   return {
     id: createItemId(),
-    name: getNextItemName(line),
+    name,
+    defaultName: name,
     ip: '',
     imageUrl: '',
     ports: [],
@@ -1807,6 +1809,7 @@ function createNamedProductItem(name) {
   return {
     id: createItemId(),
     name,
+    defaultName: name,
     ip: DEFAULT_ITEM_IPS[name] || '',
     imageUrl: LOCKED_ITEM_IMAGES[name] || '',
     ports: [],
@@ -1866,7 +1869,7 @@ function getDefaultItemsForLine(line) {
 }
 
 function getProductImages(item) {
-  const variants = LOCKED_ITEM_IMAGE_VARIANTS[item?.name];
+  const variants = LOCKED_ITEM_IMAGE_VARIANTS[item?.defaultName || item?.name];
   if (Array.isArray(variants) && variants.length > 0) {
     return variants;
   }
@@ -1921,11 +1924,13 @@ function normalizeProductItem(item, index, lineName) {
   const intervalValue = parseInt(item?.scanInterval, 10);
   const fallbackId = item?.id || createItemId();
   const fallbackName = item?.name || item?.description || `${lineName}-${String(index + 1).padStart(2, '0')}`;
+  const defaultName = item?.defaultName || fallbackName;
 
   return {
     id: fallbackId,
     name: fallbackName,
-    ip: item?.ip || DEFAULT_ITEM_IPS[fallbackName] || '',
+    defaultName,
+    ip: item?.ip || DEFAULT_ITEM_IPS[defaultName] || '',
     imageUrl: item?.imageUrl || item?.image || '',
     ports: normalizePorts(item?.ports),
     scanInterval: Number.isNaN(intervalValue) || intervalValue < 1 ? 5 : intervalValue,
@@ -2268,7 +2273,9 @@ function syncLockedLineItems() {
     const lockedNames = LOCKED_LINE_ITEMS[getLineKey(line)];
     if (!lockedNames) return;
 
-    const existingByName = new Map((line.items || []).map(item => [item.name, item]));
+    const existingByName = new Map(
+      (line.items || []).map(item => [item.defaultName || item.name, item])
+    );
     line.items = lockedNames.map((name, index) => {
       const existingItem = existingByName.get(name);
       const item = normalizeProductItem(existingItem || createNamedProductItem(name), index, line.name);
@@ -7231,7 +7238,8 @@ function createProductCard(item, line) {
   dns.className = 'product-dns';
   dns.textContent = item.dnsDomain || '';
 
-  const links = PRODUCT_LINKS[item.name] || [];
+  const productMetadataName = item.defaultName || item.name;
+  const links = PRODUCT_LINKS[productMetadataName] || [];
   const linksRow = document.createElement('div');
   linksRow.className = 'product-links';
   const sshRow = document.createElement('div');
@@ -7267,14 +7275,14 @@ function createProductCard(item, line) {
     openItemHTTPS(item.id);
   });
   sshRow.appendChild(httpsButton);
-  if (PRODUCT_SPECS[item.name]) {
+  if (PRODUCT_SPECS[productMetadataName]) {
     const specsButton = document.createElement('button');
     specsButton.type = 'button';
     specsButton.className = 'product-link-button';
     specsButton.textContent = 'Specs';
     specsButton.addEventListener('click', (event) => {
       event.stopPropagation();
-      openProductSpecsModal(item.name);
+      openProductSpecsModal(productMetadataName);
     });
     linksRow.appendChild(specsButton);
   }
@@ -7341,7 +7349,8 @@ function openItemHTTPS(itemId) {
 }
 
 function createDocsSearchForm(item) {
-  if (!buildDocsSearchUrl(item.name)) return null;
+  const productMetadataName = item.defaultName || item.name;
+  if (!buildDocsSearchUrl(productMetadataName)) return null;
 
   const form = document.createElement('form');
   form.className = 'docs-search-form';
@@ -7370,7 +7379,7 @@ function createDocsSearchForm(item) {
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     event.stopPropagation();
-    openDocsSearch(item.name, input.value);
+    openDocsSearch(productMetadataName, input.value);
   });
 
   return form;
@@ -7442,6 +7451,8 @@ function resetItemConfigTemp() {
 
 function openItemConfigModal(itemId) {
   const modal = document.getElementById('item-config-modal');
+  const nameInput = document.getElementById('item-name');
+  const restoreNameButton = document.getElementById('restore-item-name');
   const ipInput = document.getElementById('item-ip');
   const imageInput = document.getElementById('item-image');
   const imageFileInput = document.getElementById('item-image-file');
@@ -7449,13 +7460,18 @@ function openItemConfigModal(itemId) {
   const dnsInput = document.getElementById('item-dns-domain');
   const match = findItemById(itemId);
 
-  if (!modal || !ipInput || !match) return;
+  if (!modal || !nameInput || !ipInput || !match) return;
 
   editingItemId = itemId;
+  match.item.defaultName = match.item.defaultName || match.item.name;
   resetItemConfigTemp();
   itemConfigTemp.imageUrl = match.item.imageUrl || '';
   itemConfigTemp.ports = normalizePorts(match.item.ports);
 
+  nameInput.value = match.item.name || '';
+  if (restoreNameButton) {
+    restoreNameButton.disabled = match.item.name === match.item.defaultName;
+  }
   ipInput.value = match.item.ip || '';
   if (imageInput) {
     imageInput.value = itemConfigTemp.imageUrl.startsWith('data:') ? '' : itemConfigTemp.imageUrl;
@@ -8264,6 +8280,8 @@ function setupItemConfigModal() {
   const closeButton = document.getElementById('close-item-config');
   const cancelButton = document.getElementById('cancel-item-config');
   const form = document.getElementById('item-config-form');
+  const nameInput = document.getElementById('item-name');
+  const restoreNameButton = document.getElementById('restore-item-name');
   const ipInput = document.getElementById('item-ip');
   const imageInput = document.getElementById('item-image');
   const imageFileInput = document.getElementById('item-image-file');
@@ -8274,7 +8292,24 @@ function setupItemConfigModal() {
   const clearPortsButton = document.getElementById('item-clear-ports');
   const portInput = document.getElementById('item-port-input');
 
-  if (!modal || !form || !ipInput) return;
+  if (!modal || !form || !nameInput || !ipInput) return;
+
+  nameInput.addEventListener('input', () => {
+    if (!restoreNameButton || !editingItemId) return;
+    const match = findItemById(editingItemId);
+    restoreNameButton.disabled = !match || nameInput.value.trim() === match.item.defaultName;
+  });
+
+  if (restoreNameButton) {
+    restoreNameButton.addEventListener('click', () => {
+      if (!editingItemId) return;
+      const match = findItemById(editingItemId);
+      if (!match) return;
+      nameInput.value = match.item.defaultName || match.item.name;
+      restoreNameButton.disabled = true;
+      nameInput.focus();
+    });
+  }
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -8290,6 +8325,7 @@ function setupItemConfigModal() {
     const imageUrlFromInput = imageInput ? imageInput.value.trim() : '';
     const parsedInterval = scanIntervalInput ? parseInt(scanIntervalInput.value, 10) : 5;
 
+    match.item.name = nameInput.value.trim();
     match.item.ip = ipInput.value.trim();
     match.item.imageUrl = imageUrlFromInput || itemConfigTemp.imageUrl || '';
     match.item.ports = [...itemConfigTemp.ports];

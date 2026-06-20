@@ -290,6 +290,27 @@ select:focus-visible,
   color: var(--ui-accent, #4caf50);
 }
 
+.product-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.product-name-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.restore-product-name-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.restore-product-name-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 @media (max-width: 720px) {
   .product-subtabs {
     margin-inline: 0;
@@ -297,6 +318,11 @@ select:focus-visible,
 
   .product-subtabs-label {
     display: none;
+  }
+
+  .product-name-row {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 
