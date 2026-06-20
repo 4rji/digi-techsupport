@@ -360,7 +360,6 @@ select:focus-visible,
 
 .product-category-link {
   flex: 0 0 auto;
-  margin-left: auto;
   padding: 10px 16px;
   border: 1px solid rgba(var(--ui-accent-rgb), 0.34);
   border-radius: var(--ui-r-pill);
@@ -375,6 +374,14 @@ select:focus-visible,
 .product-category-link:hover {
   border-color: rgba(var(--ui-accent-rgb), 0.62);
   background: rgba(var(--ui-accent-rgb), 0.18);
+}
+
+.product-category-links {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
 }
 
 .product-links a {

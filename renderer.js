@@ -31,6 +31,7 @@ const CELLULAR_LEGACY_LINE_NAME = 'WR (Legacy)';
 const CELLULAR_CATALOG_LINE_NAMES = [...DEFAULT_LINE_NAMES, CELLULAR_LEGACY_LINE_NAME];
 const CELLULAR_CATALOG_LINE_KEYS = CELLULAR_CATALOG_LINE_NAMES.map(name => name.toUpperCase());
 const CELLULAR_ROUTERS_URL = 'https://www.digi.com/products/networking/cellular-routers';
+const INFRASTRUCTURE_SUPPORT_RESOURCE_URL = 'https://hub.digi.com/support/products/infrastructure-management/';
 const USB_LINE_NAMES = ['AnywhereUSB', 'Edgeport'];
 const USB_CONNECTIVITY_URL = 'https://www.digi.com/products/networking/infrastructure-management/usb-connectivity';
 const SERIAL_LINE_NAMES = ['EZ', 'Legacy Products'];
@@ -168,6 +169,9 @@ const LOCKED_ITEM_IMAGES = {
   'EZ 4i': 'https://hub.digi.com/dp/path=/image/fileasset1713,fmt=square400,bg=ffffff,c=0,v=1',
   'EZ 8': 'https://www.digi.com/products/assets/digi-connect-ez/digi-connect-ez-8',
   'EZ 16/32': 'https://www.digi.com/products/assets/digi-connect-ez/digi-connect-ez-16',
+  'ConnectPort TS': 'https://hub.digi.com/dp/path=/image/product-line/connectport-ts-8-16,fmt=square400,bg=ffffff,c=0,v=1',
+  'Digi One': 'https://hub.digi.com/dp/path=/images/products/digi-one-sp-ia-family/,fmt=square400,bg=ffffff,c=0,v=1',
+  'PortServer TS': 'https://hub.digi.com/dp/path=/image/product-line/portserver-ts,fmt=square400,bg=ffffff,c=0,v=1',
   'Digi IX10 Industrial Cellular Router': 'img/digi-ix10.png',
   'Digi IX20 Industrial 4G LTE Router': 'img/digi-ix20.png',
   'Digi IX25 5G Industrial Cellular Router': 'img/digi-ix25.png',
@@ -447,6 +451,24 @@ const PRODUCT_LINKS = {
     {
       label: 'Website',
       url: 'https://www.digi.com/products/networking/infrastructure-management/serial-connectivity/terminal-servers/digi-connect-ez-16-32'
+    }
+  ],
+  'ConnectPort TS': [
+    {
+      label: 'Website',
+      url: 'https://hub.digi.com/support/products/infrastructure-management/digi-connectport-ts-8-16-terminal-server/'
+    }
+  ],
+  'Digi One': [
+    {
+      label: 'Website',
+      url: 'https://hub.digi.com/support/products/infrastructure-management/digi-one-sp-ia/'
+    }
+  ],
+  'PortServer TS': [
+    {
+      label: 'Website',
+      url: 'https://hub.digi.com/support/products/infrastructure-management/digi-portserver-ts/'
     }
   ]
 };
@@ -2017,7 +2039,10 @@ const PRODUCT_DOCS_URLS = {
   'EZ Mini': 'https://docs.digi.com/resources/documentation/digidocs/90002409/default.htm',
   'EZ 2': 'https://docs.digi.com/resources/documentation/digidocs/90002458/default.htm',
   'EZ 4': 'https://docs.digi.com/resources/documentation/digidocs/90002459/default.htm',
-  'EZ 4i': 'https://docs.digi.com/resources/documentation/digidocs/90002459/default.htm'
+  'EZ 4i': 'https://docs.digi.com/resources/documentation/digidocs/90002459/default.htm',
+  'ConnectPort TS': 'https://docs.digi.com/resources/documentation/digidocs/90000630/default.htm',
+  'Digi One': 'https://docs.digi.com/resources/documentation/digidocs/90000630/default.htm',
+  'PortServer TS': 'https://docs.digi.com/resources/documentation/digidocs/90000630/default.htm'
 };
 
 const KNOWN_PORT_SERVICES = {
@@ -3260,15 +3285,19 @@ function renderProductCategoryTabs(workspace, category) {
   const connectivityLink = connectivityLinks[category.id];
 
   if (connectivityLink) {
-    const productLink = document.createElement('a');
-    productLink.className = 'product-category-link';
-    productLink.href = connectivityLink.url;
-    productLink.target = '_blank';
-    productLink.rel = 'noopener noreferrer';
-    productLink.title = `Open Digi ${connectivityLink.titleLabel} products`;
-    productLink.textContent = 'Official Website ↗';
+    const linkGroup = document.createElement('div');
+    linkGroup.className = 'product-category-links';
 
-    nav.appendChild(productLink);
+    const supportLink = document.createElement('a');
+    supportLink.className = 'product-category-link';
+    supportLink.href = INFRASTRUCTURE_SUPPORT_RESOURCE_URL;
+    supportLink.target = '_blank';
+    supportLink.rel = 'noopener noreferrer';
+    supportLink.title = 'Open Digi Infrastructure Management support resources';
+    supportLink.textContent = 'Support Resource ↗';
+
+    linkGroup.appendChild(supportLink);
+    nav.appendChild(linkGroup);
   }
 
   workspace.appendChild(nav);
