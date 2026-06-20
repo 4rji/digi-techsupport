@@ -106,6 +106,9 @@ const logWrapper = (name, fn) => async (...args) => {
 };
 
 contextBridge.exposeInMainWorld('appAPI', {
+  changeAppZoom: logWrapper('changeAppZoom', (direction) => {
+    return ipcRenderer.invoke('change-app-zoom', direction);
+  }),
   pingHost: logWrapper('pingHost', (host, timeout = 3000) => {
     return ipcRenderer.invoke('ping-host', host, timeout);
   }),

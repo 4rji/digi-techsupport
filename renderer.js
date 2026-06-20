@@ -30,7 +30,9 @@ const DEFAULT_LINE_NAMES = ['IX', 'TX', 'EX'];
 const CELLULAR_LEGACY_LINE_NAME = 'WR (Legacy)';
 const CELLULAR_CATALOG_LINE_NAMES = [...DEFAULT_LINE_NAMES, CELLULAR_LEGACY_LINE_NAME];
 const CELLULAR_CATALOG_LINE_KEYS = CELLULAR_CATALOG_LINE_NAMES.map(name => name.toUpperCase());
+const CELLULAR_ROUTERS_URL = 'https://www.digi.com/products/networking/cellular-routers';
 const USB_LINE_NAMES = ['AnywhereUSB', 'Edgeport'];
+const USB_CONNECTIVITY_URL = 'https://www.digi.com/products/networking/infrastructure-management/usb-connectivity';
 const SERIAL_LINE_NAMES = ['EZ', 'Legacy Products'];
 const SERIAL_CONNECTIVITY_URL = 'https://www.digi.com/products/networking/infrastructure-management/serial-connectivity';
 const MY_OWN_DEVICES_LINE_NAME = 'My Own Devices';
@@ -118,7 +120,10 @@ const LOCKED_LINE_ITEMS = {
   EZ: [
     'EZ WS',
     'EZ TS',
-    'EZ Mini/2/4',
+    'EZ Mini',
+    'EZ 2',
+    'EZ 4',
+    'EZ 4i',
     'EZ 8',
     'EZ 16/32'
   ],
@@ -151,9 +156,16 @@ const LOCKED_ITEM_IMAGES = {
   'Edgeport 8': 'https://www.digi.com/products/assets/digi-edgeport/edgeport-8-db-9-8-rs-232',
   'Edgeport 16': 'https://www.digi.com/products/assets/products/edgeport',
   'Edgeport 32': 'https://www.digi.com/products/assets/products/edgeport',
+  WR21: 'https://hub.digi.com/dp/path=/image/product-line/digi-transport-wr21,fmt=square400,bg=ffffff,c=0,v=1',
+  WR31: 'https://www.digi.com/products/assets/products/digitransportwr31',
+  WR44: 'https://www.digi.com/products/networking/cellular-routers/transportation/digi-transport-wr44-rr/product-images/digi-transport-wr44-rr',
+  WR54: 'https://hub.digi.com/dp/path=/image/product-line/tx54,fmt=square400,bg=ffffff,c=0,v=1',
   'EZ WS': 'https://hub.digi.com/dp/image/path=/marketing/asset/digi-connect-ez-4-ws-jpg?q=70&_gl=1*1983me9*_gcl_au*MTQyNjM3NTM4NS4xNzgxMTE4NTUz*_ga*OTQ1MTkzNDczLjE3ODExMTg1NTQ.*_ga_RZXDK3PM3B*czE3ODE5NTQ1MDMkbzckZzEkdDE3ODE5NTY3NDUkajIwJGwwJGgxNjc2MTk2ODI3',
   'EZ TS': 'https://assets.digi.com/asset/27facd36-05e1-4bc9-9809-b602d68852a9/Web-JPG/Digi-Connect-EZ-8-TS.jpg',
-  'EZ Mini/2/4': 'https://hub.digi.com/dp/image/path=/marketing/asset/digi-connect-ez-family-jpg/?q=70&_gl=1*pet188*_gcl_au*MTQyNjM3NTM4NS4xNzgxMTE4NTUz*_ga*OTQ1MTkzNDczLjE3ODExMTg1NTQ.*_ga_RZXDK3PM3B*czE3ODE5NTQ1MDMkbzckZzEkdDE3ODE5NTY5MjkkajUyJGwwJGgxNjc2MTk2ODI3',
+  'EZ Mini': 'https://hub.digi.com/dp/image/path=/marketing/asset/digi-connect-ez-mini-hero-jpg/?q=70&_gl=1*kgnstf*_gcl_au*MTQyNjM3NTM4NS4xNzgxMTE4NTUz*_ga*OTQ1MTkzNDczLjE3ODExMTg1NTQ.*_ga_RZXDK3PM3B*czE3ODE5NTQ1MDMkbzckZzEkdDE3ODE5NTkyMzAkajI4JGwwJGgxNjc2MTk2ODI3',
+  'EZ 2': 'https://hub.digi.com/dp/path=/image/4107/,fmt=square400,bg=ffffff,c=1,v=2',
+  'EZ 4': 'https://hub.digi.com/dp/path=/image/fileasset1740,fmt=square400,bg=ffffff,c=0,v=1',
+  'EZ 4i': 'https://hub.digi.com/dp/path=/image/fileasset1713,fmt=square400,bg=ffffff,c=0,v=1',
   'EZ 8': 'https://www.digi.com/products/assets/digi-connect-ez/digi-connect-ez-8',
   'EZ 16/32': 'https://www.digi.com/products/assets/digi-connect-ez/digi-connect-ez-16',
   'Digi IX10 Industrial Cellular Router': 'img/digi-ix10.png',
@@ -216,6 +228,11 @@ const LOCKED_ITEM_IMAGE_VARIANTS = {
     'img/digi-ex50-left.png',
     'img/digi-ex50-right.png',
     'img/digi-ex50-back.png'
+  ],
+  'EZ Mini': [
+    'https://hub.digi.com/dp/image/path=/marketing/asset/digi-connect-ez-mini-hero-jpg/?q=70&_gl=1*kgnstf*_gcl_au*MTQyNjM3NTM4NS4xNzgxMTE4NTUz*_ga*OTQ1MTkzNDczLjE3ODExMTg1NTQ.*_ga_RZXDK3PM3B*czE3ODE5NTQ1MDMkbzckZzEkdDE3ODE5NTkyMzAkajI4JGwwJGgxNjc2MTk2ODI3',
+    'https://hub.digi.com/dp/image/path=/marketing/asset/digi-connect-ez-mini-front-jpg/?q=70&_gl=1*1luc0x8*_gcl_au*MTQyNjM3NTM4NS4xNzgxMTE4NTUz*_ga*OTQ1MTkzNDczLjE3ODExMTg1NTQ.*_ga_RZXDK3PM3B*czE3ODE5NTQ1MDMkbzckZzEkdDE3ODE5NTkyMzAkajI4JGwwJGgxNjc2MTk2ODI3',
+    'https://hub.digi.com/dp/image/path=/marketing/asset/digi-connect-ez-mini-back-jpg/?q=70&_gl=1*1luc0x8*_gcl_au*MTQyNjM3NTM4NS4xNzgxMTE4NTUz*_ga*OTQ1MTkzNDczLjE3ODExMTg1NTQ.*_ga_RZXDK3PM3B*czE3ODE5NTQ1MDMkbzckZzEkdDE3ODE5NTkyMzAkajI4JGwwJGgxNjc2MTk2ODI3'
   ],
   'Digi CORE plug-in LTE modem': [
     'img/digi-core-cm-18.jpg',
@@ -360,6 +377,30 @@ const PRODUCT_LINKS = {
       url: 'https://www.digi.com/products/networking/infrastructure-management/usb-connectivity/usb-to-serial/edgeport'
     }
   ],
+  WR21: [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/cellular-routers/digi-transport-wr21'
+    }
+  ],
+  WR31: [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/cellular-routers/digi-transport-wr31'
+    }
+  ],
+  WR44: [
+    {
+      label: 'Website WR44 RR',
+      url: 'https://www.digi.com/products/networking/cellular-routers/transportation/digi-transport-wr44-rr'
+    }
+  ],
+  WR54: [
+    {
+      label: 'Support Website',
+      url: 'https://hub.digi.com/support/products/cellular-routers/digi-tx54/?_gl=1*1dobqts*_gcl_au*MTQyNjM3NTM4NS4xNzgxMTE4NTUz*_ga*OTQ1MTkzNDczLjE3ODExMTg1NTQ.*_ga_RZXDK3PM3B*czE3ODE5NTQ1MDMkbzckZzEkdDE3ODE5NTc3NTgkajIxJGwwJGgxNjc2MTk2ODI3'
+    }
+  ],
   'EZ WS': [
     {
       label: 'Website',
@@ -372,7 +413,25 @@ const PRODUCT_LINKS = {
       url: 'https://www.digi.com/products/networking/infrastructure-management/serial-connectivity/device-servers/digi-connect-ez-ts'
     }
   ],
-  'EZ Mini/2/4': [
+  'EZ Mini': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/infrastructure-management/serial-connectivity/device-servers/digi-connect-ez'
+    }
+  ],
+  'EZ 2': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/infrastructure-management/serial-connectivity/device-servers/digi-connect-ez'
+    }
+  ],
+  'EZ 4': [
+    {
+      label: 'Website',
+      url: 'https://www.digi.com/products/networking/infrastructure-management/serial-connectivity/device-servers/digi-connect-ez'
+    }
+  ],
+  'EZ 4i': [
     {
       label: 'Website',
       url: 'https://www.digi.com/products/networking/infrastructure-management/serial-connectivity/device-servers/digi-connect-ez'
@@ -391,7 +450,470 @@ const PRODUCT_LINKS = {
     }
   ]
 };
+
+const ANYWHEREUSB_2_PLUS_PRODUCT_SPECS = {
+  subtitle: 'Digi AnywhereUSB 2 Plus',
+  sourceUrl: 'https://www.digi.com/products/models/aw02-g300',
+  sections: [
+    {
+      title: 'Wireless',
+      rows: [
+        ['Cellular', 'Not included'],
+        ['Wi-Fi', 'Not included']
+      ]
+    },
+    {
+      title: 'Software and Management',
+      rows: [
+        ['Remote Management', 'Digi Remote Manager (cloud based) or Digi On-Prem Manager (local)'],
+        ['Local Management', 'Web UI (HTTP/HTTPS); CLI (Console, SSH)'],
+        ['Windows', 'Windows 7, 8.1, 10 and 11; Windows Server 2012-R2, 2016, 2019, 2022 and 2025'],
+        ['Linux', 'Ubuntu LTS 18.04, 20.04, 22.04 and 24.04; Debian LTS 10.13, 11.9 and 12.5; Red Hat, AlmaLinux and Rocky LTS 8.10 and 9.4'],
+        ['Protocols', 'Supports multi-host connectivity for each USB port or group independently'],
+        ['Memory', '512 MB RAM, 4 GB flash (eMMC)']
+      ]
+    },
+    {
+      title: 'Network',
+      rows: [
+        ['Ethernet', '(1) RJ-45; 10 M/100 M/1 G']
+      ]
+    },
+    {
+      title: 'Connectors',
+      rows: [
+        ['USB', '(2) USB 3.1 Gen 1 Type A'],
+        ['USB Port Power', '1.8 A per port (simultaneous)']
+      ]
+    },
+    {
+      title: 'Physical',
+      rows: [
+        ['Dimensions (L x W x H)', '118 mm x 74 mm x 30 mm (4.6 in x 2.9 in x 1.2 in)'],
+        ['Weight', '0.38 kg (0.84 lb)'],
+        ['Status LEDs', 'Ethernet, 2x USB, power']
+      ]
+    },
+    {
+      title: 'Power Requirements',
+      rows: [
+        ['Power Input', '5 V, 5 A max'],
+        ['Power Consumption', '25 watts max'],
+        ['Power Connector', 'Locking barrel connector']
+      ]
+    },
+    {
+      title: 'Environmental',
+      rows: [
+        ['Operating Temperature', '0 °C to 40 °C (32 °F to 104 °F)'],
+        ['Relative Humidity', '5% to 95% (non-condensing)']
+      ]
+    },
+    {
+      title: 'Approvals',
+      rows: [
+        ['Safety', 'UL 62368/60950, EN 62368, IEC 62368, CSA 22.2 62368-1'],
+        ['Emissions / Immunity', 'CE; FCC Part 15 Class B, AS/NZS CISPR 22, EN 55024, EN 55032']
+      ]
+    },
+    {
+      title: 'Warranty and Assurance',
+      rows: [
+        ['Product Warranty', '5-year'],
+        ['LifeCycle Assurance', '1-year LifeCycle Assurance with 24x7 Expert Support and Digi Remote Manager Premier included'],
+        ['Accessories', 'Recommended power supply: 76000965; view available accessories']
+      ]
+    },
+    {
+      title: "What's in the Box",
+      rows: [
+        ['Digi AnywhereUSB 2 Plus', 'Dual USB 3.1 Gen 1 ports, single 10 M/100 M/1 G Ethernet, 5 VDC']
+      ]
+    }
+  ]
+};
+
+const ANYWHEREUSB_8_PLUS_PRODUCT_SPECS = {
+  subtitle: 'Digi AnywhereUSB 8 Plus',
+  sourceUrl: 'https://www.digi.com/products/models/aw08-g300',
+  sections: [
+    {
+      title: 'Wireless',
+      rows: [
+        ['Cellular Module Support', '(1) Digi CORE plug-in LTE modem compliant socket'],
+        ['Wi-Fi', 'Not included']
+      ]
+    },
+    {
+      title: 'Software and Management',
+      rows: [
+        ['Remote Management', 'Digi Remote Manager (cloud based) or Digi On-Prem Manager (local)'],
+        ['Local Management', 'Digi On-Prem Manager (local); Web UI (HTTP/HTTPS); CLI (Console, SSH)'],
+        ['Windows', 'Windows 7, 8.1, 10 and 11; Windows Server 2012-R2, 2016, 2019, 2022 and 2025'],
+        ['Linux', 'Ubuntu LTS 18.04, 20.04, 22.04 and 24.04; Debian LTS 10.13, 11.9 and 12.5; Red Hat, AlmaLinux and Rocky LTS 8.10 and 9.4'],
+        ['Protocols', 'Supports multi-host connectivity for each USB port or group independently'],
+        ['Memory', '2 GB RAM, 4 GB flash (eMMC)']
+      ]
+    },
+    {
+      title: 'Network',
+      rows: [
+        ['Ethernet', '(1) RJ-45; 10 M / 100 M / 1 G / 10 G'],
+        ['SFP+', '(1) SFP+ socket']
+      ]
+    },
+    {
+      title: 'Connectors',
+      rows: [
+        ['Console', '(1) DB09M; RS-232 DTE'],
+        ['USB', '(8) USB 3.1 Gen 1 Type A'],
+        ['USB Port Power', '1 A per port (simultaneous)']
+      ]
+    },
+    {
+      title: 'Physical',
+      rows: [
+        ['Dimensions (L x W x H)', '260 mm x 160 mm x 44.45 mm (10 in x 6 in x 1.75 in)'],
+        ['Weight', '1.58 kg (3.48 lb)'],
+        ['Status LEDs', 'Ethernet, SFP+, 8x USB, power, fan, user and 2x WWAN (if CORE module is inserted)'],
+        ['Mounting Accessory', 'Rack mount extension kit for use in a 19-inch 1U rack (included)']
+      ]
+    },
+    {
+      title: 'Power Requirements',
+      rows: [
+        ['Power Input', '12 VDC, 12 A max'],
+        ['Power Consumption', '98.5 watts max'],
+        ['Power Connector', 'Phoenix connector']
+      ]
+    },
+    {
+      title: 'Environmental',
+      rows: [
+        ['Operating Temperature', '0 °C to 55 °C (32 °F to 131 °F)'],
+        ['Relative Humidity', '5% to 95% (non-condensing)']
+      ]
+    },
+    {
+      title: 'Approvals',
+      rows: [
+        ['Safety', 'UL 62368/60950, EN 62368, IEC 62368, CSA 22.2 62368-1'],
+        ['Emissions / Immunity', 'CE; FCC Part 15 Class B, AS/NZS CISPR 22, EN 55024, EN 55032']
+      ]
+    },
+    {
+      title: 'Warranty and Assurance',
+      rows: [
+        ['Product Warranty', '5-year'],
+        ['LifeCycle Assurance', '1-year LifeCycle Assurance with 24x7 Expert Support and Digi Remote Manager Premier included'],
+        ['Accessories', 'Power supply and rack mount extension included; optional Digi CORE plug-in LTE modem']
+      ]
+    },
+    {
+      title: "What's in the Box",
+      rows: [
+        ['Digi AnywhereUSB 8 Plus', '8-port USB over IP remote USB 3.1 hub with 10 M/100 M/1 G/10 G Ethernet, 12 VDC, SFP+ module support and optional cellular Digi CORE module'],
+        ['Included', 'Power supply; rack mount extension kit; attachable 19-inch rack ears']
+      ]
+    },
+    {
+      title: 'Power Cable Requirements',
+      rows: [
+        ['General', 'Use an appropriate power cable meeting national standards to connect to a standard outlet.'],
+        ['EU / International', 'VDE Mark; conforming to IEC 60083, IEC 60227 or IEC 60320; C13 to the appropriate national mains connector; rated for the national mains voltage; 3 x 0.823 mm².'],
+        ['USA / Canada', 'UR Mark; conforming to UL 62, UL 817 or CSA-C22.2; C13 to 5-15P, 5-15P or NEMA locking connector; 18 AWG.']
+      ]
+    }
+  ]
+};
+
+const ANYWHEREUSB_24_PLUS_PRODUCT_SPECS = {
+  subtitle: 'Digi AnywhereUSB 24 Plus',
+  sourceUrl: 'https://www.digi.com/products/models/aw24-g300',
+  sections: [
+    {
+      title: 'Wireless',
+      rows: [
+        ['Cellular Module Support', '(1) Digi CORE plug-in LTE modem compliant socket'],
+        ['Wi-Fi', 'Not included']
+      ]
+    },
+    {
+      title: 'Software and Management',
+      rows: [
+        ['Remote Management', 'Digi Remote Manager (cloud based) or Digi On-Prem Manager (local)'],
+        ['Local Management', 'Digi On-Prem Manager (local); Web UI (HTTP/HTTPS); CLI (Console, SSH)'],
+        ['Windows', 'Windows 7, 8.1, 10 and 11; Windows Server 2012-R2, 2016, 2019, 2022 and 2025'],
+        ['Linux', 'Ubuntu LTS 18.04, 20.04, 22.04 and 24.04; Debian LTS 10.13, 11.9 and 12.5; Red Hat, AlmaLinux and Rocky LTS 8.10 and 9.4'],
+        ['Protocols', 'Supports multi-host connectivity for each USB port or group independently'],
+        ['Memory', '2 GB RAM, 4 GB flash (eMMC)']
+      ]
+    },
+    {
+      title: 'Network',
+      rows: [
+        ['Ethernet', '(2) RJ-45; 10 M / 100 M / 1 G / 10 G'],
+        ['SFP+', '(2) SFP+ sockets']
+      ]
+    },
+    {
+      title: 'Connectors',
+      rows: [
+        ['Console', '(1) DB09M; RS-232 DTE'],
+        ['USB', '(24) USB 3.1 Gen 1 Type A'],
+        ['USB Port Power', '1 A per port (simultaneous)']
+      ]
+    },
+    {
+      title: 'Physical',
+      rows: [
+        ['Dimensions (L x W x H)', '450.85 mm x 255 mm x 44.45 mm (17.75 in x 10 in x 1.75 in)'],
+        ['Weight', '4.7 kg (10.36 lb)'],
+        ['Status LEDs', '2x Ethernet, 2x SFP+, 24x USB, 2x PSU, 2x fan, user and 2x WWAN (if CORE module is inserted)'],
+        ['Mounting Accessory', 'Rack mount extension kit for use in a 19-inch 1U rack (included)']
+      ]
+    },
+    {
+      title: 'Power Requirements',
+      rows: [
+        ['Power Input', 'Dual 100-240 VAC, 3 A max (dual supplies for redundancy)'],
+        ['Power Consumption', '157.7 watts max'],
+        ['Power Connector', 'IEC 60320 C14 inlet']
+      ]
+    },
+    {
+      title: 'Environmental',
+      rows: [
+        ['Operating Temperature', '0 °C to 40 °C (32 °F to 104 °F)'],
+        ['Relative Humidity', '5% to 95% (non-condensing)']
+      ]
+    },
+    {
+      title: 'Approvals',
+      rows: [
+        ['Safety', 'UL 62368/60950, EN 62368, IEC 62368, CSA 22.2 62368-1'],
+        ['Emissions / Immunity', 'CE; FCC Part 15 Class B, AS/NZS CISPR 22, EN 55024, EN 55032']
+      ]
+    },
+    {
+      title: 'Warranty and Assurance',
+      rows: [
+        ['Product Warranty', '5-year'],
+        ['LifeCycle Assurance', '1-year LifeCycle Assurance with 24x7 Expert Support and Digi Remote Manager Premier included'],
+        ['Accessories', 'Rack mount extension kit included; optional Digi CORE plug-in LTE modem']
+      ]
+    },
+    {
+      title: "What's in the Box",
+      rows: [
+        ['Digi AnywhereUSB 24 Plus', '24-port USB over IP remote USB 3.1 hub with dual 10 M/100 M/1 G/10 G Ethernet, dual 100-240 VAC power, dual SFP+ module support and optional cellular Digi CORE module'],
+        ['Included', 'Rack mount extension kit']
+      ]
+    },
+    {
+      title: 'Power Cable Requirements',
+      rows: [
+        ['General', 'Use an appropriate power cable meeting national standards to connect to a standard outlet.'],
+        ['EU / International', 'VDE Mark; conforming to IEC 60083, IEC 60227 or IEC 60320; C13 to the appropriate national mains connector; rated for the national mains voltage; 3 x 0.823 mm².'],
+        ['USA / Canada', 'UR Mark; conforming to UL 62, UL 817 or CSA-C22.2; C13 to 5-15P, 5-15P or NEMA locking connector; 18 AWG.']
+      ]
+    }
+  ]
+};
+
+const WR31_PRODUCT_SPECS = {
+  subtitle: 'Digi TransPort WR31',
+  sourceUrl: 'https://www.digi.com/products/networking/cellular-routers/digi-transport-wr31',
+  sections: [
+    {
+      title: 'Wireless Interfaces — Cellular',
+      rows: [
+        ['Certifications', 'Visit https://www.digi.com/resources/certifications for latest certifications'],
+        ['LTE — ANZ/LATAM (L9)', 'LTE-Advanced Cat 6: 700(B28)/850(B5,B18,B19)/900(B8)/1500(B21)/1800(B3)/1900(B39)/2100(B1)/2600(B7,B38)/2300(B40)/2500(B41). 3G HSPA+: 800/850/900/1700/2100 MHz. Transfer rate (max): 300 Mbps down, 50 Mbps up. GNSS: 30 channels (16 GPS, 14 GLONASS) simultaneous tracking.'],
+        ['LTE — North America/EMEA (M8)', 'LTE-Advanced Cat 6: 700(B12,B13,B29)/800(B20,B26)/850(B5)/900(B8)/AWS(B4)/1800(B3)/1900(B2,B25)/2100(B1)/2300(B30)/2500(B41)/2600(B7). 3G HSPA+: 850/900/AWS/1800/1900/2100 MHz. Transfer rate (max): 300 Mbps down, 50 Mbps up. GNSS: 30 channels (16 GPS, 14 GLONASS) simultaneous tracking.'],
+        ['LTE — North America (M5)', 'LTE Cat 4: 700(B12,B13)/850(B5)/AWS(B4)/1900(B2). 3G HSPA+: 850/1900 MHz. Transfer rate (max): 150 Mbps down, 50 Mbps up.'],
+        ['LTE — EMEA/APAC (M7)', 'LTE Cat 4: 800(B20)/900(B8)/1800(B3)/2100(B1)/2600(B7). HSPA: 900/2100 MHz. EDGE: 900/1800 MHz. Transfer rate (max): 150 Mbps down, 50 Mbps up.'],
+        ['LTE 450 — EMEA/APAC (M2)', 'LTE Cat 3: 450(B31)/800(B20)/1800(B3)/2600(B7). HSPA+: 900/2100 MHz. EDGE: 900/1800 MHz. Transfer rate (max): 100 Mbps down, 50 Mbps up.'],
+        ['Global HSPA+ (U9)', '3G HSPA+: 850/900/1700AWS/1900/2100 MHz. 2G EDGE/GPRS: 850/900/1800/1900 MHz. Transfer rate (max): 21 Mbps down, 5.76 Mbps up.'],
+        ['CDMA EV-DO 450 MHz — EMEA (D5)', '3G EVDO Rev B: 450 MHz. 2G 1XRTT: 450 MHz. Transfer rate (max): 14.7 Mbps down, 5.4 Mbps up.'],
+        ['Connectors', '(2) 50 Ω SMA (center pin: female)'],
+        ['SIM Slots', '(2) Mini-SIM (2FF)'],
+        ['SIM Security', 'Screw-down SIM cover'],
+        ['GNSS (Select Models)', 'Protocol NMEA 0183 V3.0. Acquisition time: hot start 1 s; warm start 29 s; cold start 32 s. Accuracy — horizontal: < 2 m (50%), < 5 m (90%); altitude: < 4 m (50%), < 8 m (90%); velocity: < 0.2 m/s.']
+      ]
+    },
+    {
+      title: 'Software & Management',
+      rows: [
+        ['Remote Management', 'Digi Remote Manager (cloud based); SNMP v1/v2c/v3 (user installed/managed)'],
+        ['Local Management', 'WebUI (HTTP/HTTPS); CLI (Telnet, SSH, SMS)'],
+        ['Management / Troubleshooting Tools', 'FTP, SFTP, SCP; protocol analyzer with PCAP for Wireshark; event logging with Syslog and SMTP; NTP/SNTP']
+      ]
+    },
+    {
+      title: 'Wired Interfaces — Ethernet',
+      rows: [
+        ['Ports', '(2) RJ-45; 10/100 Mbps (auto-sensing)']
+      ]
+    },
+    {
+      title: 'Serial',
+      rows: [
+        ['Ports', '(1) DB-9; DCE'],
+        ['Standard', 'RS-232/422/485'],
+        ['Signal Support', 'TXD, RXD, RTS, CTS, DTR, DCD, DSR, RI'],
+        ['Flow Control', 'Software (XON/XOFF), hardware supported']
+      ]
+    },
+    {
+      title: 'I/O',
+      rows: [
+        ['Connector', '5-pin screw down terminal block'],
+        ['Digital', '0-30 VDC, 200 mA max.; (2) I/O, software selectable'],
+        ['Analog', '(1) analog I/O; 4-20 mA or 0-10 V, software selectable; 12-bit resolution']
+      ]
+    },
+    {
+      title: 'USB',
+      rows: [
+        ['Ports', '(1) USB 2.0 Type A']
+      ]
+    },
+    {
+      title: 'Physical',
+      rows: [
+        ['Dimensions (L x W x H)', '12.7 cm x 8.9 cm x 5.1 cm (5 in x 3.5 in x 2 in)'],
+        ['Weight', '0.5 kg (1.1 lb)'],
+        ['Status LEDs', 'Power, service, WWAN, 3x signal strength, user programmable'],
+        ['Enclosure / Rating', 'Aluminum / IP30'],
+        ['Mounting', 'DIN rail mount included']
+      ]
+    },
+    {
+      title: 'Power Requirements',
+      rows: [
+        ['Power Input', '9-30 VDC, 18 W minimum power source required'],
+        ['Power Connector', 'Screw down removable terminal block'],
+        ['Power Consumption', '4 W typical (idle); 12 W typical (peak Tx/Rx)']
+      ]
+    },
+    {
+      title: 'Environmental',
+      rows: [
+        ['Hazardous (Class 1 Div 2)', 'Yes'],
+        ['Operating Temperature', '-34° C to 74° C (-29° F to 165° F); reduced cellular performance may occur above 60° C (140° F)'],
+        ['Storage Temperature', '-40° C to 85° C (-40° F to 185° F)'],
+        ['Ethernet Isolation', '1.5 kV RMS'],
+        ['Serial Port Protection (ESD)', '15 kV'],
+        ['Relative Humidity', '5% to 95% (non-condensing)']
+      ]
+    },
+    {
+      title: 'Approvals',
+      rows: [
+        ['Cellular', 'PTCRB'],
+        ['Safety', 'Hazardous locations: ANSI/ISA-12.12.01-2015, CAN/CSA C22.2 No. 213-15. Ordinary locations: UL 60950-1, 2nd Edition, 2014-10-14; UL 62368: 2014, 2nd Edition. ATEX: II 3 G Ex nA IIC T4 Gc; EN 60079-0:2012+A11:2013; EN 60079-15:2010; DEMKO 15 ATEX 1574X Rev. 1.'],
+        ['IECEx Standards', 'US/UL/ExTR17.0077/00'],
+        ['Emissions / Immunity', 'CE, FCC Part 15 Class B, AS/NZS CISPR 22, EN55024, EN55022 Class B']
+      ]
+    },
+    {
+      title: 'Warranty',
+      rows: [
+        ['Product Warranty', '3-year standard warranty; upgradeable to 5 years with purchase of a Digi Remote Manager Premier 5-year subscription at the time of product purchase and product registration in Digi Remote Manager.']
+      ]
+    },
+    {
+      title: 'Line Art',
+      rows: [
+        ['Reference', 'See the official WR31 specifications link for product line art.']
+      ]
+    },
+    {
+      title: 'Enterprise Software',
+      rows: [
+        ['Protocol Support', 'HTTP, HTTPS, FTP, SFTP, SSL, SNMP v1/v2c/v3, SSH, Telnet and CLI for web management; Digi Remote Manager; SMS management; protocol analyzer and PCAP capture for Wireshark; DynDNS; Dynamic DNS client compatible with BIND9/No-IP/DynDNS.'],
+        ['Security / VPN', 'IP filtering; stateful inspection firewall with scripting; address and port translation; IPSec VPN with IKEv1, IKEv2 and NAT Traversal; SSL, SSLv2, SSLv3, FIPS 197; OpenVPN client and server; PPTP; L2TP; (5) VPN tunnels; SHA-1, MD5, RSA; DES, 3DES and AES up to 256-bit; RADIUS, TACACS+, SCEP for X.509; certificates; content filtering; MAC address filtering; VLAN support.'],
+        ['Routing / Failover', 'IP pass-through; NAT; NAPT with IP port forwarding; Ethernet bridging; GRE; multicast routing; PPP, PPPoE, RIP v1/v2, OSPF, SRI, BGP and iGMP; VRRP and VRRP+; automatic failover/failback to second GSM network or standby APN.'],
+        ['Other Protocols', 'DHCP; Dynamic DNS compatible with BIND9/No-IP/DynDNS; QoS via TOS/DSCP/WRED; Modbus UDP/TCP to serial; X.25 including XOT, SNA/IP, TPAD and PAD; protocol switch; Modbus bridging for diverse field assets.']
+      ]
+    }
+  ]
+};
+
+const EDGEPORT_PRODUCT_SPECS = {
+  subtitle: 'Edgeport Serial / Edgeport Industrial',
+  sourceUrl: 'https://www.digi.com/products/networking/infrastructure-management/usb-connectivity/usb-to-serial/edgeport',
+  sections: [
+    {
+      title: 'Interfaces (Varies by Model)',
+      columns: ['Specifications', 'Edgeport Serial', 'Edgeport Industrial'],
+      rows: [
+        ['Serial Ports', '1, 4, 8 or 16', '1, 4 or 8'],
+        ['Serial Type', 'RS-232', 'RS-422/485, software selectable RS-422/485'],
+        ['Serial Connector', 'DB-9, DB-25', 'DB-9'],
+        ['Serial Data Rate', '230 Kbps per port simultaneously', '230 Kbps per port simultaneously'],
+        ['Downstream USB Ports', '2 (16-port models only)', '0']
+      ]
+    },
+    {
+      title: 'Features',
+      columns: ['Specifications', 'Edgeport Serial', 'Edgeport Industrial'],
+      rows: [
+        ['USB', 'USB 1.0 and USB 1.1 compatible; backwards compatibility for USB 2.0 and USB 3.0; USB-IF certified; Plug and Play', 'USB 1.0 and USB 1.1 compatible; backwards compatibility for USB 2.0 and USB 3.0; USB-IF certified; Plug and Play'],
+        ['LEDs', 'LED displays device status and COM port activity', 'LED displays device status and COM port activity'],
+        ['Operating Systems', 'Windows Server 2019, Windows Server 2016, Windows Server 2012, Windows 10, Windows 8.1, Windows 7; Linux', 'Windows Server 2019, Windows Server 2016, Windows Server 2012, Windows 10, Windows 8.1, Windows 7; Linux'],
+        ['Cables', '1-meter USB cable', '1-meter USB cable'],
+        ['Other (General)', 'Automatic port reacquisition; COM port assignments maintained across reboots; full hardware and software flow control; no additional IRQ or memory address requirements; low power consumption; rack mountable; hot-swappable', 'Automatic port reacquisition; COM port assignments maintained across reboots; full hardware and software flow control; no additional IRQ or memory address requirements; low power consumption; rack mountable; hot-swappable'],
+        ['Other (Model-Specific)', 'N/A', 'N/A']
+      ]
+    },
+    {
+      title: 'Power Requirements',
+      columns: ['Specifications', 'Edgeport Serial', 'Edgeport Industrial'],
+      rows: [
+        ['Power Supply', 'External power supply not required for models without USB ports (USB powered). Models with USB ports (Edgeport/216) ship with power supply: 100/240 VAC, 60/50 Hz at 5 VDC @ 3 A max.', 'External power supply not required for models without USB ports (USB powered).']
+      ]
+    },
+    {
+      title: 'Environmental',
+      columns: ['Specifications', 'Edgeport Serial', 'Edgeport Industrial'],
+      rows: [
+        ['Operating Temperature', '0° C to 55° C (32° F to 131° F)', '0° C to 55° C (32° F to 131° F)'],
+        ['Relative Humidity', '0% to 95% (non-condensing)', '0% to 95% (non-condensing)']
+      ]
+    },
+    {
+      title: 'Approvals',
+      columns: ['Specifications', 'Edgeport Serial', 'Edgeport Industrial'],
+      rows: [
+        ['Safety', 'EN60950, UL 1950, CSA 2.2 No. 950, IEC 950', 'EN60950, UL 1950, CSA 2.2 No. 950, IEC 950'],
+        ['Emissions / Immunity', 'CE, FCC Part 15, Class B, EN55022, EN55024', 'CE, FCC Part 15, Class B, EN55022, EN55024']
+      ]
+    },
+    {
+      title: 'Product Views',
+      rows: [
+        ['Edgeport/1 and Edgeport/1i', 'Front; back; Edgeport/1 with 2-meter captive cable'],
+        ['Edgeport/4', 'Edgeport/4s MEI; Edgeport/4/DB-25'],
+        ['Edgeport/8', 'Edgeport/8s MEI; Edgeport/8/DB-25 front and back'],
+        ['Edgeport/216', 'Front (Edgeport-216-line-art-front.gif); back']
+      ]
+    }
+  ]
+};
+
 const PRODUCT_SPECS = {
+  '2 Plus': ANYWHEREUSB_2_PLUS_PRODUCT_SPECS,
+  '8 Plus': ANYWHEREUSB_8_PLUS_PRODUCT_SPECS,
+  '24 Plus': ANYWHEREUSB_24_PLUS_PRODUCT_SPECS,
+  WR31: WR31_PRODUCT_SPECS,
+  'Edgeport 1': EDGEPORT_PRODUCT_SPECS,
+  'Edgeport 2': EDGEPORT_PRODUCT_SPECS,
+  'Edgeport 4': EDGEPORT_PRODUCT_SPECS,
+  'Edgeport 8': EDGEPORT_PRODUCT_SPECS,
+  'Edgeport 16': EDGEPORT_PRODUCT_SPECS,
+  'Edgeport 32': EDGEPORT_PRODUCT_SPECS,
   'Digi IX10 Industrial Cellular Router': {
     subtitle: 'Digi IX10 with Digi 360*',
     sourceUrl: 'https://www.digi.com/products/networking/cellular-routers/industrial/digi-ix10#specifications',
@@ -1486,6 +2008,17 @@ const PRODUCT_SPECS = {
   }
 };
 const DOCS_PORTAL_BASE_URL = 'https://docsportal.digi.com';
+const PRODUCT_DOCS_URLS = {
+  '2 Plus': 'https://docs.digi.com/resources/documentation/digidocs/90002383/default.htm',
+  '8 Plus': 'https://docs.digi.com/resources/documentation/digidocs/90002383/default.htm',
+  '24 Plus': 'https://docs.digi.com/resources/documentation/digidocs/90002383/default.htm',
+  'EZ WS': 'https://docs.digi.com/resources/documentation/digidocs/90002607/default.htm',
+  'EZ TS': 'https://docs.digi.com/resources/documentation/digidocs/90002646/default.htm',
+  'EZ Mini': 'https://docs.digi.com/resources/documentation/digidocs/90002409/default.htm',
+  'EZ 2': 'https://docs.digi.com/resources/documentation/digidocs/90002458/default.htm',
+  'EZ 4': 'https://docs.digi.com/resources/documentation/digidocs/90002459/default.htm',
+  'EZ 4i': 'https://docs.digi.com/resources/documentation/digidocs/90002459/default.htm'
+};
 
 const KNOWN_PORT_SERVICES = {
   22: 'SSH',
@@ -1720,7 +2253,44 @@ document.addEventListener('DOMContentLoaded', () => {
   setupFileSupportKeyboardShortcuts();
   setupTabCycleShortcut();
   setupInfoScratchpad();
+  setupAppZoomControls();
 });
+
+function setupAppZoomControls() {
+  const controls = document.getElementById('app-zoom-controls');
+  const zoomOutButton = document.getElementById('app-zoom-out');
+  const zoomInButton = document.getElementById('app-zoom-in');
+  const appAPI = getNetworkAPI();
+
+  if (!controls || !zoomOutButton || !zoomInButton) return;
+  if (!appAPI || typeof appAPI.changeAppZoom !== 'function') {
+    zoomOutButton.disabled = true;
+    zoomInButton.disabled = true;
+    controls.title = 'Zoom is available in the desktop app';
+    return;
+  }
+
+  const changeZoom = async (direction) => {
+    const result = await appAPI.changeAppZoom(direction);
+    if (!result?.success) return;
+    controls.title = `Application zoom: ${result.zoomPercent}%`;
+    controls.setAttribute('aria-label', `Application zoom: ${result.zoomPercent}%`);
+  };
+
+  zoomOutButton.addEventListener('click', () => changeZoom(-1));
+  zoomInButton.addEventListener('click', () => changeZoom(1));
+
+  document.addEventListener('keydown', (event) => {
+    if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+    if (event.key === '-' || event.key === '_') {
+      event.preventDefault();
+      changeZoom(-1);
+    } else if (event.key === '+' || event.key === '=') {
+      event.preventDefault();
+      changeZoom(1);
+    }
+  });
+}
 
 // Quick-reference bar under the tabs: manually filled ID / SN / MAC / Case /
 // Notes fields that persist locally and can be copied with one click. Handy
@@ -2029,15 +2599,19 @@ function getDocsGuideSlug(itemName) {
 }
 
 function buildDocsSearchUrl(itemName, searchTerm = '') {
+  const productDocsUrl = PRODUCT_DOCS_URLS[itemName];
   const guideSlug = getDocsGuideSlug(itemName);
-  if (!guideSlug) return '';
+  const guideUrl = productDocsUrl || (guideSlug
+    ? `${DOCS_PORTAL_BASE_URL}/${guideSlug}/Default.htm`
+    : '');
+  if (!guideUrl) return '';
 
   const trimmedSearchTerm = String(searchTerm || '').trim();
   const searchHash = trimmedSearchTerm
     ? `#search-${encodeURIComponent(trimmedSearchTerm)}`
     : '#search-';
 
-  return `${DOCS_PORTAL_BASE_URL}/${guideSlug}/Default.htm${searchHash}`;
+  return `${guideUrl}${searchHash}`;
 }
 
 function openDocsSearch(itemName, searchTerm) {
@@ -2442,6 +3016,24 @@ function syncLockedLineItems() {
           existingItem.defaultName = name;
         }
       }
+      if (!existingItem && getLineKey(line) === 'EZ') {
+        const previousEzNames = {
+          'EZ Mini': ['Digi Connect EZ Mini', 'EZ Mini/2/4'],
+          'EZ 2': ['Digi Connect EZ 2'],
+          'EZ 4': ['Digi Connect EZ 4'],
+          'EZ 4i': ['Digi Connect EZ 4i']
+        };
+        existingItem = (previousEzNames[name] || [])
+          .map(previousName => existingByName.get(previousName))
+          .find(Boolean);
+        if (existingItem) {
+          const previousDefaultName = existingItem.defaultName || existingItem.name;
+          if (existingItem.name === previousDefaultName) {
+            existingItem.name = name;
+          }
+          existingItem.defaultName = name;
+        }
+      }
       const item = normalizeProductItem(existingItem || createNamedProductItem(name), index, line.name);
       item.imageUrl = LOCKED_ITEM_IMAGES[name] || item.imageUrl;
       if (!item.ip && DEFAULT_ITEM_IPS[name]) {
@@ -2660,14 +3252,22 @@ function renderProductCategoryTabs(workspace, category) {
     appendSubtab(getLineDisplayName(line), line.id);
   });
 
-  if (category.id === 'serial') {
+  const connectivityLinks = {
+    cellular: { titleLabel: 'Cellular Routers', url: CELLULAR_ROUTERS_URL },
+    usb: { titleLabel: 'USB Connectivity', url: USB_CONNECTIVITY_URL },
+    serial: { titleLabel: 'Serial Connectivity', url: SERIAL_CONNECTIVITY_URL }
+  };
+  const connectivityLink = connectivityLinks[category.id];
+
+  if (connectivityLink) {
     const productLink = document.createElement('a');
     productLink.className = 'product-category-link';
-    productLink.href = SERIAL_CONNECTIVITY_URL;
+    productLink.href = connectivityLink.url;
     productLink.target = '_blank';
     productLink.rel = 'noopener noreferrer';
-    productLink.textContent = 'Serial Connectivity ↗';
-    productLink.title = 'Open Digi Serial Connectivity products';
+    productLink.title = `Open Digi ${connectivityLink.titleLabel} products`;
+    productLink.textContent = 'Official Website ↗';
+
     nav.appendChild(productLink);
   }
 
@@ -7765,20 +8365,28 @@ function openProductSpecsModal(itemName) {
 
     const table = document.createElement('div');
     table.className = 'product-specs-table';
-    section.rows.forEach(([label, value]) => {
+    if (Array.isArray(section.columns) && section.columns.length > 0) {
+      table.classList.add('is-comparison');
+      const headerRow = document.createElement('div');
+      headerRow.className = 'product-specs-row product-specs-column-header';
+      section.columns.forEach(column => {
+        const headerCell = document.createElement('div');
+        headerCell.className = 'product-specs-column-heading';
+        headerCell.textContent = column;
+        headerRow.appendChild(headerCell);
+      });
+      table.appendChild(headerRow);
+    }
+
+    section.rows.forEach(cells => {
       const row = document.createElement('div');
       row.className = 'product-specs-row';
-
-      const labelElement = document.createElement('div');
-      labelElement.className = 'product-specs-label';
-      labelElement.textContent = label;
-
-      const valueElement = document.createElement('div');
-      valueElement.className = 'product-specs-value';
-      valueElement.textContent = value;
-
-      row.appendChild(labelElement);
-      row.appendChild(valueElement);
+      cells.forEach((value, index) => {
+        const cell = document.createElement('div');
+        cell.className = index === 0 ? 'product-specs-label' : 'product-specs-value';
+        cell.textContent = value;
+        row.appendChild(cell);
+      });
       table.appendChild(row);
     });
 

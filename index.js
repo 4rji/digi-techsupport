@@ -1934,6 +1934,17 @@ async function saveTextFileFromDialog(webContents, options = {}) {
 }
 
 function setupIPCHandlers() {
+  ipcMain.handle('change-app-zoom', async (event, direction) => {
+    const zoomDirection = Number(direction) < 0 ? -1 : 1;
+    const currentZoomLevel = event.sender.getZoomLevel();
+    const nextZoomLevel = Math.max(-4, Math.min(5, currentZoomLevel + zoomDirection));
+    event.sender.setZoomLevel(nextZoomLevel);
+    return {
+      success: true,
+      zoomPercent: Math.round(event.sender.getZoomFactor() * 100)
+    };
+  });
+
   ipcMain.handle('ping-host', async (_event, host, timeout = 3000) => {
     return pingHost(host, timeout);
   });
