@@ -9074,15 +9074,9 @@ function setupSSHTerminalModal() {
     });
   }
 
-  modal.addEventListener('click', (event) => {
-    if (event.target === modal) {
-      closeSSHTerminalModal();
-    }
-  });
-
   document.addEventListener('keydown', (event) => {
     if (modal.style.display === 'flex' && event.key === 'Escape') {
-      closeSSHTerminalModal();
+      // Do not close SSH modal on Escape to avoid accidental disconnection
     }
     if (modal.style.display === 'flex' && event.key === 'C' && event.ctrlKey && event.shiftKey) {
       event.preventDefault();
