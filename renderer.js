@@ -148,27 +148,27 @@ const DEFAULT_ITEM_IPS = {
   'Digi EX50 5G Cellular Extender': '10.10.65.72'
 };
 const LOCKED_ITEM_IMAGES = {
-  '2 Plus': 'https://www.digi.com/products/assets/anywhereusb-plus/anywhereusb_2plus_hero',
-  '8 Plus': 'https://www.digi.com/products/assets/anywhereusb-plus/anywhereusb_8plus_hero',
+  '2 Plus': 'img/AnywhereUSB_2Plus_hero.png',
+  '8 Plus': 'img/AnywhereUSB_8Plus_hero.png',
   '24 Plus': 'https://www.digi.com/products/assets/anywhereusb-plus/anywhereusb_24plus_hero',
-  'Edgeport 1': 'https://www.digi.com/products/assets/products/edgeport',
-  'Edgeport 2': 'https://www.digi.com/products/assets/products/edgeport',
-  'Edgeport 4': 'https://www.digi.com/products/assets/products/edgeport',
-  'Edgeport 8': 'https://www.digi.com/products/assets/digi-edgeport/edgeport-8-db-9-8-rs-232',
-  'Edgeport 16': 'https://www.digi.com/products/assets/products/edgeport',
-  'Edgeport 32': 'https://www.digi.com/products/assets/products/edgeport',
+  'Edgeport 1': 'img/edgeport-1.png',
+  'Edgeport 2': 'img/edgeport-216-front.png',
+  'Edgeport 4': 'img/Edgeport-4-DB25.png',
+  'Edgeport 8': 'img/Edgeport-8-DB-9-8-RS-232.png',
+  'Edgeport 16': 'img/edgeport-216-front.png',
+  'Edgeport 32': 'img/edgeport.png',
   WR21: 'https://hub.digi.com/dp/path=/image/product-line/digi-transport-wr21,fmt=square400,bg=ffffff,c=0,v=1',
   WR31: 'https://www.digi.com/products/assets/products/digitransportwr31',
   WR44: 'https://www.digi.com/products/networking/cellular-routers/transportation/digi-transport-wr44-rr/product-images/digi-transport-wr44-rr',
   WR54: 'https://hub.digi.com/dp/path=/image/product-line/tx54,fmt=square400,bg=ffffff,c=0,v=1',
-  'EZ WS': 'https://hub.digi.com/dp/image/path=/marketing/asset/digi-connect-ez-4-ws-jpg?q=70&_gl=1*1983me9*_gcl_au*MTQyNjM3NTM4NS4xNzgxMTE4NTUz*_ga*OTQ1MTkzNDczLjE3ODExMTg1NTQ.*_ga_RZXDK3PM3B*czE3ODE5NTQ1MDMkbzckZzEkdDE3ODE5NTY3NDUkajIwJGwwJGgxNjc2MTk2ODI3',
-  'EZ TS': 'https://assets.digi.com/asset/27facd36-05e1-4bc9-9809-b602d68852a9/Web-JPG/Digi-Connect-EZ-8-TS.jpg',
-  'EZ Mini': 'https://hub.digi.com/dp/image/path=/marketing/asset/digi-connect-ez-mini-hero-jpg/?q=70&_gl=1*kgnstf*_gcl_au*MTQyNjM3NTM4NS4xNzgxMTE4NTUz*_ga*OTQ1MTkzNDczLjE3ODExMTg1NTQ.*_ga_RZXDK3PM3B*czE3ODE5NTQ1MDMkbzckZzEkdDE3ODE5NTkyMzAkajI4JGwwJGgxNjc2MTk2ODI3',
-  'EZ 2': 'https://hub.digi.com/dp/path=/image/4107/,fmt=square400,bg=ffffff,c=1,v=2',
-  'EZ 4': 'https://hub.digi.com/dp/path=/image/fileasset1740,fmt=square400,bg=ffffff,c=0,v=1',
-  'EZ 4i': 'https://hub.digi.com/dp/path=/image/fileasset1713,fmt=square400,bg=ffffff,c=0,v=1',
-  'EZ 8': 'https://www.digi.com/products/assets/digi-connect-ez/digi-connect-ez-8',
-  'EZ 16/32': 'https://www.digi.com/products/assets/digi-connect-ez/digi-connect-ez-16',
+  'EZ WS': 'img/digi-connect-ez-4-ws.png',
+  'EZ TS': 'img/Digi-Connect-EZ-4-TS-front.png',
+  'EZ Mini': 'img/digi-connect-ez-mini.png',
+  'EZ 2': 'img/digi-connect-ez-2.png',
+  'EZ 4': 'img/digi-connect-ez-4.png',
+  'EZ 4i': 'img/digi-connect-ez-4i.png',
+  'EZ 8': 'img/Digi-Connect-EZ-8-TS.png',
+  'EZ 16/32': 'img/digi-connect-ez-16.png',
   'ConnectPort TS': 'https://hub.digi.com/dp/path=/image/product-line/connectport-ts-8-16,fmt=square400,bg=ffffff,c=0,v=1',
   'Digi One': 'https://hub.digi.com/dp/path=/images/products/digi-one-sp-ia-family/,fmt=square400,bg=ffffff,c=0,v=1',
   'PortServer TS': 'https://hub.digi.com/dp/path=/image/product-line/portserver-ts,fmt=square400,bg=ffffff,c=0,v=1',
@@ -187,6 +187,35 @@ const LOCKED_ITEM_IMAGES = {
   'Digi CORE plug-in LTE modem': 'img/digi-core-cm-18.jpg'
 };
 const LOCKED_ITEM_IMAGE_VARIANTS = {
+  '2 Plus': [
+    'img/AnywhereUSB_2Plus_hero.png',
+    'img/AnywhereUSB_2Plus_front.png',
+    'img/AnywhereUSB_2Plus_back.png'
+  ],
+  '8 Plus': [
+    'img/AnywhereUSB_8Plus_hero.png'
+  ],
+  'Edgeport 1': [
+    'img/edgeport-1.png'
+  ],
+  'Edgeport 2': [
+    'img/edgeport-216-front.png',
+    'img/edgeport-216-back.png'
+  ],
+  'Edgeport 4': [
+    'img/Edgeport-4-DB25.png'
+  ],
+  'Edgeport 8': [
+    'img/Edgeport-8-DB-9-8-RS-232.png',
+    'img/edgeport-8-DB-25.png'
+  ],
+  'Edgeport 16': [
+    'img/edgeport-216-front.png',
+    'img/edgeport-216-back.png'
+  ],
+  'Edgeport 32': [
+    'img/edgeport.png'
+  ],
   'Digi IX10 Industrial Cellular Router': [
     'img/digi-ix10.png',
     'img/digi-ix10-front.png',
@@ -233,10 +262,46 @@ const LOCKED_ITEM_IMAGE_VARIANTS = {
     'img/digi-ex50-right.png',
     'img/digi-ex50-back.png'
   ],
+  'EZ WS': [
+    'img/digi-connect-ez-4-ws.png',
+    'img/digi-connect-ez-4-ws-front.png',
+    'img/digi-connect-ez-4-ws-back.png'
+  ],
+  'EZ TS': [
+    'img/Digi-Connect-EZ-4-TS-front.png',
+    'img/Digi-Connect-EZ-4-TS-top.png',
+    'img/Digi-Connect-EZ-4-TS-back.png'
+  ],
   'EZ Mini': [
-    'https://hub.digi.com/dp/image/path=/marketing/asset/digi-connect-ez-mini-hero-jpg/?q=70&_gl=1*kgnstf*_gcl_au*MTQyNjM3NTM4NS4xNzgxMTE4NTUz*_ga*OTQ1MTkzNDczLjE3ODExMTg1NTQ.*_ga_RZXDK3PM3B*czE3ODE5NTQ1MDMkbzckZzEkdDE3ODE5NTkyMzAkajI4JGwwJGgxNjc2MTk2ODI3',
-    'https://hub.digi.com/dp/image/path=/marketing/asset/digi-connect-ez-mini-front-jpg/?q=70&_gl=1*1luc0x8*_gcl_au*MTQyNjM3NTM4NS4xNzgxMTE4NTUz*_ga*OTQ1MTkzNDczLjE3ODExMTg1NTQ.*_ga_RZXDK3PM3B*czE3ODE5NTQ1MDMkbzckZzEkdDE3ODE5NTkyMzAkajI4JGwwJGgxNjc2MTk2ODI3',
-    'https://hub.digi.com/dp/image/path=/marketing/asset/digi-connect-ez-mini-back-jpg/?q=70&_gl=1*1luc0x8*_gcl_au*MTQyNjM3NTM4NS4xNzgxMTE4NTUz*_ga*OTQ1MTkzNDczLjE3ODExMTg1NTQ.*_ga_RZXDK3PM3B*czE3ODE5NTQ1MDMkbzckZzEkdDE3ODE5NTkyMzAkajI4JGwwJGgxNjc2MTk2ODI3'
+    'img/digi-connect-ez-mini.png',
+    'img/digi-connect-ez-mini-front.png',
+    'img/digi-connect-ez-mini-back.png'
+  ],
+  'EZ 2': [
+    'img/digi-connect-ez-2.png',
+    'img/digi-connect-ez-2-front.png',
+    'img/digi-connect-ez-2-back.png'
+  ],
+  'EZ 4': [
+    'img/digi-connect-ez-4.png',
+    'img/digi-connect-ez-4-front.png',
+    'img/digi-connect-ez-4-back.png'
+  ],
+  'EZ 4i': [
+    'img/digi-connect-ez-4i.png',
+    'img/digi-connect-ez-4i-front.png',
+    'img/digi-connect-ez-4i-back.png'
+  ],
+  'EZ 8': [
+    'img/Digi-Connect-EZ-8-TS.png',
+    'img/Digi-Connect-EZ-8-TS-front.png'
+  ],
+  'EZ 16/32': [
+    'img/digi-connect-ez-16.png',
+    'img/digi-connect-ez-16-front.png',
+    'img/digi-connect-ez-16-32-back.png',
+    'img/digi-connect-ez-32.png',
+    'img/digi-connect-ez-32-front.png'
   ],
   'Digi CORE plug-in LTE modem': [
     'img/digi-core-cm-18.jpg',
