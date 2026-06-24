@@ -150,7 +150,7 @@ const DEFAULT_ITEM_IPS = {
 const LOCKED_ITEM_IMAGES = {
   '2 Plus': 'img/AnywhereUSB_2Plus_hero.png',
   '8 Plus': 'img/AnywhereUSB_8Plus_hero.png',
-  '24 Plus': 'https://www.digi.com/products/assets/anywhereusb-plus/anywhereusb_24plus_hero',
+  '24 Plus': 'img/AnywhereUSB_24Plus_hero.png',
   'Edgeport 1': 'img/edgeport-1.png',
   'Edgeport 2': 'img/edgeport-216-front.png',
   'Edgeport 4': 'img/Edgeport-4-DB25.png',
@@ -194,6 +194,12 @@ const LOCKED_ITEM_IMAGE_VARIANTS = {
   ],
   '8 Plus': [
     'img/AnywhereUSB_8Plus_hero.png'
+  ],
+  '24 Plus': [
+    'img/AnywhereUSB_24Plus_hero.png',
+    'img/AnywhereUSB_24Plus_front.png',
+    'img/AnywhereUSB_24Plus_right.png',
+    'img/AnywhereUSB_24Plus_back.png'
   ],
   'Edgeport 1': [
     'img/edgeport-1.png'
