@@ -4865,3 +4865,24 @@ body.is-file-support-resizing {
   background: rgba(240, 120, 120, 0.2);
   color: #f07878;
 }
+/* SSH window controls: visually distinct minimize vs maximize */
+.ssh-window-btn {
+  font-size: 1.02rem;
+  min-width: 32px;
+}
+
+.ssh-window-btn--min {
+  margin-left: 8px;
+}
+
+.ssh-window-btn--min:hover {
+  background: rgba(227, 179, 65, 0.18);
+  color: #e3b341;
+  border-color: rgba(227, 179, 65, 0.45);
+}
+
+.ssh-window-btn--max:hover {
+  background: rgba(159, 215, 255, 0.16);
+  color: #9fd7ff;
+  border-color: rgba(159, 215, 255, 0.4);
+}
