@@ -45,7 +45,7 @@ const MIME_TYPES = {
 function sendResponse(res, status, contentType, payload) {
   res.writeHead(status, {
     'Content-Type': contentType,
-    'Cache-Control': 'no-cache'
+    'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate'
   });
   res.end(payload);
 }
@@ -187,7 +187,7 @@ async function handleRequest(req, res) {
     stream.on('error', (err) => sendInternalError(res, err));
     res.writeHead(200, {
       'Content-Type': getContentType(filePath),
-      'Cache-Control': 'no-cache'
+      'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate'
     });
     stream.pipe(res);
   } catch (error) {

@@ -58,6 +58,7 @@ const PRODUCT_CATEGORIES = [
 const FILE_SUPPORT_VIEW_ID = '__file_support__';
 const DEVICES_VIEW_ID = '__devices__';
 const CELLULAR_ALL_VIEW_ID = '__cellular_all__';
+const LOCAL_IMAGE_ASSET_VERSION = String(Date.now());
 const BUILT_IN_VIEW_IDS = new Set([
   TEMPLATES_VIEW_ID,
   FILE_SUPPORT_VIEW_ID,
@@ -173,18 +174,18 @@ const LOCKED_ITEM_IMAGES = {
   'Edgeport 8': 'img/Edgeport-8-DB-9-8-RS-232.png',
   'Edgeport 16': 'img/edgeport-216-front.png',
   'Edgeport 32': 'img/edgeport.png',
-  WR21: 'https://hub.digi.com/dp/path=/image/product-line/digi-transport-wr21,fmt=square400,bg=ffffff,c=0,v=1',
+  WR21: 'img/digi-transport-wr21.png',
   WR31: 'https://www.digi.com/products/assets/products/digitransportwr31',
-  WR44: 'https://www.digi.com/products/networking/cellular-routers/transportation/digi-transport-wr44-rr/product-images/digi-transport-wr44-rr',
+  WR44: 'img/digi-transport-wr44-rr.png',
   WR54: 'https://hub.digi.com/dp/path=/image/product-line/tx54,fmt=square400,bg=ffffff,c=0,v=1',
   'EZ WS': 'img/digi-connect-ez-4-ws.png',
-  'EZ TS': 'img/Digi-Connect-EZ-4-TS-front.png',
+  'EZ TS': 'img/Digi-Connect-EZ-4-TS.png',
   'EZ Mini': 'img/digi-connect-ez-mini.png',
   'EZ 2': 'img/digi-connect-ez-2.png',
   'EZ 4': 'img/digi-connect-ez-4.png',
   'EZ 4i': 'img/digi-connect-ez-4i.png',
   'EZ 8': 'img/Digi-Connect-EZ-8-TS.png',
-  'EZ 16/32': 'img/digi-connect-ez-16.png',
+  'EZ 16/32': 'img/digi-connect-ez-32-front.png',
   'ConnectPort TS': 'https://hub.digi.com/dp/path=/image/product-line/connectport-ts-8-16,fmt=square400,bg=ffffff,c=0,v=1',
   'Digi One': 'https://hub.digi.com/dp/path=/images/products/digi-one-sp-ia-family/,fmt=square400,bg=ffffff,c=0,v=1',
   'PortServer TS': 'https://hub.digi.com/dp/path=/image/product-line/portserver-ts,fmt=square400,bg=ffffff,c=0,v=1',
@@ -194,7 +195,7 @@ const LOCKED_ITEM_IMAGES = {
   'Digi IX30 Industrial Cellular Router': 'img/digi-ix30.png',
   'Digi IX40 5G Edge Computing Industrial IoT Solution': 'img/digi-ix40.png',
   'Digi TX40 5G Cellular Router': 'img/digi-tx40-5g-badge.png',
-  'Digi TX54 5G / LTE-Advanced Cellular Router': 'img/digi-tx54-dual-wifi-5g.png',
+  'Digi TX54 5G / LTE-Advanced Cellular Router': 'img/tx54.png',
   'Digi TX64 5G / LTE-Advanced Pro Cellular Router': 'img/tx64-5gbadge.png',
   'Digi TX64 5G Rail Cellular Router': 'img/digi-tx64-r-5gbadge.png',
   'Digi EX12 Cellular Extender': 'img/digi-ex12.png',
@@ -290,6 +291,7 @@ const LOCKED_ITEM_IMAGE_VARIANTS = {
     'img/digi-connect-ez-4-ws-back.png'
   ],
   'EZ TS': [
+    'img/Digi-Connect-EZ-4-TS.png',
     'img/Digi-Connect-EZ-4-TS-front.png',
     'img/Digi-Connect-EZ-4-TS-top.png',
     'img/Digi-Connect-EZ-4-TS-back.png'
@@ -319,11 +321,11 @@ const LOCKED_ITEM_IMAGE_VARIANTS = {
     'img/Digi-Connect-EZ-8-TS-front.png'
   ],
   'EZ 16/32': [
+    'img/digi-connect-ez-32-front.png',
     'img/digi-connect-ez-16.png',
     'img/digi-connect-ez-16-front.png',
     'img/digi-connect-ez-16-32-back.png',
-    'img/digi-connect-ez-32.png',
-    'img/digi-connect-ez-32-front.png'
+    'img/digi-connect-ez-32.png'
   ],
   'Digi CORE plug-in LTE modem': [
     'img/digi-core-cm-18.jpg',
@@ -2590,6 +2592,13 @@ function getNetworkAPI() {
   return window.appAPI || null;
 }
 
+function resolveImageAssetUrl(imageUrl) {
+  const value = String(imageUrl || '');
+  if (!value.startsWith('img/')) return value;
+  const separator = value.includes('?') ? '&' : '?';
+  return `${value}${separator}v=${LOCAL_IMAGE_ASSET_VERSION}`;
+}
+
 function createLineId(name) {
   lineCounter++;
   const slug = String(name || 'line')
@@ -3670,7 +3679,7 @@ const DEVICE_MODEL_IMAGES = [
   ['ex15', 'img/Digi-EX15.png'],
   ['ex12', 'img/digi-ex12.png'],
   ['tx64', 'img/digi-tx64-r-5gbadge.png'],
-  ['tx54', 'img/digi-tx54-dual-wifi-5g.png'],
+  ['tx54', 'img/tx54.png'],
   ['tx40', 'img/digi-tx40-5g-badge.png'],
   ['core-cm', 'img/digi-core-cm-18.jpg'],
   ['cm18', 'img/digi-core-cm-18.jpg'],
@@ -3898,7 +3907,7 @@ function createDeviceRow(device) {
   if (productImg) {
     const thumb = document.createElement('img');
     thumb.className = 'device-row-thumb';
-    thumb.src = productImg;
+    thumb.src = resolveImageAssetUrl(productImg);
     thumb.alt = '';
     thumb.setAttribute('aria-hidden', 'true');
     row.appendChild(thumb);
@@ -3973,7 +3982,7 @@ function openDeviceDetailModal(device) {
       iconEl.classList.add('has-product-img');
       iconEl.innerHTML = '';
       const imgEl = document.createElement('img');
-      imgEl.src = modalProductImg;
+      imgEl.src = resolveImageAssetUrl(modalProductImg);
       imgEl.alt = '';
       imgEl.setAttribute('aria-hidden', 'true');
       imgEl.className = 'device-detail-modal-icon-img';
@@ -4142,7 +4151,7 @@ function createDeviceCard(device) {
   if (cardProductImg) {
     icon.classList.add('has-product-img');
     const imgEl = document.createElement('img');
-    imgEl.src = cardProductImg;
+    imgEl.src = resolveImageAssetUrl(cardProductImg);
     imgEl.alt = '';
     imgEl.setAttribute('aria-hidden', 'true');
     imgEl.className = 'device-card-icon-img';
@@ -8215,7 +8224,7 @@ function createProductCard(item, line) {
   icon.className = 'vm-icon product-icon';
   if (item.imageUrl) {
     icon.classList.add('has-image');
-    icon.style.backgroundImage = `url("${String(item.imageUrl).replace(/"/g, '\\"')}")`;
+    icon.style.backgroundImage = `url("${resolveImageAssetUrl(item.imageUrl).replace(/"/g, '\\"')}")`;
     icon.textContent = '';
     icon.setAttribute('role', 'button');
     icon.tabIndex = 0;
@@ -8654,7 +8663,7 @@ function renderProductImageModal() {
   const currentImage = imageViewerState.images[imageViewerState.imageIndex];
 
   if (image) {
-    image.src = currentImage || '';
+    image.src = resolveImageAssetUrl(currentImage);
     image.alt = imageViewerState.item?.name || 'Product image';
   }
 
