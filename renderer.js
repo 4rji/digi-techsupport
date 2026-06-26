@@ -140,12 +140,28 @@ const DEFAULT_ITEM_IPS = {
   'Digi IX25 5G Industrial Cellular Router': '10.10.65.48',
   'Digi IX30 Industrial Cellular Router': '10.10.65.78',
   'Digi IX40 5G Edge Computing Industrial IoT Solution': '10.10.65.79',
+  'Digi TX40 5G Cellular Router': '10.10.65.88',
   'Digi TX54 5G / LTE-Advanced Cellular Router': '10.10.65.67',
   'Digi TX64 5G / LTE-Advanced Pro Cellular Router': '10.10.65.68',
   'Digi TX64 5G Rail Cellular Router': '10.10.65.38',
   'Digi EX12 Cellular Extender': '10.10.65.62',
   'Digi EX15 Cellular Extender': '10.10.65.57',
-  'Digi EX50 5G Cellular Extender': '10.10.65.72'
+  'Digi EX50 5G Cellular Extender': '10.10.65.72',
+  '2 Plus': '10.10.65.89',
+  '8 Plus': '10.10.65.74',
+  '24 Plus': '10.10.65.75',
+  WR21: '10.10.65.45',
+  WR31: '10.10.65.46',
+  WR44: '10.10.65.47',
+  'EZ WS': '10.10.65.42',
+  'EZ TS': '10.10.65.85',
+  'EZ Mini': '10.10.65.76',
+  'EZ 4': '10.10.65.93',
+  'EZ 8': '10.10.65.94',
+  'EZ 16/32': '10.10.65.81',
+  'ConnectPort TS': '10.10.65.25',
+  'PortServer TS': '10.10.65.20',
+  'Digi One': '10.10.65.65'
 };
 const LOCKED_ITEM_IMAGES = {
   '2 Plus': 'img/AnywhereUSB_2Plus_hero.png',
@@ -6050,14 +6066,15 @@ function createSupportSmartScanControls() {
   const form = document.createElement('form');
   form.className = 'file-support-smart-scan';
 
-  const input = document.createElement('input');
-  input.type = 'search';
+  const scanPromptPlaceholder = 'Describe the problem or context for the AI (optional). e.g. "Router drops cellular every night around 2am and recovers itself"';
+  const input = document.createElement('textarea');
   input.id = 'file-support-smart-scan-query';
   input.className = 'file-support-search-input file-support-smart-scan-input';
-  input.placeholder = 'Ask AI to scan this support file';
+  input.rows = 3;
+  input.placeholder = scanPromptPlaceholder;
   input.value = supportSmartScanState.query;
   input.disabled = !supportFileState.sessionId || supportSmartScanState.loading;
-  input.setAttribute('aria-label', 'Ask AI to scan this support file');
+  input.setAttribute('aria-label', 'Describe the problem or context for the AI');
   input.addEventListener('input', () => {
     supportSmartScanState = {
       ...supportSmartScanState,

@@ -60,8 +60,9 @@
 .file-support-dashboard-table-row+.file-support-dashboard-table-row{border-top:1px solid var(--app-border,rgba(255,255,255,.14))}
 .file-support-dashboard-table-row span{min-width:0;padding:8px 10px;color:var(--app-text,#fff);font-size:.78rem;line-height:1.35;overflow-wrap:anywhere}
 .file-support-dashboard-table-row.is-header span{color:var(--app-muted,#9c9c9c);font-weight:700;text-transform:uppercase}
-.file-support-smart-scan{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:0 12px 12px;border-bottom:1px solid var(--app-border,rgba(255,255,255,.14));background:rgba(var(--app-card-rgb,var(--app-sidebar-rgb,27,73,101)),.32)}
-.file-support-smart-scan-button{min-height:38px;padding:8px 12px;border:1px solid rgba(var(--app-primary-rgb,132,195,97),.48);border-radius:6px;background:rgba(var(--app-primary-rgb,132,195,97),.14);color:var(--app-text,#fff);font:inherit;font-size:.84rem;cursor:pointer;white-space:nowrap}
+.file-support-smart-scan{display:flex;flex-direction:column;gap:8px;padding:0 12px 12px;border-bottom:1px solid var(--app-border,rgba(255,255,255,.14));background:rgba(var(--app-card-rgb,var(--app-sidebar-rgb,27,73,101)),.32)}
+.file-support-smart-scan-input{min-height:72px;line-height:1.4;resize:vertical;font:inherit}
+.file-support-smart-scan-button{align-self:flex-end;min-height:38px;padding:8px 12px;border:1px solid rgba(var(--app-primary-rgb,132,195,97),.48);border-radius:6px;background:rgba(var(--app-primary-rgb,132,195,97),.14);color:var(--app-text,#fff);font:inherit;font-size:.84rem;cursor:pointer;white-space:nowrap}
 .file-support-smart-scan-button:hover:not(:disabled),.file-support-smart-scan-button:focus-visible{border-color:var(--app-primary,#84c361);background:rgba(var(--app-primary-rgb,132,195,97),.22);outline:none}
 .file-support-smart-scan-button:disabled{opacity:.55;cursor:not-allowed}
 .file-support-smart-result{margin:14px;padding:12px;border:1px solid rgba(var(--app-primary-rgb,132,195,97),.32);border-radius:8px;background:rgba(var(--app-card-rgb,var(--app-sidebar-rgb,27,73,101)),.36)}

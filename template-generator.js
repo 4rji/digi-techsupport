@@ -153,10 +153,17 @@ function buildFileSupportContext(files) {
 }
 
 function buildFileSupportUserPrompt({ query, files, summary }) {
-  const question = String(query || '').trim() || 'Run a first-pass troubleshooting scan of this support archive.';
+  const problem = String(query || '').trim();
+  const intro = problem
+    ? [
+        'The user is troubleshooting this reported problem / context:',
+        problem,
+        '',
+        'Use it as the lens for your analysis. Focus your findings on this issue.'
+      ]
+    : ['Run a first-pass troubleshooting scan of this support archive.'];
   return [
-    'Analyze the imported Digi support archive for this request:',
-    question,
+    ...intro,
     '',
     'Dashboard summary JSON:',
     JSON.stringify(summary || {}, null, 2),

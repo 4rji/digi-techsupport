@@ -4183,15 +4183,23 @@ body.is-file-support-resizing {
 }
 
 .file-support-smart-scan {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   padding: 0 12px 12px;
   border-bottom: 1px solid var(--app-border, rgba(255, 255, 255, 0.14));
   background: rgba(var(--app-card-rgb, var(--app-sidebar-rgb, 27, 73, 101)), 0.32);
 }
 
+.file-support-smart-scan-input {
+  min-height: 72px;
+  line-height: 1.4;
+  resize: vertical;
+  font: inherit;
+}
+
 .file-support-smart-scan-button {
+  align-self: flex-end;
   min-height: 38px;
   padding: 8px 12px;
   border: 1px solid rgba(var(--app-primary-rgb, 132, 195, 97), 0.48);
