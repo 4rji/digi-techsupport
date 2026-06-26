@@ -50,8 +50,8 @@ conectado **enfoca/restaura** la sesión existente en vez de crear otra.
   por sesión. Cada xterm se monta una sola vez en su propio div (`terminal.open(containerEl)`)
   y **nunca se mueve** entre contenedores. Solo el div de `activeSshSessionId` se muestra;
   los demás quedan ocultos (`display:none`).
-- Header del modal: agregar botón **Minimizar** (⎯) junto a Maximizar, y botón **Pegar** (📥)
-  junto a Copiar.
+- Header del modal: **dos botones distintos** — **Minimizar** (⎯) y **Cerrar** (×) — claramente
+  separados, además del de Maximizar. Y botón **Pegar** (📥) junto a Copiar.
 - Nuevo **dock** `#ssh-session-dock`: contenedor fijo a nivel de `<body>`, esquina inferior,
   visible solo cuando hay sesiones minimizadas. Cada sesión minimizada = una pastilla
   `.ssh-session-pill` con la etiqueta `username@host`, un indicador de estado, clic para
@@ -72,9 +72,9 @@ conectado **enfoca/restaura** la sesión existente en vez de crear otra.
   guarda el `sessionId` real devuelto, la marca activa y oculta el formulario.
 
 ### Minimizar
-- Botón Minimizar (o × del modal con una sesión conectada): oculta el modal
-  (`modal.style.display='none'`), marca `session.minimized = true`, renderiza/actualiza el dock.
-  La conexión SSH **sigue viva**. No limpia ni desconecta.
+- Botón Minimizar (⎯): oculta el modal (`modal.style.display='none'`), marca
+  `session.minimized = true`, renderiza/actualiza el dock. La conexión SSH **sigue viva**.
+  No limpia ni desconecta.
 
 ### Restaurar
 - Clic en pastilla: muestra el modal, `setActiveSshSession(sessionId)` (muestra su contenedor,
@@ -82,7 +82,9 @@ conectado **enfoca/restaura** la sesión existente en vez de crear otra.
   marca `minimized=false` y refresca el dock.
 
 ### Cerrar (×) del modal
-- Si hay sesión activa conectada → equivale a **minimizar** (va al dock, no desconecta).
+- Si hay sesión activa conectada → **desconecta** esa sesión (`sshDisconnect`, `dispose()` del
+  xterm, elimina contenedor, borra del registro y del dock) y oculta el modal. Es distinto de
+  Minimizar.
 - Si está en modo formulario sin sesión → solo oculta el modal.
 
 ### Desconectar
