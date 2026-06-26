@@ -169,11 +169,11 @@ const LOCKED_ITEM_IMAGES = {
   '8 Plus': 'img/AnywhereUSB_8Plus_hero.png',
   '24 Plus': 'img/AnywhereUSB_24Plus_hero.png',
   'Edgeport 1': 'img/edgeport-1.png',
-  'Edgeport 2': 'img/edgeport-216-front.png',
+  'Edgeport 2': 'img/Edgeport-4-DB25.png',
   'Edgeport 4': 'img/Edgeport-4-DB25.png',
   'Edgeport 8': 'img/Edgeport-8-DB-9-8-RS-232.png',
   'Edgeport 16': 'img/edgeport-216-front.png',
-  'Edgeport 32': 'img/edgeport.png',
+  'Edgeport 32': 'img/digi-connect-ez-32-front.png',
   WR21: 'img/digi-transport-wr21.png',
   WR31: 'https://www.digi.com/products/assets/products/digitransportwr31',
   WR44: 'img/digi-transport-wr44-rr.png',
@@ -194,7 +194,7 @@ const LOCKED_ITEM_IMAGES = {
   'Digi IX25 5G Industrial Cellular Router': 'img/digi-ix25.png',
   'Digi IX30 Industrial Cellular Router': 'img/digi-ix30.png',
   'Digi IX40 5G Edge Computing Industrial IoT Solution': 'img/digi-ix40.png',
-  'Digi TX40 5G Cellular Router': 'img/digi-tx40-5g-badge.png',
+  'Digi TX40 5G Cellular Router': 'img/digi-tx40.png',
   'Digi TX54 5G / LTE-Advanced Cellular Router': 'img/tx54.png',
   'Digi TX64 5G / LTE-Advanced Pro Cellular Router': 'img/tx64-5gbadge.png',
   'Digi TX64 5G Rail Cellular Router': 'img/digi-tx64-r-5gbadge.png',
@@ -222,8 +222,7 @@ const LOCKED_ITEM_IMAGE_VARIANTS = {
     'img/edgeport-1.png'
   ],
   'Edgeport 2': [
-    'img/edgeport-216-front.png',
-    'img/edgeport-216-back.png'
+    'img/Edgeport-4-DB25.png'
   ],
   'Edgeport 4': [
     'img/Edgeport-4-DB25.png'
@@ -237,7 +236,8 @@ const LOCKED_ITEM_IMAGE_VARIANTS = {
     'img/edgeport-216-back.png'
   ],
   'Edgeport 32': [
-    'img/edgeport.png'
+    'img/digi-connect-ez-32-front.png',
+    'img/digi-connect-ez-32.png'
   ],
   'Digi IX10 Industrial Cellular Router': [
     'img/digi-ix10.png',
@@ -267,6 +267,11 @@ const LOCKED_ITEM_IMAGE_VARIANTS = {
     'img/digi-ix40-front.png',
     'img/digi-ix40-back.png',
     'img/digi-ix40-left.png'
+  ],
+  'Digi TX40 5G Cellular Router': [
+    'img/digi-tx40.png',
+    'img/digi-tx40-front.png',
+    'img/digi-tx40-back-5g.png'
   ],
   'Digi EX12 Cellular Extender': [
     'img/digi-ex12.png',
@@ -3680,7 +3685,7 @@ const DEVICE_MODEL_IMAGES = [
   ['ex12', 'img/digi-ex12.png'],
   ['tx64', 'img/digi-tx64-r-5gbadge.png'],
   ['tx54', 'img/tx54.png'],
-  ['tx40', 'img/digi-tx40-5g-badge.png'],
+  ['tx40', 'img/digi-tx40.png'],
   ['core-cm', 'img/digi-core-cm-18.jpg'],
   ['cm18', 'img/digi-core-cm-18.jpg'],
 ];

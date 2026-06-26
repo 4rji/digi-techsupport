@@ -190,16 +190,6 @@ function extractOpenAIText(payload) {
   return chunks.join('\n').trim();
 }
 
-function extractClaudeText(payload) {
-  const chunks = [];
-  for (const content of payload?.content || []) {
-    if (content?.type === 'text' && typeof content.text === 'string') {
-      chunks.push(content.text);
-    }
-  }
-  return chunks.join('\n').trim();
-}
-
 function stripMarkdownFence(text) {
   const trimmed = String(text || '').trim();
   const fenceMatch = trimmed.match(/^```(?:markdown|md)?\s*([\s\S]*?)\s*```$/i);
@@ -261,7 +251,10 @@ async function callOpenAIFileSupportAPI({ apiKey, skill, query, files, summary }
   return extractOpenAIText(payload);
 }
 
-async function callClaudeTemplateAPI({ apiKey, skill, sourceText, templates }) {
+// Streams an Anthropic Messages request and returns the accumulated text.
+// Streaming keeps the connection active with continuous SSE events, which avoids
+// the idle-timeout "Premature close" seen on long non-streaming requests.
+async function streamClaudeMessage({ apiKey, maxTokens, system, content }) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -271,44 +264,73 @@ async function callClaudeTemplateAPI({ apiKey, skill, sourceText, templates }) {
     },
     body: JSON.stringify({
       model: CLAUDE_TEMPLATE_MODEL,
-      max_tokens: TEMPLATE_MAX_OUTPUT_TOKENS,
-      system: buildTemplateInstructions(skill),
-      messages: [
-        {
-          role: 'user',
-          content: buildTemplateUserPrompt(sourceText, templates)
-        }
-      ]
+      max_tokens: maxTokens,
+      stream: true,
+      system,
+      messages: [{ role: 'user', content }]
     })
   });
 
-  const payload = await parseAPIResponse(response);
-  return extractClaudeText(payload);
+  // Errors (auth, rate limit, bad request) come back as a non-2xx JSON body, not SSE.
+  if (!response.ok) {
+    await parseAPIResponse(response);
+  }
+
+  const chunks = [];
+  let buffer = '';
+
+  const handleEvent = (raw) => {
+    for (const line of raw.split('\n')) {
+      if (!line.startsWith('data:')) continue;
+      const data = line.slice(5).trim();
+      if (!data) continue;
+      let event;
+      try {
+        event = JSON.parse(data);
+      } catch {
+        continue;
+      }
+      if (event.type === 'error') {
+        throw new Error(event.error?.message || 'Anthropic streaming error');
+      }
+      if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+        chunks.push(event.delta.text);
+      }
+    }
+  };
+
+  for await (const part of response.body) {
+    buffer += part.toString('utf8');
+    let boundary;
+    while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+      const raw = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      handleEvent(raw);
+    }
+  }
+  if (buffer.trim()) {
+    handleEvent(buffer);
+  }
+
+  return chunks.join('').trim();
+}
+
+async function callClaudeTemplateAPI({ apiKey, skill, sourceText, templates }) {
+  return streamClaudeMessage({
+    apiKey,
+    maxTokens: TEMPLATE_MAX_OUTPUT_TOKENS,
+    system: buildTemplateInstructions(skill),
+    content: buildTemplateUserPrompt(sourceText, templates)
+  });
 }
 
 async function callClaudeFileSupportAPI({ apiKey, skill, query, files, summary }) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: CLAUDE_TEMPLATE_MODEL,
-      max_tokens: FILE_SUPPORT_MAX_OUTPUT_TOKENS,
-      system: buildFileSupportInstructions(skill),
-      messages: [
-        {
-          role: 'user',
-          content: buildFileSupportUserPrompt({ query, files, summary })
-        }
-      ]
-    })
+  return streamClaudeMessage({
+    apiKey,
+    maxTokens: FILE_SUPPORT_MAX_OUTPUT_TOKENS,
+    system: buildFileSupportInstructions(skill),
+    content: buildFileSupportUserPrompt({ query, files, summary })
   });
-
-  const payload = await parseAPIResponse(response);
-  return extractClaudeText(payload);
 }
 
 async function generateSupportTemplate(options = {}) {
