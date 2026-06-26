@@ -5150,3 +5150,96 @@ body.is-file-support-resizing {
   font-size: 0.72rem;
   font-style: italic;
 }
+
+/* SSH multi-session: per-session terminal instances + minimized dock */
+.ssh-term-instance {
+  height: 100%;
+}
+
+.ssh-term-instance .xterm {
+  height: 100%;
+}
+
+.ssh-session-dock {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 1345;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+}
+
+.ssh-session-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 4px;
+  border: 1px solid rgba(120, 190, 240, 0.3);
+  border-radius: 18px;
+  background: #1a1f24;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.ssh-session-pill[data-state="error"],
+.ssh-session-pill[data-state="closed"] {
+  border-color: rgba(240, 120, 120, 0.5);
+}
+
+.ssh-session-pill-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 6px 7px 14px;
+  border: none;
+  background: transparent;
+  color: #dce6ef;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ssh-session-pill-label::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #56d364;
+  flex-shrink: 0;
+}
+
+.ssh-session-pill[data-state="connecting"] .ssh-session-pill-label::before {
+  background: #e3b341;
+}
+
+.ssh-session-pill[data-state="error"] .ssh-session-pill-label::before,
+.ssh-session-pill[data-state="closed"] .ssh-session-pill-label::before {
+  background: #f07878;
+}
+
+.ssh-session-pill-label:hover {
+  color: #9fd7ff;
+}
+
+.ssh-session-pill-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #9aa7b2;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ssh-session-pill-close:hover {
+  background: rgba(240, 120, 120, 0.2);
+  color: #f07878;
+}

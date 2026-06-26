@@ -2224,14 +2224,15 @@ let imageViewerState = {
 };
 let imageSwipeStartX = null;
 let portPollTimer = null;
-let sshTerminal = null;
-let sshFitAddon = null;
-let sshSessionId = null;
-let sshCurrentItem = null;
+const sshSessions = new Map(); // clientId -> Session
+let activeSshClientId = null;
+let sshPendingItem = null;
+let sshClientCounter = 0;
 let sshResizeObserver = null;
 let removeSSHDataListener = null;
 let removeSSHCloseListener = null;
 let removeSSHErrorListener = null;
+let sshEventListenersRegistered = false;
 let sshPasswordSaveTimer = null;
 let sshFontSize = 13;
 
@@ -2558,10 +2559,12 @@ window.addEventListener('beforeunload', () => {
   if (portPollTimer) {
     clearInterval(portPollTimer);
   }
-  if (sshSessionId) {
-    const networkAPI = getNetworkAPI();
-    if (networkAPI && typeof networkAPI.sshDisconnect === 'function') {
-      networkAPI.sshDisconnect(sshSessionId);
+  const networkAPI = getNetworkAPI();
+  if (networkAPI && typeof networkAPI.sshDisconnect === 'function') {
+    for (const session of sshSessions.values()) {
+      if (session.sessionId) {
+        networkAPI.sshDisconnect(session.sessionId);
+      }
     }
   }
 });
@@ -8600,45 +8603,228 @@ function setupProductSpecsModal() {
   });
 }
 
-function ensureSSHTerminal() {
-  const container = document.getElementById('ssh-terminal-container');
-  if (!container) return null;
+function nextSshClientId() {
+  return `sshc_${++sshClientCounter}`;
+}
 
-  if (!sshTerminal) {
-    sshTerminal = new Terminal({
-      cursorBlink: true,
-      convertEol: true,
-      fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
-      fontSize: sshFontSize,
-      lineHeight: 1.18,
-      theme: {
-        background: '#050505',
-        foreground: '#f2f2f2',
-        cursor: '#9fd7ff',
-        selectionBackground: '#2f5f7a'
-      }
-    });
-    sshFitAddon = new FitAddon();
-    sshTerminal.loadAddon(sshFitAddon);
-    sshTerminal.open(container);
-    sshTerminal.onData(data => {
-      const networkAPI = getNetworkAPI();
-      if (sshSessionId && networkAPI && typeof networkAPI.sshWrite === 'function') {
-        networkAPI.sshWrite(sshSessionId, data);
-      }
-    });
+function getActiveSession() {
+  return activeSshClientId ? sshSessions.get(activeSshClientId) || null : null;
+}
+
+function findSessionBySessionId(sessionId) {
+  if (!sessionId) return null;
+  for (const session of sshSessions.values()) {
+    if (session.sessionId === sessionId) return session;
+  }
+  return null;
+}
+
+function findSessionByItemId(itemId) {
+  if (itemId === null || itemId === undefined) return null;
+  for (const session of sshSessions.values()) {
+    if (session.itemId === itemId) return session;
+  }
+  return null;
+}
+
+function sshStatusText(status) {
+  switch (status) {
+    case 'connected': return 'Connected';
+    case 'connecting': return 'Connecting...';
+    case 'closed': return 'Disconnected';
+    case 'error': return 'SSH error';
+    default: return 'Not connected';
+  }
+}
+
+function sshStatusState(status) {
+  if (status === 'connected') return 'connected';
+  if (status === 'connecting') return 'connecting';
+  if (status === 'error') return 'error';
+  return 'idle';
+}
+
+// Creates a Session with its own xterm instance mounted in its own container.
+// The xterm is opened once and never moved between containers.
+function createSSHSession(itemId, item, host, port, username) {
+  const hostArea = document.getElementById('ssh-terminal-container');
+  if (!hostArea) return null;
+
+  const containerEl = document.createElement('div');
+  containerEl.className = 'ssh-term-instance';
+  containerEl.style.display = 'none';
+  hostArea.appendChild(containerEl);
+
+  const terminal = new Terminal({
+    cursorBlink: true,
+    convertEol: true,
+    fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
+    fontSize: sshFontSize,
+    lineHeight: 1.18,
+    theme: {
+      background: '#050505',
+      foreground: '#f2f2f2',
+      cursor: '#9fd7ff',
+      selectionBackground: '#2f5f7a'
+    }
+  });
+  const fitAddon = new FitAddon();
+  terminal.loadAddon(fitAddon);
+  terminal.open(containerEl);
+
+  const session = {
+    clientId: nextSshClientId(),
+    sessionId: null,
+    itemId,
+    item,
+    host,
+    port,
+    username,
+    terminal,
+    fitAddon,
+    containerEl,
+    label: `${username}@${host}`,
+    status: 'connecting',
+    minimized: false
+  };
+
+  terminal.onData(data => {
+    const networkAPI = getNetworkAPI();
+    if (session.sessionId && networkAPI && typeof networkAPI.sshWrite === 'function') {
+      networkAPI.sshWrite(session.sessionId, data);
+    }
+  });
+
+  // Right-click pastes the clipboard into the active terminal.
+  containerEl.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    pasteIntoSSH();
+  });
+
+  return session;
+}
+
+// Shows the given session's terminal in the modal and hides the others/form.
+function setActiveSshSession(clientId) {
+  const session = sshSessions.get(clientId);
+  if (!session) return;
+  activeSshClientId = clientId;
+
+  for (const other of sshSessions.values()) {
+    if (other.containerEl) {
+      other.containerEl.style.display = other.clientId === clientId ? 'block' : 'none';
+    }
   }
 
-  requestAnimationFrame(() => fitSSHTerminal());
-  return sshTerminal;
+  const title = document.getElementById('ssh-terminal-title');
+  const eyebrow = document.getElementById('ssh-terminal-eyebrow');
+  const compactInfo = document.getElementById('ssh-compact-info');
+  if (title) title.textContent = (session.item && session.item.name) || 'SSH Terminal';
+  if (eyebrow) eyebrow.textContent = `SSH to ${session.host}`;
+  if (compactInfo) compactInfo.textContent = `${session.label}:${session.port}`;
+
+  setSSHFormState(true);
+  setSSHStatus(sshStatusText(session.status), sshStatusState(session.status));
+  requestAnimationFrame(() => {
+    fitSSHTerminal();
+    if (session.terminal) session.terminal.focus();
+  });
+}
+
+// Switches the modal to the "new connection" form (no active session).
+function showSSHFormMode() {
+  activeSshClientId = null;
+  for (const session of sshSessions.values()) {
+    if (session.containerEl) session.containerEl.style.display = 'none';
+  }
+  setSSHFormState(false);
+}
+
+function minimizeSSHSession() {
+  const modal = document.getElementById('ssh-terminal-modal');
+  const active = getActiveSession();
+  if (active) {
+    active.minimized = true;
+  }
+  if (modal) modal.style.display = 'none';
+  updateSSHDock();
+}
+
+function restoreSSHSession(clientId) {
+  const session = sshSessions.get(clientId);
+  if (!session) return;
+  const modal = document.getElementById('ssh-terminal-modal');
+  session.minimized = false;
+  if (modal) modal.style.display = 'flex';
+  registerSSHEventListeners();
+  setActiveSshSession(clientId);
+  updateSSHDock();
+}
+
+// Disconnects (optionally) and fully tears down a session's terminal + DOM.
+async function destroySSHSession(clientId, { disconnect = true } = {}) {
+  const session = sshSessions.get(clientId);
+  if (!session) return;
+  const networkAPI = getNetworkAPI();
+  if (disconnect && session.sessionId && networkAPI && typeof networkAPI.sshDisconnect === 'function') {
+    try { await networkAPI.sshDisconnect(session.sessionId); } catch (e) { /* ignore */ }
+  }
+  try { if (session.terminal) session.terminal.dispose(); } catch (e) { /* ignore */ }
+  if (session.containerEl && session.containerEl.parentNode) {
+    session.containerEl.parentNode.removeChild(session.containerEl);
+  }
+  sshSessions.delete(clientId);
+  if (activeSshClientId === clientId) {
+    activeSshClientId = null;
+  }
+  updateSSHDock();
+}
+
+// Renders the dock of minimized sessions (a pill per session).
+function updateSSHDock() {
+  const dock = document.getElementById('ssh-session-dock');
+  if (!dock) return;
+  const minimized = [...sshSessions.values()].filter(s => s.minimized);
+  dock.innerHTML = '';
+  if (minimized.length === 0) {
+    dock.style.display = 'none';
+    return;
+  }
+  dock.style.display = 'flex';
+  minimized.forEach(session => {
+    const pill = document.createElement('div');
+    pill.className = 'ssh-session-pill';
+    pill.dataset.state = session.status;
+
+    const label = document.createElement('button');
+    label.type = 'button';
+    label.className = 'ssh-session-pill-label';
+    label.textContent = session.label;
+    label.title = `Restore ${session.label}:${session.port}`;
+    label.addEventListener('click', () => restoreSSHSession(session.clientId));
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'ssh-session-pill-close';
+    close.textContent = '×';
+    close.title = 'Disconnect session';
+    close.addEventListener('click', (event) => {
+      event.stopPropagation();
+      disconnectSSHSession(session.clientId);
+    });
+
+    pill.appendChild(label);
+    pill.appendChild(close);
+    dock.appendChild(pill);
+  });
 }
 
 function changeSshFontSize(delta) {
   sshFontSize = Math.max(9, Math.min(22, sshFontSize + delta));
-  if (sshTerminal) {
-    sshTerminal.options.fontSize = sshFontSize;
-    requestAnimationFrame(() => fitSSHTerminal());
+  for (const session of sshSessions.values()) {
+    if (session.terminal) session.terminal.options.fontSize = sshFontSize;
   }
+  requestAnimationFrame(() => fitSSHTerminal());
 }
 
 function toggleSshMaximize() {
@@ -8651,8 +8837,9 @@ function toggleSshMaximize() {
 }
 
 async function copySSHSelection() {
-  if (!sshTerminal) return;
-  const text = sshTerminal.getSelection();
+  const active = getActiveSession();
+  if (!active || !active.terminal) return;
+  const text = active.terminal.getSelection();
   if (!text) {
     showNotification('No text selected in terminal');
     return;
@@ -8676,13 +8863,34 @@ async function copySSHSelection() {
   }
 }
 
-function fitSSHTerminal() {
-  if (!sshTerminal || !sshFitAddon) return;
+async function pasteIntoSSH() {
+  const active = getActiveSession();
+  const networkAPI = getNetworkAPI();
+  if (!active || !active.sessionId) return;
+  if (!networkAPI || typeof networkAPI.sshWrite !== 'function') return;
+
+  let text = '';
   try {
-    sshFitAddon.fit();
+    if (navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
+      text = await navigator.clipboard.readText();
+    }
+  } catch (e) {
+    showNotification('Could not read clipboard');
+    return;
+  }
+  if (!text) return;
+  networkAPI.sshWrite(active.sessionId, text);
+  if (active.terminal) active.terminal.focus();
+}
+
+function fitSSHTerminal() {
+  const active = getActiveSession();
+  if (!active || !active.fitAddon || !active.terminal) return;
+  try {
+    active.fitAddon.fit();
     const networkAPI = getNetworkAPI();
-    if (sshSessionId && networkAPI && typeof networkAPI.sshResize === 'function') {
-      networkAPI.sshResize(sshSessionId, sshTerminal.cols, sshTerminal.rows);
+    if (active.sessionId && networkAPI && typeof networkAPI.sshResize === 'function') {
+      networkAPI.sshResize(active.sessionId, active.terminal.cols, active.terminal.rows);
     }
   } catch (error) {
     console.error('Error fitting SSH terminal:', error);
@@ -8764,34 +8972,38 @@ function queueSSHAdminPasswordSave() {
 
 function registerSSHEventListeners() {
   const networkAPI = getNetworkAPI();
-  if (!networkAPI) return;
+  if (!networkAPI || sshEventListenersRegistered) return;
+  sshEventListenersRegistered = true;
 
-  if (!removeSSHDataListener && typeof networkAPI.onSSHData === 'function') {
+  if (typeof networkAPI.onSSHData === 'function') {
     removeSSHDataListener = networkAPI.onSSHData(payload => {
-      if (!payload || payload.sessionId !== sshSessionId || !sshTerminal) return;
-      sshTerminal.write(payload.data || '');
+      if (!payload) return;
+      const session = findSessionBySessionId(payload.sessionId);
+      if (session && session.terminal) session.terminal.write(payload.data || '');
     });
   }
 
-  if (!removeSSHCloseListener && typeof networkAPI.onSSHClose === 'function') {
+  if (typeof networkAPI.onSSHClose === 'function') {
     removeSSHCloseListener = networkAPI.onSSHClose(payload => {
-      if (!payload || payload.sessionId !== sshSessionId) return;
-      sshSessionId = null;
-      setSSHStatus('Disconnected', 'idle');
-      setSSHFormState(false);
-      if (sshTerminal) {
-        sshTerminal.writeln('\r\n[SSH session closed]');
-      }
+      if (!payload) return;
+      const session = findSessionBySessionId(payload.sessionId);
+      if (!session) return;
+      session.status = 'closed';
+      if (session.terminal) session.terminal.writeln('\r\n[SSH session closed]');
+      if (session.clientId === activeSshClientId) setSSHStatus('Disconnected', 'idle');
+      updateSSHDock();
     });
   }
 
-  if (!removeSSHErrorListener && typeof networkAPI.onSSHError === 'function') {
+  if (typeof networkAPI.onSSHError === 'function') {
     removeSSHErrorListener = networkAPI.onSSHError(payload => {
-      if (!payload || payload.sessionId !== sshSessionId) return;
-      setSSHStatus(payload.error || 'SSH error', 'error');
-      if (sshTerminal) {
-        sshTerminal.writeln(`\r\n[SSH error] ${payload.error || 'Unknown error'}`);
-      }
+      if (!payload) return;
+      const session = findSessionBySessionId(payload.sessionId);
+      if (!session) return;
+      session.status = 'error';
+      if (session.terminal) session.terminal.writeln(`\r\n[SSH error] ${payload.error || 'Unknown error'}`);
+      if (session.clientId === activeSshClientId) setSSHStatus(payload.error || 'SSH error', 'error');
+      updateSSHDock();
     });
   }
 }
@@ -8819,7 +9031,24 @@ function openSSHTerminalModal(itemId) {
     sshPasswordSaveTimer = null;
   }
 
-  sshCurrentItem = match.item;
+  registerSSHEventListeners();
+  modal.style.display = 'flex';
+
+  // If a live session for this item already exists, restore/focus it.
+  const existing = findSessionByItemId(match.item.id);
+  if (existing && existing.status !== 'closed') {
+    restoreSSHSession(existing.clientId);
+    return;
+  }
+
+  // Otherwise open the modal in "new connection" form mode. Send any currently
+  // active live session to the dock so it isn't lost.
+  const current = getActiveSession();
+  if (current && current.status !== 'closed') {
+    current.minimized = true;
+  }
+
+  sshPendingItem = match.item;
   hostInput.value = match.item.ip;
   if (portInput) portInput.value = '22';
   if (usernameInput) usernameInput.value = 'admin';
@@ -8829,19 +9058,12 @@ function openSSHTerminalModal(itemId) {
   if (title) title.textContent = match.item.name || 'SSH Terminal';
   if (eyebrow) eyebrow.textContent = `SSH to ${match.item.ip}`;
 
-  modal.style.display = 'flex';
-  registerSSHEventListeners();
-  ensureSSHTerminal();
-  if (sshTerminal && !sshSessionId) {
-    sshTerminal.clear();
-  }
-  setSSHStatus(sshSessionId ? 'Connected' : 'Not connected', sshSessionId ? 'connected' : 'idle');
-  setSSHFormState(Boolean(sshSessionId));
+  showSSHFormMode();
+  updateSSHDock();
+  setSSHStatus('Not connected', 'idle');
   applySSHDefaults(match.item.ip);
   applySSHAdminPasswordDefault(match.item.ip);
-  if (usernameInput && !sshSessionId) {
-    usernameInput.focus();
-  }
+  if (usernameInput) usernameInput.focus();
 }
 
 async function applySSHAdminPasswordDefault(host) {
@@ -8918,86 +9140,83 @@ async function connectSSHFromForm() {
     return;
   }
 
-  if (sshSessionId) {
-    await disconnectSSHSession();
-  }
-
-  const terminal = ensureSSHTerminal();
-  if (terminal) {
-    terminal.clear();
-    const target = `${username}@${host}:${Number.isNaN(port) ? 22 : port}`;
-    terminal.writeln(directShell
-      ? `Connecting to ${target} and starting /bin/sh...`
-      : `Connecting to ${target}...`);
-  }
+  const safePort = Number.isNaN(port) ? 22 : port;
+  const item = sshPendingItem || { id: null, name: host, ip: host };
 
   if (username === 'admin' && saveAdminPasswordInput) {
     const saveResult = await saveSSHAdminPasswordPreference();
     if (!saveResult || !saveResult.success) {
       setSSHStatus(saveResult?.error || 'Could not save SSH password', 'error');
-      if (terminal) {
-        terminal.writeln(`\r\n[Warning] ${saveResult?.error || 'Could not save SSH password'}`);
-      }
     }
   }
 
+  const session = createSSHSession(item.id, item, host, safePort, username);
+  if (!session) {
+    setSSHStatus('Could not create terminal', 'error');
+    return;
+  }
+  sshSessions.set(session.clientId, session);
+  setActiveSshSession(session.clientId);
   setSSHStatus('Connecting...', 'connecting');
-  setSSHFormState(false, true);
+
+  const target = `${username}@${host}:${safePort}`;
+  session.terminal.writeln(directShell
+    ? `Connecting to ${target} and starting /bin/sh...`
+    : `Connecting to ${target}...`);
 
   const result = await networkAPI.sshConnect({
     host,
     username,
     password,
-    port: Number.isNaN(port) ? 22 : port,
+    port: safePort,
     directShell,
-    cols: terminal ? terminal.cols : 80,
-    rows: terminal ? terminal.rows : 24
+    cols: session.terminal.cols || 80,
+    rows: session.terminal.rows || 24
   });
 
   if (!result || !result.success) {
-    sshSessionId = null;
+    session.terminal.writeln(`\r\n[Connection failed] ${result?.error || 'Unknown error'}`);
+    await destroySSHSession(session.clientId, { disconnect: false });
+    showSSHFormMode();
     setSSHStatus(result?.error || 'Could not connect', 'error');
-    setSSHFormState(false);
-    if (terminal) {
-      terminal.writeln(`\r\n[Connection failed] ${result?.error || 'Unknown error'}`);
-    }
     return;
   }
 
-  sshSessionId = result.sessionId;
+  session.sessionId = result.sessionId;
+  session.status = 'connected';
   setSSHStatus('Connected', 'connected');
   const compactInfo = document.getElementById('ssh-compact-info');
-  if (compactInfo) {
-    compactInfo.textContent = `${username}@${host}:${Number.isNaN(port) ? 22 : port}`;
-  }
-  setSSHFormState(true);
+  if (compactInfo) compactInfo.textContent = target;
   fitSSHTerminal();
-  if (terminal) {
-    terminal.focus();
+  session.terminal.focus();
+}
+
+// Disconnects a session (the active one if no clientId is given). If it was the
+// active session, returns the modal to the connection form so the user can reconnect.
+async function disconnectSSHSession(clientId) {
+  const targetId = clientId || activeSshClientId;
+  if (!targetId) return;
+  const wasActive = targetId === activeSshClientId;
+  await destroySSHSession(targetId, { disconnect: true });
+  if (wasActive) {
+    showSSHFormMode();
+    setSSHStatus('Disconnected', 'idle');
   }
 }
 
-async function disconnectSSHSession() {
-  const networkAPI = getNetworkAPI();
-  const sessionId = sshSessionId;
-  sshSessionId = null;
-  if (networkAPI && typeof networkAPI.sshDisconnect === 'function' && sessionId) {
-    await networkAPI.sshDisconnect(sessionId);
-  }
-  setSSHStatus('Disconnected', 'idle');
-  setSSHFormState(false);
-  if (sshTerminal) {
-    sshTerminal.writeln('\r\n[Disconnected]');
-  }
-}
-
-function closeSSHTerminalModal() {
+// The modal's × button: disconnects the active session (distinct from minimize)
+// and hides the modal.
+async function closeSSHTerminalModal() {
   const modal = document.getElementById('ssh-terminal-modal');
   const passwordInput = document.getElementById('ssh-password');
   const saveAdminPasswordInput = document.getElementById('ssh-save-admin-password');
   if (sshPasswordSaveTimer) {
     clearTimeout(sshPasswordSaveTimer);
     sshPasswordSaveTimer = null;
+  }
+  const active = getActiveSession();
+  if (active) {
+    await destroySSHSession(active.clientId, { disconnect: true });
   }
   if (modal) {
     modal.style.display = 'none';
@@ -9007,9 +9226,6 @@ function closeSSHTerminalModal() {
   }
   if (saveAdminPasswordInput) {
     saveAdminPasswordInput.checked = false;
-  }
-  if (sshSessionId) {
-    disconnectSSHSession();
   }
 }
 
@@ -9094,6 +9310,8 @@ function setupSSHTerminalModal() {
   const fontDecreaseBtn = document.getElementById('ssh-font-decrease');
   const fontIncreaseBtn = document.getElementById('ssh-font-increase');
   const copySelectionBtn = document.getElementById('ssh-copy-selection');
+  const pasteBtn = document.getElementById('ssh-paste');
+  const minimizeBtn = document.getElementById('ssh-minimize');
   const maximizeBtn = document.getElementById('ssh-maximize');
   const scriptsBar = document.getElementById('ssh-scripts-bar');
 
@@ -9116,6 +9334,14 @@ function setupSSHTerminalModal() {
     copySelectionBtn.addEventListener('mousedown', keepTerminalFocus);
     copySelectionBtn.addEventListener('click', () => copySSHSelection());
   }
+  if (pasteBtn) {
+    pasteBtn.addEventListener('mousedown', keepTerminalFocus);
+    pasteBtn.addEventListener('click', () => pasteIntoSSH());
+  }
+  if (minimizeBtn) {
+    minimizeBtn.addEventListener('mousedown', keepTerminalFocus);
+    minimizeBtn.addEventListener('click', minimizeSSHSession);
+  }
   if (maximizeBtn) {
     maximizeBtn.addEventListener('mousedown', keepTerminalFocus);
     maximizeBtn.addEventListener('click', toggleSshMaximize);
@@ -9135,10 +9361,11 @@ function setupSSHTerminalModal() {
       btn.title = script.title;
       btn.addEventListener('mousedown', keepTerminalFocus);
       btn.addEventListener('click', () => {
-        if (!sshSessionId) return;
+        const active = getActiveSession();
+        if (!active || !active.sessionId) return;
         const networkAPI = getNetworkAPI();
         if (networkAPI && typeof networkAPI.sshWrite === 'function') {
-          networkAPI.sshWrite(sshSessionId, script.cmd + '\n');
+          networkAPI.sshWrite(active.sessionId, script.cmd + '\n');
         }
       });
       scriptsBar.appendChild(btn);
@@ -9152,6 +9379,12 @@ function setupSSHTerminalModal() {
     if (modal.style.display === 'flex' && event.key === 'C' && event.ctrlKey && event.shiftKey) {
       event.preventDefault();
       copySSHSelection();
+    }
+    // Ctrl+V (or Cmd+V) pastes the clipboard into the active terminal.
+    if (modal.style.display === 'flex' && (event.ctrlKey || event.metaKey) && !event.shiftKey
+        && (event.key === 'v' || event.key === 'V')) {
+      event.preventDefault();
+      pasteIntoSSH();
     }
   });
 
