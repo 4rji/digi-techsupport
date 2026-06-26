@@ -3968,16 +3968,16 @@ body.is-templates-view .template-body-input {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(120px, var(--file-support-tree-width, 220px)) 12px minmax(0, 1fr);
   height: 100vh;
   height: 100dvh;
   padding: 12px;
   background: var(--app-background, #121417);
 }
 
-.file-support-layout.is-viewer-fullscreen .file-support-tree-panel,
-.file-support-layout.is-viewer-fullscreen .file-support-resizer {
-  display: none;
+.file-support-layout.is-viewer-fullscreen .file-support-tree-panel {
+  height: 100%;
+  min-height: 0;
 }
 
 .file-support-layout.is-viewer-fullscreen .file-support-viewer-panel {
@@ -4520,6 +4520,8 @@ body.is-file-support-resizing {
   }
 
   .file-support-layout.is-viewer-fullscreen {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(140px, 34vh) minmax(0, 1fr);
     height: 100vh;
     min-height: 0;
     padding: 8px;
@@ -4541,6 +4543,11 @@ body.is-file-support-resizing {
 
   .file-support-layout.is-viewer-fullscreen .file-support-viewer-panel {
     height: 100%;
+    min-height: 0;
+  }
+
+  .file-support-layout.is-viewer-fullscreen .file-support-tree-panel {
+    height: auto;
     min-height: 0;
   }
 

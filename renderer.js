@@ -276,10 +276,14 @@ const LOCKED_ITEM_IMAGE_VARIANTS = {
   'Digi TX54 5G / LTE-Advanced Cellular Router': [
     'img/tx54.png',
     'img/tx54-front.png',
+    'img/tx54-back.png',
+    'img/tx54-dual-wifi-back.png',
     'img/digi-tx54-a106-a146-a156.png',
     'img/digi-tx54-a106-a146-a156-front.png',
     'img/Digi-TX54-A152-156-front.png',
     'img/Digi-TX54-A152-back.png',
+    'img/digi-tx54-a256-2.png',
+    'img/digi-tx54-a256-2-front.png',
     'img/digi-tx54-a256-2-back.png'
   ],
   'Digi TX64 5G / LTE-Advanced Pro Cellular Router': [
@@ -6939,7 +6943,6 @@ function renderFileSupportView(workspace) {
       padding: '12px',
       boxSizing: 'border-box',
       display: 'grid',
-      gridTemplateColumns: 'minmax(0, 1fr)',
       overflow: 'hidden'
     });
   }

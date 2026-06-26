@@ -1,4 +1,6 @@
 const fetch = require('node-fetch');
+const http = require('http');
+const https = require('https');
 
 const OPENAI_TEMPLATE_MODEL = process.env.OPENAI_TEMPLATE_MODEL || 'gpt-4.1-mini';
 const CLAUDE_TEMPLATE_MODEL = process.env.CLAUDE_TEMPLATE_MODEL || 'claude-sonnet-4-5';
@@ -10,6 +12,58 @@ const FILE_SUPPORT_MAX_OUTPUT_TOKENS = 2200;
 const FILE_SUPPORT_CONTEXT_MAX_FILES = 10;
 const FILE_SUPPORT_CONTEXT_MAX_CHARS = 52000;
 const FILE_SUPPORT_CONTEXT_MAX_FILE_CHARS = 7000;
+
+// Open a fresh connection per AI request instead of reusing the keep-alive pool.
+// Node 18+ defaults the global agents to keepAlive:true; node-fetch v2 then reuses
+// pooled sockets that a proxy/firewall/VPN may have already closed, which surfaces
+// as ERR_STREAM_PREMATURE_CLOSE ("Premature close"). A non-keep-alive agent avoids
+// reusing a dead socket. Passed as a function so http (tests) and https both work.
+const httpAgent = new http.Agent({ keepAlive: false });
+const httpsAgent = new https.Agent({ keepAlive: false });
+const selectAgent = (parsedUrl) => (parsedUrl.protocol === 'https:' ? httpsAgent : httpAgent);
+
+const NETWORK_MAX_ATTEMPTS = 3;
+const NETWORK_RETRY_BASE_MS = 600;
+const RETRYABLE_NETWORK_CODES = new Set([
+  'ERR_STREAM_PREMATURE_CLOSE',
+  'ECONNRESET',
+  'ECONNABORTED',
+  'EPIPE',
+  'ETIMEDOUT',
+  'UND_ERR_SOCKET'
+]);
+
+// A dropped connection (proxy idle-kill, dead keep-alive socket) is transient and
+// worth retrying. Auth/rate-limit/4xx errors come back as plain Errors from
+// parseAPIResponse and are intentionally NOT matched here, so they fail fast.
+function isRetryableNetworkError(error) {
+  if (!error) return false;
+  if (RETRYABLE_NETWORK_CODES.has(error.code)) return true;
+  const message = String(error.message || '').toLowerCase();
+  return message.includes('premature close')
+    || message.includes('socket hang up')
+    || message.includes('network socket disconnected');
+}
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Retries the whole request+body-read. "Premature close" is thrown while consuming
+// the body (after fetch() has already resolved), so wrapping only fetch() would miss
+// it — the entire operation must be re-run. Callers accumulate output locally and
+// only return on success, so re-running never duplicates content.
+async function withNetworkRetry(operation) {
+  let lastError;
+  for (let attempt = 1; attempt <= NETWORK_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableNetworkError(error) || attempt === NETWORK_MAX_ATTEMPTS) break;
+      await sleep(NETWORK_RETRY_BASE_MS * attempt);
+    }
+  }
+  throw lastError;
+}
 
 function normalizeAIProvider(provider) {
   const normalizedProvider = String(provider || '').trim().toLowerCase();
@@ -214,49 +268,56 @@ async function parseAPIResponse(response) {
 }
 
 async function callOpenAITemplateAPI({ apiKey, skill, sourceText, templates }) {
-  const response = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: OPENAI_TEMPLATE_MODEL,
-      instructions: buildTemplateInstructions(skill),
-      input: buildTemplateUserPrompt(sourceText, templates),
-      max_output_tokens: TEMPLATE_MAX_OUTPUT_TOKENS
-    })
-  });
+  return withNetworkRetry(async () => {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      agent: selectAgent,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: OPENAI_TEMPLATE_MODEL,
+        instructions: buildTemplateInstructions(skill),
+        input: buildTemplateUserPrompt(sourceText, templates),
+        max_output_tokens: TEMPLATE_MAX_OUTPUT_TOKENS
+      })
+    });
 
-  const payload = await parseAPIResponse(response);
-  return extractOpenAIText(payload);
+    const payload = await parseAPIResponse(response);
+    return extractOpenAIText(payload);
+  });
 }
 
 async function callOpenAIFileSupportAPI({ apiKey, skill, query, files, summary }) {
-  const response = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: OPENAI_TEMPLATE_MODEL,
-      instructions: buildFileSupportInstructions(skill),
-      input: buildFileSupportUserPrompt({ query, files, summary }),
-      max_output_tokens: FILE_SUPPORT_MAX_OUTPUT_TOKENS
-    })
-  });
+  return withNetworkRetry(async () => {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      agent: selectAgent,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: OPENAI_TEMPLATE_MODEL,
+        instructions: buildFileSupportInstructions(skill),
+        input: buildFileSupportUserPrompt({ query, files, summary }),
+        max_output_tokens: FILE_SUPPORT_MAX_OUTPUT_TOKENS
+      })
+    });
 
-  const payload = await parseAPIResponse(response);
-  return extractOpenAIText(payload);
+    const payload = await parseAPIResponse(response);
+    return extractOpenAIText(payload);
+  });
 }
 
 // Streams an Anthropic Messages request and returns the accumulated text.
 // Streaming keeps the connection active with continuous SSE events, which avoids
 // the idle-timeout "Premature close" seen on long non-streaming requests.
-async function streamClaudeMessage({ apiKey, maxTokens, system, content }) {
+async function streamClaudeMessageOnce({ apiKey, maxTokens, system, content }) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
+    agent: selectAgent,
     headers: {
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
@@ -313,6 +374,13 @@ async function streamClaudeMessage({ apiKey, maxTokens, system, content }) {
   }
 
   return chunks.join('').trim();
+}
+
+// Retry the full stream on a dropped connection. Tokens accumulate inside
+// streamClaudeMessageOnce and are only returned on success, so a retry restarts
+// cleanly without duplicating output.
+async function streamClaudeMessage(args) {
+  return withNetworkRetry(() => streamClaudeMessageOnce(args));
 }
 
 async function callClaudeTemplateAPI({ apiKey, skill, sourceText, templates }) {
@@ -409,5 +477,7 @@ async function analyzeSupportFiles(options = {}) {
 
 module.exports = {
   generateSupportTemplate,
-  analyzeSupportFiles
+  analyzeSupportFiles,
+  withNetworkRetry,
+  isRetryableNetworkError
 };
