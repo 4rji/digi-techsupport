@@ -8832,7 +8832,7 @@ function toggleSshMaximize() {
   const btn = document.getElementById('ssh-maximize');
   if (!modal) return;
   const isMax = modal.classList.toggle('maximized');
-  if (btn) btn.textContent = isMax ? '⊡' : '⛶';
+  if (btn) btn.textContent = isMax ? '⤡' : '⤢';
   requestAnimationFrame(() => fitSSHTerminal());
 }
 
@@ -9309,8 +9309,6 @@ function setupSSHTerminalModal() {
 
   const fontDecreaseBtn = document.getElementById('ssh-font-decrease');
   const fontIncreaseBtn = document.getElementById('ssh-font-increase');
-  const copySelectionBtn = document.getElementById('ssh-copy-selection');
-  const pasteBtn = document.getElementById('ssh-paste');
   const minimizeBtn = document.getElementById('ssh-minimize');
   const maximizeBtn = document.getElementById('ssh-maximize');
   const scriptsBar = document.getElementById('ssh-scripts-bar');
@@ -9329,14 +9327,6 @@ function setupSSHTerminalModal() {
   if (fontIncreaseBtn) {
     fontIncreaseBtn.addEventListener('mousedown', keepTerminalFocus);
     fontIncreaseBtn.addEventListener('click', () => changeSshFontSize(1));
-  }
-  if (copySelectionBtn) {
-    copySelectionBtn.addEventListener('mousedown', keepTerminalFocus);
-    copySelectionBtn.addEventListener('click', () => copySSHSelection());
-  }
-  if (pasteBtn) {
-    pasteBtn.addEventListener('mousedown', keepTerminalFocus);
-    pasteBtn.addEventListener('click', () => pasteIntoSSH());
   }
   if (minimizeBtn) {
     minimizeBtn.addEventListener('mousedown', keepTerminalFocus);
