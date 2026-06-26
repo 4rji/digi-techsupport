@@ -177,7 +177,7 @@ const LOCKED_ITEM_IMAGES = {
   WR21: 'img/digi-transport-wr21.png',
   WR31: 'https://www.digi.com/products/assets/products/digitransportwr31',
   WR44: 'img/digi-transport-wr44-rr.png',
-  WR54: 'https://hub.digi.com/dp/path=/image/product-line/tx54,fmt=square400,bg=ffffff,c=0,v=1',
+  WR54: 'img/tx54.png',
   'EZ WS': 'img/digi-connect-ez-4-ws.png',
   'EZ TS': 'img/Digi-Connect-EZ-4-TS.png',
   'EZ Mini': 'img/digi-connect-ez-mini.png',
@@ -196,12 +196,12 @@ const LOCKED_ITEM_IMAGES = {
   'Digi IX40 5G Edge Computing Industrial IoT Solution': 'img/digi-ix40.png',
   'Digi TX40 5G Cellular Router': 'img/digi-tx40.png',
   'Digi TX54 5G / LTE-Advanced Cellular Router': 'img/tx54.png',
-  'Digi TX64 5G / LTE-Advanced Pro Cellular Router': 'img/tx64-5gbadge.png',
-  'Digi TX64 5G Rail Cellular Router': 'img/digi-tx64-r-5gbadge.png',
+  'Digi TX64 5G / LTE-Advanced Pro Cellular Router': 'img/tx64-front.png',
+  'Digi TX64 5G Rail Cellular Router': 'img/digi-tx64-r.png',
   'Digi EX12 Cellular Extender': 'img/digi-ex12.png',
   'Digi EX15 Cellular Extender': 'img/Digi-EX15.png',
   'Digi EX50 5G Cellular Extender': 'img/digi-ex50-new.png',
-  'Digi CORE plug-in LTE modem': 'img/digi-core-cm-18.jpg'
+  'Digi CORE plug-in LTE modem': 'img/digi-core-cm-18.png'
 };
 const LOCKED_ITEM_IMAGE_VARIANTS = {
   '2 Plus': [
@@ -273,6 +273,16 @@ const LOCKED_ITEM_IMAGE_VARIANTS = {
     'img/digi-tx40-front.png',
     'img/digi-tx40-back-5g.png'
   ],
+  'Digi TX64 5G / LTE-Advanced Pro Cellular Router': [
+    'img/tx64-front.png',
+    'img/tx64.png',
+    'img/tx64-back.png'
+  ],
+  'Digi TX64 5G Rail Cellular Router': [
+    'img/digi-tx64-r.png',
+    'img/digi-tx64-r-back.png',
+    'img/digi-tx64-r-front.png'
+  ],
   'Digi EX12 Cellular Extender': [
     'img/digi-ex12.png',
     'img/digi-ex12-left.png',
@@ -333,9 +343,10 @@ const LOCKED_ITEM_IMAGE_VARIANTS = {
     'img/digi-connect-ez-32.png'
   ],
   'Digi CORE plug-in LTE modem': [
-    'img/digi-core-cm-18.jpg',
     'img/digi-core-cm-18.png',
-    'img/Digi-CORE-1002-CM-back.png'
+    'img/Digi-CORE-1002-CM-back.png',
+    'img/Digi-ex15-CORE-animation-web.gif',
+    'img/digi-ix20-with-digi-core-modem-animation.gif'
   ]
 };
 const PRODUCT_LINKS = {
@@ -3683,11 +3694,11 @@ const DEVICE_MODEL_IMAGES = [
   ['ex50', 'img/digi-ex50-new.png'],
   ['ex15', 'img/Digi-EX15.png'],
   ['ex12', 'img/digi-ex12.png'],
-  ['tx64', 'img/digi-tx64-r-5gbadge.png'],
+  ['tx64', 'img/digi-tx64-r.png'],
   ['tx54', 'img/tx54.png'],
   ['tx40', 'img/digi-tx40.png'],
-  ['core-cm', 'img/digi-core-cm-18.jpg'],
-  ['cm18', 'img/digi-core-cm-18.jpg'],
+  ['core-cm', 'img/digi-core-cm-18.png'],
+  ['cm18', 'img/digi-core-cm-18.png'],
 ];
 
 function getDeviceProductImage(name) {
