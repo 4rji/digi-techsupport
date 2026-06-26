@@ -8,3 +8,5 @@ package-lock.json
 node_modules/.package-lock.json
 build
 icono-bad.png
+.atl/.skill-registry.cache.json
+.atl/skill-registry.md
