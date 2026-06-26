@@ -2203,6 +2203,7 @@ const FILE_SUPPORT_QUICK_SEARCHES = [
 ];
 
 let productLines = [];
+let productSearchQuery = '';
 let lastActiveLineByCategory = {};
 let supportTemplates = [];
 let templateDrafts = [];
@@ -2665,6 +2666,111 @@ function getCategoryLines(category) {
   return category.lineKeys
     .map(lineKey => productLines.find(line => getLineKey(line) === lineKey))
     .filter(Boolean);
+}
+
+function getAllCatalogEntries() {
+  return productLines.flatMap(line => (line.items || []).map(item => ({ line, item })));
+}
+
+function matchesProductSearch(entry, query) {
+  const haystack = [
+    entry.item.name,
+    entry.item.defaultName,
+    entry.item.ip,
+    entry.line.name,
+    getLineDisplayName(entry.line)
+  ].filter(Boolean).join(' ').toLowerCase();
+  return query.split(/\s+/).every(term => haystack.includes(term));
+}
+
+function getProductSearchEntries() {
+  const query = productSearchQuery.trim().toLowerCase();
+  if (!query) return [];
+  return getAllCatalogEntries().filter(entry => matchesProductSearch(entry, query));
+}
+
+function getProductSearchTitle(count) {
+  return `Search results for “${productSearchQuery.trim()}” (${count})`;
+}
+
+// Entries shown for the current view when no search is active.
+function getActiveViewEntries() {
+  if (activeLineId === CELLULAR_ALL_VIEW_ID) {
+    const cellularCategory = PRODUCT_CATEGORIES.find(category => category.id === 'cellular');
+    const cellularLines = getCategoryLines(cellularCategory)
+      .filter(line => CELLULAR_CATALOG_LINE_KEYS.includes(getLineKey(line)));
+    return {
+      title: 'All Cellular Devices',
+      entries: cellularLines.flatMap(line => line.items.map(item => ({ line, item })))
+    };
+  }
+  const line = getActiveLine();
+  if (!line) return { title: '', entries: [] };
+  return {
+    title: getLineDisplayName(line),
+    entries: line.items.map(item => ({ line, item }))
+  };
+}
+
+function createProductSearchInput() {
+  const form = document.createElement('form');
+  form.className = 'product-search';
+  form.setAttribute('role', 'search');
+  form.addEventListener('submit', event => event.preventDefault());
+
+  const input = document.createElement('input');
+  input.type = 'search';
+  input.id = 'product-search-input';
+  input.className = 'product-search-input';
+  input.placeholder = 'Search catalog…';
+  input.autocomplete = 'off';
+  input.setAttribute('aria-label', 'Search products in catalog');
+  input.value = productSearchQuery;
+  input.addEventListener('input', () => {
+    productSearchQuery = input.value;
+    applyProductSearch();
+  });
+
+  form.appendChild(input);
+  return form;
+}
+
+// Updates the product grid + header in place (without rebuilding the nav)
+// so the search input keeps focus while typing.
+function applyProductSearch() {
+  const grid = document.getElementById('product-grid');
+  const title = document.getElementById('product-line-header-title');
+  if (!grid) return;
+
+  const query = productSearchQuery.trim();
+  let titleText;
+  let entries;
+
+  if (query) {
+    entries = getProductSearchEntries();
+    titleText = getProductSearchTitle(entries.length);
+  } else {
+    const view = getActiveViewEntries();
+    titleText = view.title;
+    entries = view.entries;
+  }
+
+  if (title) title.textContent = titleText;
+
+  grid.innerHTML = '';
+  grid.classList.toggle('empty', entries.length === 0);
+  if (entries.length === 0) {
+    const emptyState = document.createElement('div');
+    emptyState.className = 'monitor-placeholder-card';
+    const heading = document.createElement('h3');
+    heading.textContent = query ? `No products match “${query}”` : 'No products yet';
+    emptyState.appendChild(heading);
+    grid.appendChild(emptyState);
+  } else {
+    entries.forEach(({ line, item }) => grid.appendChild(createProductCard(item, line)));
+  }
+
+  cleanupPortStatuses();
 }
 
 function isLineLockedForManualItems(line) {
@@ -3252,6 +3358,7 @@ function renderProductTabs() {
     button.textContent = label;
     button.classList.toggle('active', activeLineId === viewId);
     button.addEventListener('click', () => {
+      productSearchQuery = '';
       const wasInTemplatesView = activeLineId === TEMPLATES_VIEW_ID;
       activeLineId = viewId;
       if (viewId === TEMPLATES_VIEW_ID && !wasInTemplatesView) {
@@ -3282,6 +3389,7 @@ function renderProductTabs() {
     button.textContent = category.label;
     button.classList.toggle('active', activeCategory?.id === category.id);
     button.addEventListener('click', () => {
+      productSearchQuery = '';
       if (category.id === 'cellular' && lastActiveLineByCategory[category.id] === CELLULAR_ALL_VIEW_ID) {
         activeLineId = CELLULAR_ALL_VIEW_ID;
         saveProductLines();
@@ -3305,6 +3413,7 @@ function renderProductTabs() {
     button.textContent = line.name;
     button.classList.toggle('active', line.id === activeLineId);
     button.addEventListener('click', () => {
+      productSearchQuery = '';
       activeLineId = line.id;
       saveProductLines();
       renderProductApp();
@@ -3335,6 +3444,7 @@ function renderProductCategoryTabs(workspace, category) {
     button.classList.toggle('active', viewId === activeLineId);
     button.setAttribute('aria-pressed', String(viewId === activeLineId));
     button.addEventListener('click', () => {
+      productSearchQuery = '';
       activeLineId = viewId;
       lastActiveLineByCategory[category.id] = viewId;
       saveProductLines();
@@ -3361,6 +3471,8 @@ function renderProductCategoryTabs(workspace, category) {
   if (connectivityLink) {
     const linkGroup = document.createElement('div');
     linkGroup.className = 'product-category-links';
+
+    linkGroup.appendChild(createProductSearchInput());
 
     const supportLink = document.createElement('a');
     supportLink.className = 'product-category-link';
@@ -3416,7 +3528,7 @@ function renderActiveLine() {
     const cellularLines = getCategoryLines(cellularCategory)
       .filter(line => CELLULAR_CATALOG_LINE_KEYS.includes(getLineKey(line)));
     const entries = cellularLines.flatMap(line => line.items.map(item => ({ line, item })));
-    renderProductCollection(workspace, 'All Cellular Devices', entries);
+    renderProductWorkspaceBody(workspace, 'All Cellular Devices', entries);
     return;
   }
 
@@ -3432,11 +3544,22 @@ function renderActiveLine() {
 
   renderProductCategoryTabs(workspace, getCategoryForLine(line));
 
-  renderProductCollection(
+  renderProductWorkspaceBody(
     workspace,
     getLineDisplayName(line),
     line.items.map(item => ({ line, item }))
   );
+}
+
+// Renders the product grid, substituting whole-catalog search results when a
+// search query is active so any full re-render stays consistent with the box.
+function renderProductWorkspaceBody(workspace, baseTitle, baseEntries) {
+  if (productSearchQuery.trim()) {
+    const entries = getProductSearchEntries();
+    renderProductCollection(workspace, getProductSearchTitle(entries.length), entries);
+  } else {
+    renderProductCollection(workspace, baseTitle, baseEntries);
+  }
 }
 
 function renderProductCollection(workspace, titleText, entries) {
@@ -10335,16 +10458,20 @@ function invalidatePortStatuses(itemId) {
 }
 
 function pollActiveLineStatuses() {
-  const lines = activeLineId === CELLULAR_ALL_VIEW_ID
-    ? getCategoryLines(PRODUCT_CATEGORIES.find(category => category.id === 'cellular'))
-      .filter(line => CELLULAR_CATALOG_LINE_KEYS.includes(getLineKey(line)))
-    : [getActiveLine()].filter(Boolean);
+  let items;
+  if (productSearchQuery.trim()) {
+    items = getProductSearchEntries().map(entry => entry.item);
+  } else {
+    const lines = activeLineId === CELLULAR_ALL_VIEW_ID
+      ? getCategoryLines(PRODUCT_CATEGORIES.find(category => category.id === 'cellular'))
+        .filter(line => CELLULAR_CATALOG_LINE_KEYS.includes(getLineKey(line)))
+      : [getActiveLine()].filter(Boolean);
+    items = lines.flatMap(line => line.items);
+  }
 
-  lines.forEach(line => {
-    line.items.forEach(item => {
-      scheduleHostCheck(item);
-      schedulePortChecks(item);
-    });
+  items.forEach(item => {
+    scheduleHostCheck(item);
+    schedulePortChecks(item);
   });
 }
 
