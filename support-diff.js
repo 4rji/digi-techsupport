@@ -164,8 +164,25 @@ function compareCategoryForTags(tags) {
 
 const CATEGORY_KEYS = ['config', 'logs', 'json', 'other'];
 
+function normalizeCompareEntryPath(entryPath) {
+  const parts = String(entryPath || '')
+    .replace(/\0/g, '')
+    .replace(/\\/g, '/')
+    .replace(/^\/+/, '')
+    .split('/')
+    .filter(part => part && part !== '.');
+
+  if (parts.some(part => part === '..')) return '';
+
+  if (parts.length >= 3 && parts[0].toLowerCase() === 'tmp' && /^\d+$/.test(parts[1])) {
+    return parts.slice(2).join('/');
+  }
+
+  return parts.join('/');
+}
+
 // buildCompareManifest(indexA, indexB) -> { files, counts }
-//   indexA / indexB: Map<path, { entryId, size, hash, binary, category }>
+//   indexA / indexB: Map<comparePath, { entryId, path, size, hash, binary, category }>
 //     hash:   stable content hash, or null when content is unavailable (binary)
 //   Files present on both sides are 'identical' when hashes match (or, when no
 //   hash is available, when sizes match — flagged approxComparison); otherwise
@@ -217,6 +234,8 @@ function buildCompareManifest(indexA, indexB) {
       status,
       entryIdA: a ? a.entryId : '',
       entryIdB: b ? b.entryId : '',
+      pathA: a ? (a.path || path) : '',
+      pathB: b ? (b.path || path) : '',
       sizeA: a ? a.size : null,
       sizeB: b ? b.size : null,
       binary,
@@ -285,7 +304,7 @@ function filterDiffRows(rows, opts = {}) {
   return { rows: filtered, filtered: true, error: '' };
 }
 
-const api = { diffLines, compareCategoryForTags, buildCompareManifest, filterDiffRows, CATEGORY_KEYS };
+const api = { diffLines, compareCategoryForTags, normalizeCompareEntryPath, buildCompareManifest, filterDiffRows, CATEGORY_KEYS };
 
 if (typeof module === 'object' && module.exports) {
   module.exports = api;

@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const {
   diffLines,
   compareCategoryForTags,
+  normalizeCompareEntryPath,
   buildCompareManifest,
   filterDiffRows,
   mergeCompareSearchResults
@@ -105,6 +106,17 @@ test('compareCategoryForTags: config wins when multiple tags are present', () =>
   assert.equal(compareCategoryForTags(['logs', 'json']), 'logs');
 });
 
+test('normalizeCompareEntryPath: strips volatile tmp process directory', () => {
+  assert.equal(normalizeCompareEntryPath('tmp/342/fw_printenv'), 'fw_printenv');
+  assert.equal(normalizeCompareEntryPath('/tmp/423/config_json'), 'config_json');
+  assert.equal(normalizeCompareEntryPath('tmp/770/nested/file.txt'), 'nested/file.txt');
+});
+
+test('normalizeCompareEntryPath: preserves stable paths', () => {
+  assert.equal(normalizeCompareEntryPath('var/log/messages'), 'var/log/messages');
+  assert.equal(normalizeCompareEntryPath('./etc/config/mm.json'), 'etc/config/mm.json');
+});
+
 // ---------------------------------------------------------------------------
 // buildCompareManifest
 // ---------------------------------------------------------------------------
@@ -168,6 +180,28 @@ test('buildCompareManifest: unmatched paths become only-a and only-b', () => {
   assert.equal(fileB.sizeA, null);
   assert.equal(manifest.counts.onlyA, 1);
   assert.equal(manifest.counts.onlyB, 1);
+});
+
+test('buildCompareManifest: normalized tmp paths compare as one file', () => {
+  const a = new Map([[
+    normalizeCompareEntryPath('tmp/342/fw_printenv'),
+    entry({ entryId: 'a-fw', path: 'tmp/342/fw_printenv', hash: 'A', category: 'config' })
+  ]]);
+  const b = new Map([[
+    normalizeCompareEntryPath('tmp/423/fw_printenv'),
+    entry({ entryId: 'b-fw', path: 'tmp/423/fw_printenv', hash: 'B', category: 'config' })
+  ]]);
+  const manifest = buildCompareManifest(a, b);
+  assert.equal(manifest.files.length, 1);
+  assert.equal(manifest.files[0].path, 'fw_printenv');
+  assert.equal(manifest.files[0].pathA, 'tmp/342/fw_printenv');
+  assert.equal(manifest.files[0].pathB, 'tmp/423/fw_printenv');
+  assert.equal(manifest.files[0].entryIdA, 'a-fw');
+  assert.equal(manifest.files[0].entryIdB, 'b-fw');
+  assert.equal(manifest.files[0].status, 'changed');
+  assert.equal(manifest.counts.changed, 1);
+  assert.equal(manifest.counts.onlyA, 0);
+  assert.equal(manifest.counts.onlyB, 0);
 });
 
 test('buildCompareManifest: entries without a hash fall back to size comparison', () => {

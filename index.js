@@ -11,7 +11,7 @@ const tar = require('tar-stream');
 const { generateSupportTemplate, analyzeSupportFiles } = require('./template-generator');
 const digiRemoteService = require('./digi-remote-service');
 const { searchSupportArchiveSession, classifySupportEntry } = require('./support-search');
-const { buildCompareManifest, compareCategoryForTags } = require('./support-diff');
+const { buildCompareManifest, compareCategoryForTags, normalizeCompareEntryPath } = require('./support-diff');
 
 const APP_ICON_NAME = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
 const APP_ICON_PATH = app.isPackaged
@@ -1822,9 +1822,29 @@ function createSupportArchiveSession(webContents, parsedArchive, savedFile = nul
   };
 }
 
-// Build a path -> { entryId, size, hash, binary, category } index for one
-// session, used to compare two archives. Per-entry content hashes are cached on
-// the session so re-compare / swap A<->B does not re-hash.
+function getCompareIndexPath(index, comparePath, entryPath) {
+  const basePath = comparePath || entryPath;
+  if (!index.has(basePath)) return basePath;
+
+  const existing = index.get(basePath);
+  if (!existing || existing.path === entryPath) return basePath;
+
+  if (!index.has(entryPath)) return entryPath;
+
+  let suffix = 2;
+  let candidate = `${entryPath}#${suffix}`;
+  while (index.has(candidate)) {
+    suffix++;
+    candidate = `${entryPath}#${suffix}`;
+  }
+  return candidate;
+}
+
+// Build a comparePath -> { entryId, path, size, hash, binary, category } index
+// for one session. The compare path strips volatile tmp/<pid>/ prefixes so
+// equivalent files from two support archives line up even when their capture
+// process IDs differ. Per-entry content hashes are cached on the session so
+// re-compare / swap A<->B does not re-hash.
 function buildCompareIndex(session) {
   if (!session.contentHashById) session.contentHashById = new Map();
   const index = new Map();
@@ -1840,8 +1860,10 @@ function buildCompareIndex(session) {
         session.contentHashById.set(entry.id, hash);
       }
     }
-    index.set(entry.path, {
+    const comparePath = getCompareIndexPath(index, normalizeCompareEntryPath(entry.path), entry.path);
+    index.set(comparePath, {
       entryId: entry.id,
+      path: entry.path,
       size: Number(entry.size) || 0,
       hash,
       binary: !entry.isText,

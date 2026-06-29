@@ -2364,12 +2364,25 @@ function createEmptyCompareSelection() {
     error: '',
     status: '',
     path: '',
+    pathA: '',
+    pathB: '',
     binary: false,
     note: '',
     rows: [],
+    previewRows: [],
     tooLarge: false,
     addedCount: 0,
     removedCount: 0
+  };
+}
+function createEmptyCompareContentSearch(overrides = {}) {
+  return {
+    active: false,
+    query: '',
+    loading: false,
+    error: '',
+    results: null,
+    ...overrides
   };
 }
 let supportCompareState = {
@@ -2384,10 +2397,13 @@ let supportCompareState = {
   pathFilter: '',
   selectedPath: '',
   selected: createEmptyCompareSelection(),
+  contentSearch: createEmptyCompareContentSearch(),
   diffSearch: { query: '', grep: false, ignoreCase: false, cut: false },
   savedFiles: []
 };
 let supportCompareFullscreen = false;
+let compareContentSearchDebounce = null;
+let compareContentSearchToken = 0;
 let supportFileTreeWidth = getSavedSupportTreeWidth();
 let supportTreeSearchQuery = '';
 let supportContentSearchQuery = '';
@@ -6891,6 +6907,7 @@ function setupFileSupportShortcutsModal() {
 // ===========================================================================
 
 const COMPARE_MAX_RENDER_ROWS = 4000;
+const COMPARE_TOO_LARGE_PREVIEW_ROWS = 4000;
 let compareSavedFilesLoaded = false;
 
 function emptyCompareCounts() {
@@ -6916,11 +6933,183 @@ function getCompareStatusBadge(file) {
     return { symbol: 'bin', className: 'badge-binary', label: 'Binary, differs' };
   }
   switch (file.status) {
-    case 'changed': return { symbol: '~', className: 'badge-changed', label: 'Changed' };
+    case 'changed': return { symbol: '', className: 'badge-changed', label: 'Changed' };
     case 'only-a': return { symbol: '-', className: 'badge-only-a', label: 'Only in A' };
     case 'only-b': return { symbol: '+', className: 'badge-only-b', label: 'Only in B' };
     default: return { symbol: '=', className: 'badge-identical', label: 'Identical' };
   }
+}
+
+function getCompareFileDisplayPath(file) {
+  const aPath = String(file?.pathA || '');
+  const bPath = String(file?.pathB || '');
+  if (aPath && bPath && aPath !== bPath) return `A: ${aPath} | B: ${bPath}`;
+  return aPath || bPath || String(file?.path || '');
+}
+
+function getCompareFileTitle(file) {
+  const lines = [];
+  if (file.path) lines.push(`Compare: ${file.path}`);
+  if (file.pathA && file.pathA !== file.path) lines.push(`A: ${file.pathA}`);
+  if (file.pathB && file.pathB !== file.path) lines.push(`B: ${file.pathB}`);
+  return lines.join('\n') || file.path || '';
+}
+
+function buildCompareTooLargePreviewRows(aText, bText) {
+  const aLines = String(aText || '').split(/\r?\n/);
+  const bLines = String(bText || '').split(/\r?\n/);
+  const total = Math.max(aLines.length, bLines.length);
+  const limit = Math.min(total, COMPARE_TOO_LARGE_PREVIEW_ROWS);
+  const rows = [];
+  for (let i = 0; i < limit; i++) {
+    const hasA = i < aLines.length;
+    const hasB = i < bLines.length;
+    const aLine = hasA ? aLines[i] : '';
+    const bLine = hasB ? bLines[i] : '';
+    let type = 'equal';
+    if (hasA && hasB && aLine !== bLine) type = 'change';
+    else if (hasA && !hasB) type = 'del';
+    else if (!hasA && hasB) type = 'add';
+    rows.push({
+      type,
+      aNo: hasA ? i + 1 : null,
+      bNo: hasB ? i + 1 : null,
+      aText: aLine,
+      bText: bLine
+    });
+  }
+  return { rows, truncated: total > limit, total };
+}
+
+function refocusCompareContentSearchInput() {
+  requestAnimationFrame(() => {
+    const input = document.getElementById('compare-content-search-input');
+    if (!input || input.disabled) return;
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  });
+}
+
+function getCompareContentSearchState() {
+  return supportCompareState.contentSearch || createEmptyCompareContentSearch();
+}
+
+function clearCompareContentSearchWork() {
+  if (compareContentSearchDebounce) {
+    clearTimeout(compareContentSearchDebounce);
+    compareContentSearchDebounce = null;
+  }
+  compareContentSearchToken++;
+}
+
+function scheduleCompareContentSearch() {
+  if (compareContentSearchDebounce) clearTimeout(compareContentSearchDebounce);
+  compareContentSearchDebounce = setTimeout(() => {
+    compareContentSearchDebounce = null;
+    runCompareContentSearch();
+  }, 250);
+}
+
+function combineCompareContentSearchResults(resultA, resultB) {
+  const entryIdsA = (resultA?.files || []).map(file => file.id).filter(Boolean);
+  const entryIdsB = (resultB?.files || []).map(file => file.id).filter(Boolean);
+  const matchA = new Set(entryIdsA);
+  const matchB = new Set(entryIdsB);
+  const rows = supportCompareState.manifest?.files || [];
+  const totalFiles = rows.filter(file => matchA.has(file.entryIdA) || matchB.has(file.entryIdB)).length;
+  return {
+    entryIdsA,
+    entryIdsB,
+    totalFiles,
+    totalMatches: (Number(resultA?.totalMatches) || 0) + (Number(resultB?.totalMatches) || 0),
+    truncated: Boolean(resultA?.truncated || resultB?.truncated)
+  };
+}
+
+function runCompareContentSearch() {
+  if (compareContentSearchDebounce) {
+    clearTimeout(compareContentSearchDebounce);
+    compareContentSearchDebounce = null;
+  }
+  const api = getNetworkAPI();
+  const search = getCompareContentSearchState();
+  const query = search.query;
+
+  if (!normalizeSearchQuery(query)) {
+    clearCompareContentSearchWork();
+    supportCompareState = {
+      ...supportCompareState,
+      contentSearch: createEmptyCompareContentSearch({ active: search.active })
+    };
+    renderProductApp();
+    refocusCompareContentSearchInput();
+    return;
+  }
+
+  if (!api || typeof api.searchSupportArchive !== 'function' || !supportCompareState.a.sessionId || !supportCompareState.b.sessionId) {
+    supportCompareState = {
+      ...supportCompareState,
+      contentSearch: { ...search, loading: false, results: null, error: 'Search is not available.' }
+    };
+    renderProductApp();
+    refocusCompareContentSearchInput();
+    return;
+  }
+
+  const { include, exclude } = parseAdvancedSearchTerms(query);
+  const options = {
+    query,
+    include,
+    exclude,
+    grep: false,
+    ignoreCase: true,
+    cut: false,
+    fileFilters: [],
+    scope: 'all',
+    currentFileId: ''
+  };
+  const token = ++compareContentSearchToken;
+  supportCompareState = {
+    ...supportCompareState,
+    contentSearch: { ...search, loading: true, error: '', results: null }
+  };
+  renderProductApp();
+  refocusCompareContentSearchInput();
+
+  Promise.all([
+    api.searchSupportArchive(supportCompareState.a.sessionId, options),
+    api.searchSupportArchive(supportCompareState.b.sessionId, options)
+  ]).then(([resultA, resultB]) => {
+    if (token !== compareContentSearchToken) return;
+    if (!resultA?.success || !resultB?.success) {
+      throw new Error(resultA?.error || resultB?.error || 'Search failed');
+    }
+    const nextResults = combineCompareContentSearchResults(resultA, resultB);
+    supportCompareState = {
+      ...supportCompareState,
+      contentSearch: {
+        ...getCompareContentSearchState(),
+        loading: false,
+        error: '',
+        results: nextResults
+      }
+    };
+    renderProductApp();
+    refocusCompareContentSearchInput();
+  }).catch(error => {
+    if (token !== compareContentSearchToken) return;
+    supportCompareState = {
+      ...supportCompareState,
+      contentSearch: {
+        ...getCompareContentSearchState(),
+        loading: false,
+        results: null,
+        error: error.message || 'Search failed'
+      }
+    };
+    renderProductApp();
+    refocusCompareContentSearchInput();
+  });
 }
 
 async function ensureCompareSavedFiles() {
@@ -6962,13 +7151,15 @@ async function runCompare() {
   const { a, b } = supportCompareState;
   if (!api || typeof api.compareSupportArchives !== 'function' || !a.sessionId || !b.sessionId) return;
 
+  clearCompareContentSearchWork();
   supportCompareState = {
     ...supportCompareState,
     comparing: true,
     compareError: '',
     manifest: null,
     selectedPath: '',
-    selected: createEmptyCompareSelection()
+    selected: createEmptyCompareSelection(),
+    contentSearch: createEmptyCompareContentSearch()
   };
   renderProductApp();
 
@@ -7029,6 +7220,7 @@ async function handleCompareLoadSide(side, mode, fileId) {
     }
 
     if (mode === 'import') compareSavedFilesLoaded = false; // a new import joins the library
+    clearCompareContentSearchWork();
     supportCompareState = {
       ...supportCompareState,
       [side]: {
@@ -7041,7 +7233,8 @@ async function handleCompareLoadSide(side, mode, fileId) {
       manifest: null,
       compareError: '',
       selectedPath: '',
-      selected: createEmptyCompareSelection()
+      selected: createEmptyCompareSelection(),
+      contentSearch: createEmptyCompareContentSearch()
     };
 
     if (supportCompareState.a.sessionId && supportCompareState.b.sessionId) {
@@ -7062,13 +7255,15 @@ async function handleCompareLoadSide(side, mode, fileId) {
 
 function handleCompareSwap() {
   const { a, b } = supportCompareState;
+  clearCompareContentSearchWork();
   supportCompareState = {
     ...supportCompareState,
     a: b,
     b: a,
     manifest: null,
     selectedPath: '',
-    selected: createEmptyCompareSelection()
+    selected: createEmptyCompareSelection(),
+    contentSearch: createEmptyCompareContentSearch()
   };
   if (supportCompareState.a.sessionId && supportCompareState.b.sessionId) {
     runCompare();
@@ -7082,12 +7277,13 @@ async function handleCompareSelectFile(path) {
   if (!manifest) return;
   const file = manifest.files.find(f => f.path === path);
   if (!file) return;
+  const selectedPaths = { pathA: file.pathA || '', pathB: file.pathB || '' };
 
   if (file.binary) {
     supportCompareState = {
       ...supportCompareState,
       selectedPath: path,
-      selected: { ...createEmptyCompareSelection(), path, status: file.status, binary: true, note: buildBinaryCompareNote(file) }
+      selected: { ...createEmptyCompareSelection(), path, ...selectedPaths, status: file.status, binary: true, note: buildBinaryCompareNote(file) }
     };
     renderProductApp();
     return;
@@ -7096,7 +7292,7 @@ async function handleCompareSelectFile(path) {
   supportCompareState = {
     ...supportCompareState,
     selectedPath: path,
-    selected: { ...createEmptyCompareSelection(), loading: true, path, status: file.status }
+    selected: { ...createEmptyCompareSelection(), loading: true, path, ...selectedPaths, status: file.status }
   };
   renderProductApp();
 
@@ -7110,25 +7306,35 @@ async function handleCompareSelectFile(path) {
     if (!diffApi || typeof diffApi.diffLines !== 'function') throw new Error('Diff engine is not available');
 
     const diff = diffApi.diffLines(aSide.text, bSide.text);
-    const note = (aSide.truncated || bSide.truncated) ? 'Partial comparison — file content was truncated.' : '';
+    const tooLargePreview = diff.tooLarge ? buildCompareTooLargePreviewRows(aSide.text, bSide.text) : null;
+    const noteParts = [];
+    if (diff.tooLarge) {
+      noteParts.push('This file is too large for an inline line diff. Showing raw A/B preview instead.');
+      if (tooLargePreview?.truncated) {
+        noteParts.push(`Showing the first ${tooLargePreview.rows.length} of ${tooLargePreview.total} lines.`);
+      }
+    }
+    if (aSide.truncated || bSide.truncated) noteParts.push('Partial comparison — file content was truncated.');
     supportCompareState = {
       ...supportCompareState,
       selected: {
         ...createEmptyCompareSelection(),
         path,
+        ...selectedPaths,
         status: file.status,
         rows: diff.rows,
+        previewRows: tooLargePreview ? tooLargePreview.rows : [],
         tooLarge: diff.tooLarge,
         addedCount: diff.addedCount,
         removedCount: diff.removedCount,
-        note
+        note: noteParts.join(' ')
       }
     };
   } catch (error) {
     console.error('Error building diff:', error);
     supportCompareState = {
       ...supportCompareState,
-      selected: { ...createEmptyCompareSelection(), path, status: file.status, error: error.message || 'Could not load file content' }
+      selected: { ...createEmptyCompareSelection(), path, ...selectedPaths, status: file.status, error: error.message || 'Could not load file content' }
     };
   }
   renderProductApp();
@@ -7136,12 +7342,21 @@ async function handleCompareSelectFile(path) {
 
 function getCompareFilteredFiles() {
   const { manifest, categoryFilter, showIdentical, pathFilter } = supportCompareState;
+  const contentSearch = getCompareContentSearchState();
+  const contentQueryActive = contentSearch.active && normalizeSearchQuery(contentSearch.query) && !contentSearch.error;
+  const contentMatchesA = new Set(contentSearch.results?.entryIdsA || []);
+  const contentMatchesB = new Set(contentSearch.results?.entryIdsB || []);
   if (!manifest) return [];
   const needle = pathFilter.trim().toLowerCase();
   return manifest.files.filter(file => {
     if (!showIdentical && file.status === 'identical') return false;
     if (categoryFilter !== 'all' && file.category !== categoryFilter) return false;
-    if (needle && !file.path.toLowerCase().includes(needle)) return false;
+    const searchablePath = [file.path, file.pathA, file.pathB].filter(Boolean).join('\n').toLowerCase();
+    if (needle && !searchablePath.includes(needle)) return false;
+    if (contentQueryActive) {
+      if (!contentSearch.results) return false;
+      if (!contentMatchesA.has(file.entryIdA) && !contentMatchesB.has(file.entryIdB)) return false;
+    }
     return true;
   });
 }
@@ -7284,16 +7499,18 @@ function renderCompareFileList(listEl) {
     row.classList.toggle('active', supportCompareState.selectedPath === file.path);
 
     const badgeInfo = getCompareStatusBadge(file);
-    const badge = document.createElement('span');
-    badge.className = `compare-status-badge ${badgeInfo.className}`;
-    badge.textContent = badgeInfo.symbol;
-    badge.title = badgeInfo.label;
-    row.appendChild(badge);
+    if (badgeInfo.symbol) {
+      const badge = document.createElement('span');
+      badge.className = `compare-status-badge ${badgeInfo.className}`;
+      badge.textContent = badgeInfo.symbol;
+      badge.title = badgeInfo.label;
+      row.appendChild(badge);
+    }
 
     const pathSpan = document.createElement('span');
     pathSpan.className = 'compare-file-path';
-    pathSpan.textContent = file.path;
-    pathSpan.title = file.path;
+    pathSpan.textContent = getCompareFileDisplayPath(file);
+    pathSpan.title = getCompareFileTitle(file);
     row.appendChild(pathSpan);
 
     row.addEventListener('click', () => handleCompareSelectFile(file.path));
@@ -7326,6 +7543,67 @@ function renderCompareListPanel(parent) {
   }
 
   renderCompareDifferencesPanel(parent);
+}
+
+function getCompareContentSearchStatus(search) {
+  if (search.loading) return { text: 'Searching...', isError: false };
+  if (search.error) return { text: search.error, isError: true };
+  if (normalizeSearchQuery(search.query) && search.results) {
+    if (search.results.totalFiles === 0) return { text: 'No matches', isError: false };
+    const fileLabel = search.results.totalFiles === 1 ? '1 file' : `${search.results.totalFiles} files`;
+    const matchLabel = search.results.totalMatches === 1 ? '1 match' : `${search.results.totalMatches} matches`;
+    return {
+      text: `${fileLabel}, ${matchLabel}${search.results.truncated ? ' (truncated)' : ''}`,
+      isError: false
+    };
+  }
+  return { text: 'Type a word to show files that contain it.', isError: false };
+}
+
+function renderCompareContentSearchRow() {
+  const search = getCompareContentSearchState();
+  const row = document.createElement('div');
+  row.className = 'compare-content-search-row';
+
+  const input = document.createElement('input');
+  input.type = 'search';
+  input.id = 'compare-content-search-input';
+  input.className = 'compare-path-filter compare-content-search-input';
+  input.placeholder = 'Search word in files...';
+  input.value = search.query;
+  input.setAttribute('aria-label', 'Search word in compare files');
+  input.addEventListener('input', () => {
+    const nextQuery = input.value;
+    compareContentSearchToken++;
+    supportCompareState = {
+      ...supportCompareState,
+      contentSearch: {
+        ...getCompareContentSearchState(),
+        active: true,
+        query: nextQuery,
+        loading: Boolean(normalizeSearchQuery(nextQuery)),
+        error: '',
+        results: null
+      }
+    };
+    renderProductApp();
+    refocusCompareContentSearchInput();
+    scheduleCompareContentSearch();
+  });
+  input.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    runCompareContentSearch();
+  });
+  row.appendChild(input);
+
+  const status = document.createElement('span');
+  const statusInfo = getCompareContentSearchStatus(search);
+  status.className = 'compare-content-search-status' + (statusInfo.isError ? ' is-error' : '');
+  status.textContent = statusInfo.text;
+  row.appendChild(status);
+
+  return row;
 }
 
 function renderCompareDifferencesPanel(parent) {
@@ -7371,7 +7649,39 @@ function renderCompareDifferencesPanel(parent) {
   });
   controlsRow.appendChild(filter);
 
+  const contentSearch = getCompareContentSearchState();
+  const searchButton = document.createElement('button');
+  searchButton.type = 'button';
+  searchButton.className = 'compare-action-button compare-content-search-button';
+  searchButton.textContent = 'Search';
+  searchButton.setAttribute('aria-pressed', contentSearch.active ? 'true' : 'false');
+  searchButton.addEventListener('click', () => {
+    if (contentSearch.active) {
+      clearCompareContentSearchWork();
+      supportCompareState = {
+        ...supportCompareState,
+        contentSearch: { ...contentSearch, active: false, loading: false, error: '', results: null }
+      };
+      renderProductApp();
+      return;
+    }
+
+    supportCompareState = {
+      ...supportCompareState,
+      contentSearch: { ...contentSearch, active: true }
+    };
+    renderProductApp();
+    refocusCompareContentSearchInput();
+    if (normalizeSearchQuery(contentSearch.query) && !contentSearch.results) {
+      runCompareContentSearch();
+    }
+  });
+  controlsRow.appendChild(searchButton);
+
   header.appendChild(controlsRow);
+  if (contentSearch.active) {
+    header.appendChild(renderCompareContentSearchRow());
+  }
   parent.appendChild(header);
 
   const list = document.createElement('div');
@@ -7434,8 +7744,8 @@ function renderCompareDiffPanel(parent) {
   header.className = 'compare-diff-header';
   const pathEl = document.createElement('span');
   pathEl.className = 'compare-diff-path';
-  pathEl.textContent = selectedPath;
-  pathEl.title = selectedPath;
+  pathEl.textContent = getCompareFileDisplayPath(selected) || selectedPath;
+  pathEl.title = getCompareFileTitle(selected);
   header.appendChild(pathEl);
 
   if (hasDiff) {
@@ -7473,7 +7783,14 @@ function fillCompareDiffBody(bodyArea) {
   if (selected.loading) { bodyArea.appendChild(makeCompareEmptyState('Loading…')); return; }
   if (selected.error) { bodyArea.appendChild(makeCompareEmptyState(selected.error, true)); return; }
   if (selected.binary) { return; }
-  if (selected.tooLarge) { bodyArea.appendChild(makeCompareEmptyState('This file is too large for an inline line diff.', true)); return; }
+  if (selected.tooLarge) {
+    if (selected.previewRows.length) {
+      renderCompareDiffRows(bodyArea, selected.previewRows);
+      return;
+    }
+    bodyArea.appendChild(makeCompareEmptyState('This file is too large for an inline line diff.', true));
+    return;
+  }
   if (!selected.rows.length) { bodyArea.appendChild(makeCompareEmptyState('No differences — the files are identical.')); return; }
 
   const diffApi = (typeof window !== 'undefined' && window.SupportDiff) || null;

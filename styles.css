@@ -5439,8 +5439,35 @@ body.is-file-support-resizing {
 
 .compare-list-controls {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+
+.compare-content-search-button[aria-pressed="true"] {
+  background: rgba(var(--app-primary-rgb, 132, 195, 97), 0.22);
+  border-color: var(--app-primary, #84c361);
+}
+
+.compare-content-search-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.compare-content-search-input {
+  flex: 1 1 auto;
+}
+
+.compare-content-search-status {
+  flex: 0 0 auto;
+  color: var(--app-muted, #9aa3ad);
+  font-size: 12px;
+}
+
+.compare-content-search-status.is-error {
+  color: var(--app-warning, #d98b5f);
 }
 
 .compare-identical-toggle {
@@ -5496,9 +5523,10 @@ body.is-file-support-resizing {
 }
 
 .compare-file-path {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  line-height: 1.35;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
