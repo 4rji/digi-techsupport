@@ -151,6 +151,9 @@ contextBridge.exposeInMainWorld('appAPI', {
   searchSupportArchive: logWrapper('searchSupportArchive', (sessionId, options) => {
     return ipcRenderer.invoke('search-support-archive', sessionId, options);
   }),
+  compareSupportArchives: logWrapper('compareSupportArchives', (sessionIdA, sessionIdB) => {
+    return ipcRenderer.invoke('compare-support-archives', sessionIdA, sessionIdB);
+  }),
   listSavedSupportFiles: logWrapper('listSavedSupportFiles', () => {
     return ipcRenderer.invoke('list-saved-support-files');
   }),

@@ -8,7 +8,8 @@
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",
-    "serve-http": "node server-http.js"
+    "serve-http": "node server-http.js",
+    "test": "node --test"
   },
   "devDependencies": {
     "electron": "^42.4.0",

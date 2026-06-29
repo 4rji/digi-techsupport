@@ -10,7 +10,8 @@ const { Client } = require('ssh2');
 const tar = require('tar-stream');
 const { generateSupportTemplate, analyzeSupportFiles } = require('./template-generator');
 const digiRemoteService = require('./digi-remote-service');
-const { searchSupportArchiveSession } = require('./support-search');
+const { searchSupportArchiveSession, classifySupportEntry } = require('./support-search');
+const { buildCompareManifest, compareCategoryForTags } = require('./support-diff');
 
 const APP_ICON_NAME = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
 const APP_ICON_PATH = app.isPackaged
@@ -1821,6 +1822,35 @@ function createSupportArchiveSession(webContents, parsedArchive, savedFile = nul
   };
 }
 
+// Build a path -> { entryId, size, hash, binary, category } index for one
+// session, used to compare two archives. Per-entry content hashes are cached on
+// the session so re-compare / swap A<->B does not re-hash.
+function buildCompareIndex(session) {
+  if (!session.contentHashById) session.contentHashById = new Map();
+  const index = new Map();
+  for (const entry of session.filesById.values()) {
+    if (entry.type === 'directory') continue;
+    const content = session.contentById.get(entry.id);
+    let hash = null;
+    if (content && typeof content.text === 'string') {
+      if (session.contentHashById.has(entry.id)) {
+        hash = session.contentHashById.get(entry.id);
+      } else {
+        hash = crypto.createHash('sha1').update(content.text).digest('hex');
+        session.contentHashById.set(entry.id, hash);
+      }
+    }
+    index.set(entry.path, {
+      entryId: entry.id,
+      size: Number(entry.size) || 0,
+      hash,
+      binary: !entry.isText,
+      category: compareCategoryForTags(classifySupportEntry(entry))
+    });
+  }
+  return index;
+}
+
 async function importSupportFileFromDialog(webContents) {
   const browserWindow = BrowserWindow.fromWebContents(webContents);
   const dialogResult = await dialog.showOpenDialog(browserWindow || undefined, {
@@ -2017,6 +2047,28 @@ function setupIPCHandlers() {
       text: content.text,
       truncated: content.truncated
     };
+  });
+
+  ipcMain.handle('compare-support-archives', async (event, sessionIdA, sessionIdB) => {
+    const sessionA = supportArchiveSessions.get(sessionIdA);
+    const sessionB = supportArchiveSessions.get(sessionIdB);
+    if (!sessionA || sessionA.ownerId !== event.sender.id) {
+      return createSupportFileFailure('invalid-file', 'Support file session A is no longer available.');
+    }
+    if (!sessionB || sessionB.ownerId !== event.sender.id) {
+      return createSupportFileFailure('invalid-file', 'Support file session B is no longer available.');
+    }
+    try {
+      const { files, counts } = buildCompareManifest(buildCompareIndex(sessionA), buildCompareIndex(sessionB));
+      return {
+        success: true,
+        sameFile: Boolean(sessionA.savedFileId && sessionA.savedFileId === sessionB.savedFileId),
+        files,
+        counts
+      };
+    } catch (error) {
+      return createSupportFileFailure('invalid-file', error);
+    }
   });
 
   ipcMain.handle('search-support-archive', async (event, sessionId, options = {}) => {
