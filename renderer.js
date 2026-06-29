@@ -2384,8 +2384,10 @@ let supportCompareState = {
   pathFilter: '',
   selectedPath: '',
   selected: createEmptyCompareSelection(),
+  diffSearch: { query: '', grep: false, ignoreCase: false, cut: false },
   savedFiles: []
 };
+let supportCompareFullscreen = false;
 let supportFileTreeWidth = getSavedSupportTreeWidth();
 let supportTreeSearchQuery = '';
 let supportContentSearchQuery = '';
@@ -3589,6 +3591,7 @@ function renderActiveLine() {
   document.body.classList.remove('is-templates-view');
   document.body.classList.remove('is-devices-view');
   document.body.classList.remove('is-compare-view');
+  document.body.classList.remove('is-compare-fullscreen');
 
   if (activeLineId !== DEVICES_VIEW_ID) {
     stopDevicesAutoRefresh();
@@ -3609,6 +3612,7 @@ function renderActiveLine() {
 
   if (activeLineId === COMPARE_VIEW_ID) {
     document.body.classList.add('is-compare-view');
+    document.body.classList.toggle('is-compare-fullscreen', supportCompareFullscreen);
     renderCompareView(workspace);
     return;
   }
@@ -7321,6 +7325,10 @@ function renderCompareListPanel(parent) {
     return;
   }
 
+  renderCompareDifferencesPanel(parent);
+}
+
+function renderCompareDifferencesPanel(parent) {
   const header = document.createElement('div');
   header.className = 'compare-list-header';
 
@@ -7420,6 +7428,8 @@ function renderCompareDiffPanel(parent) {
     return;
   }
 
+  const hasDiff = !selected.loading && !selected.error && !selected.binary && !selected.tooLarge && selected.rows.length > 0;
+
   const header = document.createElement('div');
   header.className = 'compare-diff-header';
   const pathEl = document.createElement('span');
@@ -7428,7 +7438,7 @@ function renderCompareDiffPanel(parent) {
   pathEl.title = selectedPath;
   header.appendChild(pathEl);
 
-  if (!selected.loading && !selected.error && !selected.binary && !selected.tooLarge) {
+  if (hasDiff) {
     const counts = document.createElement('span');
     counts.className = 'compare-diff-counts';
     const added = document.createElement('span');
@@ -7443,6 +7453,8 @@ function renderCompareDiffPanel(parent) {
   }
   parent.appendChild(header);
 
+  if (hasDiff) parent.appendChild(renderCompareDiffFindBar());
+
   if (selected.note) {
     const note = document.createElement('div');
     note.className = 'compare-diff-note';
@@ -7453,14 +7465,103 @@ function renderCompareDiffPanel(parent) {
   const bodyArea = document.createElement('div');
   bodyArea.className = 'compare-diff-body';
   parent.appendChild(bodyArea);
+  fillCompareDiffBody(bodyArea);
+}
 
+function fillCompareDiffBody(bodyArea) {
+  const selected = supportCompareState.selected;
   if (selected.loading) { bodyArea.appendChild(makeCompareEmptyState('Loading…')); return; }
   if (selected.error) { bodyArea.appendChild(makeCompareEmptyState(selected.error, true)); return; }
   if (selected.binary) { return; }
   if (selected.tooLarge) { bodyArea.appendChild(makeCompareEmptyState('This file is too large for an inline line diff.', true)); return; }
   if (!selected.rows.length) { bodyArea.appendChild(makeCompareEmptyState('No differences — the files are identical.')); return; }
 
-  renderCompareDiffRows(bodyArea, selected.rows);
+  const diffApi = (typeof window !== 'undefined' && window.SupportDiff) || null;
+  const result = diffApi && typeof diffApi.filterDiffRows === 'function'
+    ? diffApi.filterDiffRows(selected.rows, supportCompareState.diffSearch)
+    : { rows: selected.rows, filtered: false, error: '' };
+
+  if (result.error) {
+    const err = document.createElement('div');
+    err.className = 'compare-diff-note is-error';
+    err.textContent = result.error;
+    bodyArea.appendChild(err);
+  } else if (result.filtered) {
+    const info = document.createElement('div');
+    info.className = 'compare-diff-note';
+    info.textContent = `Showing ${result.rows.length} of ${selected.rows.length} lines`;
+    bodyArea.appendChild(info);
+  }
+
+  if (!result.rows.length) {
+    bodyArea.appendChild(makeCompareEmptyState('No lines match the filter.'));
+    return;
+  }
+  renderCompareDiffRows(bodyArea, result.rows);
+}
+
+function rerenderCompareDiffBody() {
+  const bodyArea = document.querySelector('.compare-diff-panel .compare-diff-body');
+  if (!bodyArea) return;
+  bodyArea.innerHTML = '';
+  fillCompareDiffBody(bodyArea);
+}
+
+function refocusCompareDiffFind() {
+  requestAnimationFrame(() => {
+    const input = document.getElementById('compare-diff-find-input');
+    if (!input || input.disabled) return;
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  });
+}
+
+function makeCompareDiffToggleButton(label, pressed, title, onToggle) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'file-support-grep-button';
+  button.textContent = label;
+  button.title = title;
+  button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+  button.addEventListener('click', () => {
+    onToggle();
+    renderProductApp();
+    refocusCompareDiffFind();
+  });
+  return button;
+}
+
+function renderCompareDiffFindBar() {
+  const ds = supportCompareState.diffSearch;
+  const bar = document.createElement('div');
+  bar.className = 'compare-diff-find';
+
+  const input = document.createElement('input');
+  input.type = 'search';
+  input.id = 'compare-diff-find-input';
+  input.className = 'compare-diff-find-input';
+  input.placeholder = 'Filter diff lines (grep / -i / Cut)…';
+  input.value = ds.query;
+  input.addEventListener('input', () => {
+    supportCompareState.diffSearch.query = input.value;
+    rerenderCompareDiffBody();
+  });
+  bar.appendChild(input);
+
+  const controls = document.createElement('div');
+  controls.className = 'compare-diff-find-controls';
+  controls.appendChild(makeCompareDiffToggleButton('grep', ds.grep, 'Treat the query as a regular expression', () => {
+    supportCompareState.diffSearch.grep = !supportCompareState.diffSearch.grep;
+  }));
+  controls.appendChild(makeCompareDiffToggleButton('-i', ds.ignoreCase, 'Ignore uppercase and lowercase differences', () => {
+    supportCompareState.diffSearch.ignoreCase = !supportCompareState.diffSearch.ignoreCase;
+  }));
+  controls.appendChild(makeCompareDiffToggleButton('Cut', ds.cut, 'Show lines that do NOT match', () => {
+    supportCompareState.diffSearch.cut = !supportCompareState.diffSearch.cut;
+  }));
+  bar.appendChild(controls);
+
+  return bar;
 }
 
 function renderCompareBody(parent) {
@@ -7480,6 +7581,24 @@ function renderCompareView(workspace) {
 
   const view = document.createElement('div');
   view.className = 'compare-view';
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'compare-toolbar';
+  const title = document.createElement('span');
+  title.className = 'compare-toolbar-title';
+  title.textContent = 'Compare support archives';
+  toolbar.appendChild(title);
+  const fullscreenButton = document.createElement('button');
+  fullscreenButton.type = 'button';
+  fullscreenButton.className = 'compare-fullscreen-button';
+  fullscreenButton.textContent = supportCompareFullscreen ? 'Normal View' : 'Full Screen';
+  fullscreenButton.setAttribute('aria-pressed', supportCompareFullscreen ? 'true' : 'false');
+  fullscreenButton.addEventListener('click', () => {
+    supportCompareFullscreen = !supportCompareFullscreen;
+    renderProductApp();
+  });
+  toolbar.appendChild(fullscreenButton);
+  view.appendChild(toolbar);
 
   renderComparePickers(view);
 

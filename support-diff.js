@@ -238,7 +238,54 @@ function buildCompareManifest(indexA, indexB) {
   return { files, counts };
 }
 
-const api = { diffLines, compareCategoryForTags, buildCompareManifest, CATEGORY_KEYS };
+// filterDiffRows(rows, opts) -> { rows, filtered, error }
+//   Applies an advanced-search style filter (grep / ignoreCase / cut) to the rows
+//   of an open side-by-side diff. A row is kept when its A or B text matches the
+//   query (cut inverts). opts: { query, grep, ignoreCase, cut }.
+//   Terms split on whitespace; a leading '-'/'!' excludes, '+' forces include.
+function filterDiffRows(rows, opts = {}) {
+  const all = Array.isArray(rows) ? rows : [];
+  const query = String(opts.query == null ? '' : opts.query).trim();
+  if (!query) return { rows: all, filtered: false, error: '' };
+
+  const ignoreCase = Boolean(opts.ignoreCase);
+  const cut = Boolean(opts.cut);
+  let matches;
+
+  if (opts.grep) {
+    let regex;
+    try {
+      regex = new RegExp(query, ignoreCase ? 'i' : '');
+    } catch (_error) {
+      return { rows: all, filtered: false, error: 'Invalid grep pattern' };
+    }
+    matches = (text) => regex.test(text);
+  } else {
+    const includes = [];
+    const excludes = [];
+    for (const token of query.split(/\s+/).filter(Boolean)) {
+      if ((token.startsWith('-') || token.startsWith('!')) && token.length > 1) excludes.push(token.slice(1));
+      else if (token.startsWith('+') && token.length > 1) includes.push(token.slice(1));
+      else includes.push(token);
+    }
+    if (!includes.length && !excludes.length) return { rows: all, filtered: false, error: '' };
+    const norm = (value) => (ignoreCase ? String(value).toLowerCase() : String(value));
+    matches = (text) => {
+      const haystack = norm(text);
+      for (const term of includes) if (!haystack.includes(norm(term))) return false;
+      for (const term of excludes) if (haystack.includes(norm(term))) return false;
+      return true;
+    };
+  }
+
+  const filtered = all.filter((row) => {
+    const matched = matches(row.aText || '') || matches(row.bText || '');
+    return cut ? !matched : matched;
+  });
+  return { rows: filtered, filtered: true, error: '' };
+}
+
+const api = { diffLines, compareCategoryForTags, buildCompareManifest, filterDiffRows, CATEGORY_KEYS };
 
 if (typeof module === 'object' && module.exports) {
   module.exports = api;

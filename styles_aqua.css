@@ -5176,3 +5176,82 @@ body.is-file-support-resizing {
 }
 
 .compare-empty-state.is-error { color: var(--app-warning, #d98b5f); }
+
+/* ===========================================================================
+   Compare view — in-diff line filter (grep / -i / cut)
+   =========================================================================== */
+.compare-diff-find {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--app-border, rgba(255, 255, 255, 0.14));
+  flex: 0 0 auto;
+}
+
+.compare-diff-find-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--app-border, rgba(255, 255, 255, 0.14));
+  background: var(--app-input, #101820);
+  color: var(--app-text, #fff);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.compare-diff-find-controls {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.compare-diff-note.is-error {
+  color: var(--app-warning, #d98b5f);
+}
+
+/* ===========================================================================
+   Compare view — toolbar + fullscreen
+   =========================================================================== */
+.compare-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.compare-toolbar-title {
+  font-weight: 600;
+  color: var(--app-text, #fff);
+  font-size: 14px;
+}
+
+.compare-fullscreen-button {
+  border: 1px solid var(--app-border, rgba(255, 255, 255, 0.14));
+  background: var(--app-input, #101820);
+  color: var(--app-text, #fff);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.compare-fullscreen-button:hover {
+  border-color: var(--app-primary, #84c361);
+}
+
+body.is-compare-fullscreen {
+  overflow: hidden;
+}
+
+body.is-compare-fullscreen .compare-view {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  height: 100vh;
+  margin: 0;
+  padding: 12px;
+  background: var(--app-background, #121417);
+  box-sizing: border-box;
+}

@@ -6,7 +6,9 @@ const assert = require('node:assert/strict');
 const {
   diffLines,
   compareCategoryForTags,
-  buildCompareManifest
+  buildCompareManifest,
+  filterDiffRows,
+  mergeCompareSearchResults
 } = require('../support-diff');
 
 // ---------------------------------------------------------------------------
@@ -209,4 +211,64 @@ test('buildCompareManifest: totals and byCategory only count differing files', (
   assert.equal(manifest.counts.byCategory.logs, 1);
   assert.equal(manifest.counts.byCategory.json, 0);
   assert.equal(manifest.counts.byCategory.other, 0);
+});
+
+// ---------------------------------------------------------------------------
+// filterDiffRows — grep / -i / cut applied to the open side-by-side diff
+// ---------------------------------------------------------------------------
+
+const diffSampleRows = () => ([
+  { type: 'equal', aText: 'wan mtu 1500', bText: 'wan mtu 1500' },
+  { type: 'change', aText: 'mode dhcp', bText: 'mode static' },
+  { type: 'add', aText: '', bText: 'ip 10.0.0.5' },
+  { type: 'equal', aText: 'hostname router', bText: 'hostname router' }
+]);
+
+test('filterDiffRows: empty query returns every row, unfiltered', () => {
+  const result = filterDiffRows(diffSampleRows(), { query: '' });
+  assert.equal(result.filtered, false);
+  assert.equal(result.rows.length, 4);
+});
+
+test('filterDiffRows: a term keeps rows matching on either side', () => {
+  const result = filterDiffRows(diffSampleRows(), { query: 'mtu' });
+  assert.equal(result.filtered, true);
+  assert.equal(result.rows.length, 1);
+  assert.equal(result.rows[0].aText, 'wan mtu 1500');
+
+  const onlyB = filterDiffRows(diffSampleRows(), { query: 'ip' });
+  assert.equal(onlyB.rows.length, 1);
+  assert.equal(onlyB.rows[0].bText, 'ip 10.0.0.5');
+});
+
+test('filterDiffRows: ignoreCase widens the match', () => {
+  const rows = [{ type: 'equal', aText: 'RADIUS auth', bText: 'RADIUS auth' }];
+  assert.equal(filterDiffRows(rows, { query: 'radius' }).rows.length, 0);
+  assert.equal(filterDiffRows(rows, { query: 'radius', ignoreCase: true }).rows.length, 1);
+});
+
+test('filterDiffRows: cut inverts the match', () => {
+  const result = filterDiffRows(diffSampleRows(), { query: 'mtu', cut: true });
+  assert.equal(result.filtered, true);
+  assert.equal(result.rows.length, 3);
+  assert.ok(result.rows.every(r => !r.aText.includes('mtu') && !r.bText.includes('mtu')));
+});
+
+test('filterDiffRows: grep treats the query as a regular expression', () => {
+  const result = filterDiffRows(diffSampleRows(), { query: 'mode|ip', grep: true });
+  assert.equal(result.rows.length, 2);
+});
+
+test('filterDiffRows: an invalid grep pattern reports an error and keeps all rows', () => {
+  const result = filterDiffRows(diffSampleRows(), { query: '(', grep: true });
+  assert.ok(result.error);
+  assert.equal(result.filtered, false);
+  assert.equal(result.rows.length, 4);
+});
+
+test('filterDiffRows: an exclusion term (-foo) hides rows that contain it', () => {
+  const result = filterDiffRows(diffSampleRows(), { query: '-mtu' });
+  assert.equal(result.filtered, true);
+  assert.equal(result.rows.length, 3);
+  assert.ok(result.rows.every(r => !r.aText.includes('mtu') && !r.bText.includes('mtu')));
 });
