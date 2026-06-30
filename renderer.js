@@ -3478,7 +3478,7 @@ function renderProductTabs() {
   };
 
   createBuiltInTabButton(FILE_SUPPORT_VIEW_ID, 'File Support');
-  createBuiltInTabButton(COMPARE_VIEW_ID, 'Compare');
+  createBuiltInTabButton(COMPARE_VIEW_ID, 'DIFF');
   createBuiltInTabButton(DEVICES_VIEW_ID, 'DRM');
 
   PRODUCT_CATEGORIES.forEach(category => {

@@ -1,6 +1,12 @@
 Digi TechSupport
 ================
 
+## Release 4.0 Coming
+
+New Diff tools and more Digi products are coming soon.
+
+<img src="release2.webp" alt="Release 4.0 preview with DRM, Diff tools, and more products" width="100%">
+
 <img src="img-readme/1.webp" alt="Templates view" width="50%">
 <img src="img-readme/2.webp" alt="EX product line view" width="50%">
 <img src="img-readme/3.webp" alt="Settings view" width="50%">
