@@ -3135,6 +3135,27 @@ function createManualCaseNoteTemplate() {
   };
 }
 
+function createManualPlainNote() {
+  const index = supportTemplates.length + templateDrafts.length;
+  const title = DEFAULT_CASE_NOTE_TITLE;
+  return {
+    id: createTemplateId(title, index),
+    title,
+    body: '',
+    hidden: false,
+    sourceName: 'manual'
+  };
+}
+
+// Creates a free-form note (no Case fields panel, editable body).
+function openBlankPlainNote() {
+  const note = createManualPlainNote();
+  supportTemplates.push(note);
+  activeTemplateId = note.id;
+  saveSupportTemplates();
+  return note;
+}
+
 function openBlankCaseNote({ reuseEmpty = false } = {}) {
   if (reuseEmpty) {
     const emptyTemplate = supportTemplates.find((template) => (
@@ -4540,6 +4561,17 @@ function renderTemplatesView(workspace) {
     renderProductApp();
   });
 
+  const newBlankButton = document.createElement('button');
+  newBlankButton.type = 'button';
+  newBlankButton.className = 'config-transfer-button template-new-blank-button';
+  newBlankButton.textContent = 'New blank';
+  newBlankButton.title = 'Create a free-form note without Case fields';
+  newBlankButton.addEventListener('click', () => {
+    // Blank notes have no Case fields — just a free-form editable body.
+    openBlankPlainNote();
+    renderProductApp();
+  });
+
   const createToggleButton = document.createElement('button');
   createToggleButton.type = 'button';
   createToggleButton.className = 'config-transfer-button template-create-toggle';
@@ -4551,6 +4583,7 @@ function renderTemplatesView(workspace) {
   });
 
   controls.appendChild(newButton);
+  controls.appendChild(newBlankButton);
   controls.appendChild(createToggleButton);
   controls.appendChild(importButton);
   controls.appendChild(importInput);
@@ -8898,8 +8931,106 @@ function attachAutoSizingTextarea(textarea) {
 const TEMPLATE_ICONS = {
   copy: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>',
   save: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>',
-  delete: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>'
+  delete: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>',
+  eye: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>',
+  edit: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>'
 };
+
+// Minimal, dependency-free Markdown → HTML for the note preview. Input is
+// escaped before any tags are added, so it is safe to assign via innerHTML.
+function renderNoteMarkdownHtml(markdown) {
+  const lines = String(markdown || '').split(/\r?\n/);
+  const html = [];
+  let inCode = false;
+  let codeLines = [];
+  let listType = null;
+  let paragraph = [];
+
+  const inline = (text) => escapeHTML(text)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/__([^_]+)__/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
+
+  const flushParagraph = () => {
+    if (paragraph.length) {
+      html.push(`<p>${inline(paragraph.join(' '))}</p>`);
+      paragraph = [];
+    }
+  };
+  const closeList = () => {
+    if (listType) {
+      html.push(`</${listType}>`);
+      listType = null;
+    }
+  };
+
+  lines.forEach((line) => {
+    if (/^```/.test(line)) {
+      if (inCode) {
+        html.push(`<pre><code>${escapeHTML(codeLines.join('\n'))}</code></pre>`);
+        codeLines = [];
+        inCode = false;
+      } else {
+        flushParagraph();
+        closeList();
+        inCode = true;
+      }
+      return;
+    }
+    if (inCode) {
+      codeLines.push(line);
+      return;
+    }
+    if (!line.trim()) {
+      flushParagraph();
+      closeList();
+      return;
+    }
+    const heading = line.match(/^(#{1,6})\s+(.*)$/);
+    if (heading) {
+      flushParagraph();
+      closeList();
+      const level = heading[1].length;
+      html.push(`<h${level}>${inline(heading[2].trim())}</h${level}>`);
+      return;
+    }
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
+      flushParagraph();
+      closeList();
+      html.push('<hr>');
+      return;
+    }
+    const listItem = line.match(/^\s*(?:[-*+]|\d+[.)])\s+(.*)$/);
+    if (listItem) {
+      flushParagraph();
+      const type = /^\s*\d/.test(line) ? 'ol' : 'ul';
+      if (listType && listType !== type) closeList();
+      if (!listType) {
+        listType = type;
+        html.push(`<${type}>`);
+      }
+      html.push(`<li>${inline(listItem[1].trim())}</li>`);
+      return;
+    }
+    const quote = line.match(/^\s*>\s?(.*)$/);
+    if (quote) {
+      flushParagraph();
+      closeList();
+      html.push(`<blockquote>${inline(quote[1])}</blockquote>`);
+      return;
+    }
+    paragraph.push(line.trim());
+  });
+
+  if (inCode) {
+    html.push(`<pre><code>${escapeHTML(codeLines.join('\n'))}</code></pre>`);
+  }
+  flushParagraph();
+  closeList();
+  return html.join('\n') || '<p class="template-body-preview-empty">Nothing to preview</p>';
+}
 
 function createTemplateChip(icon, label, { danger = false, primary = false } = {}) {
   const chip = document.createElement('button');
@@ -9023,6 +9154,30 @@ function createTemplateEditor(template, index, options = {}) {
   }
   const syncBodyHeight = attachAutoSizingTextarea(bodyInput);
 
+  // Rendered (non-markdown) preview shown in place of the editor textarea.
+  const preview = document.createElement('div');
+  preview.className = 'template-body-preview';
+  preview.hidden = true;
+  let isPreview = false;
+  const refreshPreview = () => {
+    if (isPreview) preview.innerHTML = renderNoteMarkdownHtml(bodyInput.value);
+  };
+
+  const viewToggleButton = createTemplateChip('eye', 'Preview');
+  const setPreviewMode = (previewMode) => {
+    isPreview = previewMode;
+    if (isPreview) preview.innerHTML = renderNoteMarkdownHtml(bodyInput.value);
+    preview.hidden = !isPreview;
+    bodyInput.hidden = isPreview;
+    viewToggleButton.innerHTML = TEMPLATE_ICONS[isPreview ? 'edit' : 'eye'] || '';
+    const label = isPreview ? 'Edit markdown' : 'Preview';
+    viewToggleButton.title = label;
+    viewToggleButton.setAttribute('aria-label', label);
+    viewToggleButton.classList.toggle('is-active', isPreview);
+    if (!isPreview) syncBodyHeight();
+  };
+  viewToggleButton.addEventListener('click', () => setPreviewMode(!isPreview));
+
   const status = document.createElement('span');
   status.className = 'template-autosave-status';
 
@@ -9034,6 +9189,7 @@ function createTemplateEditor(template, index, options = {}) {
       caseNoteFields = normalizeCaseNoteFields(nextFields);
       bodyInput.value = buildCaseNoteMarkdown(caseNoteFields);
       syncBodyHeight();
+      refreshPreview();
       syncScratchpadFromCaseNoteFields(caseNoteFields);
       if (typeof persistCaseNoteFields === 'function') {
         persistCaseNoteFields();
@@ -9063,7 +9219,12 @@ function createTemplateEditor(template, index, options = {}) {
 
   const copyButton = createTemplateChip('copy', 'Copy note');
   copyButton.addEventListener('click', () => {
-    copyTemplateText(bodyInput.value);
+    // Preview mode copies the rendered (non-markdown) text; edit mode copies raw markdown.
+    if (isPreview) {
+      copyTemplateText(preview.innerText || preview.textContent || '');
+    } else {
+      copyTemplateText(bodyInput.value);
+    }
   });
 
   const deleteButton = createTemplateChip('delete', isDraft ? 'Discard note' : 'Delete note', { danger: true });
@@ -9180,6 +9341,7 @@ function createTemplateEditor(template, index, options = {}) {
     persistCaseNoteFields = autoSave;
   }
 
+  actions.appendChild(viewToggleButton);
   actions.appendChild(copyButton);
   actions.appendChild(deleteButton);
 
@@ -9191,6 +9353,7 @@ function createTemplateEditor(template, index, options = {}) {
     editor.appendChild(caseNotePanel);
   }
   editor.appendChild(bodyInput);
+  editor.appendChild(preview);
   if (copyGeneratedRow) {
     editor.appendChild(copyGeneratedRow);
   }

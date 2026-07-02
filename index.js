@@ -1419,6 +1419,29 @@ function createSupportTroubleshootingSummary(entries, contentById) {
   };
 }
 
+// Shared between the tar and zip parsers: given a decompressed preview buffer,
+// decide whether the entry is text, cap it to MAX_TEXT_PREVIEW_BYTES worth of
+// content, and populate metadata + contentById the same way for both formats.
+function finalizeSupportTextEntry(metadata, previewBuffer, actualSize, collectedBytes, contentById) {
+  const isText = bufferLooksLikeText(previewBuffer, metadata.path);
+  const truncated = actualSize > collectedBytes;
+
+  metadata.size = actualSize;
+  metadata.isText = isText;
+  metadata.textAvailable = isText;
+  metadata.truncated = isText && truncated;
+
+  if (isText) {
+    const text = previewBuffer.toString('utf8').replace(/^﻿/, '');
+    contentById.set(metadata.id, {
+      text,
+      truncated: metadata.truncated
+    });
+  } else {
+    metadata.previewMessage = 'Binary file preview is not available.';
+  }
+}
+
 function parseSupportTarArchive(tarBuffer) {
   return new Promise((resolve, reject) => {
     const extract = tar.extract();
@@ -1502,24 +1525,8 @@ function parseSupportTarArchive(tarBuffer) {
 
       stream.once('end', () => {
         const previewBuffer = Buffer.concat(chunks, collectedBytes);
-        const isText = bufferLooksLikeText(previewBuffer, entryPath);
         const actualSize = metadata.size || streamedBytes;
-        const truncated = actualSize > collectedBytes;
-
-        metadata.size = actualSize;
-        metadata.isText = isText;
-        metadata.textAvailable = isText;
-        metadata.truncated = isText && truncated;
-
-        if (isText) {
-          const text = previewBuffer.toString('utf8').replace(/^\uFEFF/, '');
-          contentById.set(id, {
-            text,
-            truncated: metadata.truncated
-          });
-        } else {
-          metadata.previewMessage = 'Binary file preview is not available.';
-        }
+        finalizeSupportTextEntry(metadata, previewBuffer, actualSize, collectedBytes, contentById);
 
         entries.push(metadata);
         filesById.set(id, metadata);
@@ -1554,6 +1561,170 @@ function parseSupportTarArchive(tarBuffer) {
       fail(error);
     }
   });
+}
+
+const ZIP_LOCAL_SIGNATURE = 0x04034b50;
+const ZIP_CENTRAL_SIGNATURE = 0x02014b50;
+const ZIP_EOCD_SIGNATURE = 0x06054b50;
+
+function bufferHasZipSignature(buffer) {
+  return Buffer.isBuffer(buffer)
+    && buffer.length >= 4
+    && buffer.readUInt32LE(0) === ZIP_LOCAL_SIGNATURE;
+}
+
+// Locate the End Of Central Directory record. It is the last structure in the
+// file: a fixed 22-byte header optionally followed by a comment (max 65535
+// bytes), so we scan backwards from the end for its signature.
+function findZipEndOfCentralDirectory(buffer) {
+  const minOffset = Math.max(0, buffer.length - (22 + 0xffff));
+  for (let offset = buffer.length - 22; offset >= minOffset; offset--) {
+    if (buffer.readUInt32LE(offset) === ZIP_EOCD_SIGNATURE) {
+      return offset;
+    }
+  }
+  return -1;
+}
+
+// Parse a ZIP archive (e.g. Digi's *.bin support bundle) into the same shape as
+// parseSupportTarArchive. Uses only the built-in zlib inflate — no extra deps.
+// Walks the central directory for the entry list, then reads each local header
+// to find where the compressed data begins.
+function parseSupportZipArchive(zipBuffer) {
+  if (zipBuffer.length < 22) {
+    throw new Error('The file is not a readable ZIP archive.');
+  }
+
+  const eocdOffset = findZipEndOfCentralDirectory(zipBuffer);
+  if (eocdOffset < 0) {
+    throw new Error('The file is not a readable ZIP archive.');
+  }
+
+  const centralDirEntries = zipBuffer.readUInt16LE(eocdOffset + 10);
+  const centralDirOffset = zipBuffer.readUInt32LE(eocdOffset + 16);
+
+  if (centralDirEntries === 0xffff || centralDirOffset === 0xffffffff) {
+    throw new Error('ZIP64 support archives are not supported.');
+  }
+  if (centralDirOffset >= zipBuffer.length) {
+    throw new Error('The ZIP archive central directory is out of range.');
+  }
+
+  const entries = [];
+  const filesById = new Map();
+  const contentById = new Map();
+  let entryIndex = 0;
+  let cursor = centralDirOffset;
+  let uncompressedTotal = 0;
+
+  for (let i = 0; i < centralDirEntries; i++) {
+    if (cursor + 46 > zipBuffer.length || zipBuffer.readUInt32LE(cursor) !== ZIP_CENTRAL_SIGNATURE) {
+      break;
+    }
+
+    const compressionMethod = zipBuffer.readUInt16LE(cursor + 10);
+    const compressedSize = zipBuffer.readUInt32LE(cursor + 20);
+    const uncompressedSize = zipBuffer.readUInt32LE(cursor + 24);
+    const nameLength = zipBuffer.readUInt16LE(cursor + 28);
+    const extraLength = zipBuffer.readUInt16LE(cursor + 30);
+    const commentLength = zipBuffer.readUInt16LE(cursor + 32);
+    const localHeaderOffset = zipBuffer.readUInt32LE(cursor + 42);
+    const rawName = zipBuffer.toString('utf8', cursor + 46, cursor + 46 + nameLength);
+    cursor += 46 + nameLength + extraLength + commentLength;
+
+    const entryPath = normalizeSupportEntryPath(rawName);
+    if (!entryPath) continue;
+
+    const isDirectory = rawName.endsWith('/');
+    const id = `support-entry-${entryIndex++}`;
+    const metadata = {
+      id,
+      name: path.posix.basename(entryPath),
+      path: entryPath,
+      type: isDirectory ? 'directory' : 'file',
+      kind: isDirectory ? 'directory' : 'file',
+      size: Math.max(0, Number(uncompressedSize) || 0),
+      mode: null,
+      mtime: null
+    };
+
+    if (isDirectory) {
+      entries.push(metadata);
+      continue;
+    }
+
+    const pushEntry = () => {
+      entries.push(metadata);
+      filesById.set(id, metadata);
+    };
+
+    if (localHeaderOffset + 30 > zipBuffer.length
+      || zipBuffer.readUInt32LE(localHeaderOffset) !== ZIP_LOCAL_SIGNATURE) {
+      metadata.isText = false;
+      metadata.textAvailable = false;
+      metadata.previewMessage = 'This entry could not be located inside the ZIP archive.';
+      pushEntry();
+      continue;
+    }
+
+    const localNameLength = zipBuffer.readUInt16LE(localHeaderOffset + 26);
+    const localExtraLength = zipBuffer.readUInt16LE(localHeaderOffset + 28);
+    const dataStart = localHeaderOffset + 30 + localNameLength + localExtraLength;
+    const compressedData = zipBuffer.subarray(dataStart, dataStart + compressedSize);
+
+    uncompressedTotal += Number(uncompressedSize) || 0;
+    if (uncompressedTotal > MAX_UNCOMPRESSED_ARCHIVE_BYTES) {
+      throw new Error('The ZIP archive exceeds the uncompressed size limit.');
+    }
+
+    let fullBuffer;
+    try {
+      if (compressionMethod === 0) {
+        fullBuffer = Buffer.from(compressedData);
+      } else if (compressionMethod === 8) {
+        fullBuffer = zlib.inflateRawSync(compressedData, {
+          maxOutputLength: MAX_UNCOMPRESSED_ARCHIVE_BYTES
+        });
+      } else {
+        metadata.isText = false;
+        metadata.textAvailable = false;
+        metadata.previewMessage = `ZIP compression method ${compressionMethod} is not supported.`;
+        pushEntry();
+        continue;
+      }
+    } catch (error) {
+      metadata.isText = false;
+      metadata.textAvailable = false;
+      metadata.previewMessage = 'This entry could not be decompressed.';
+      pushEntry();
+      continue;
+    }
+
+    const actualSize = fullBuffer.length;
+    const previewBuffer = fullBuffer.subarray(0, Math.min(fullBuffer.length, MAX_TEXT_PREVIEW_BYTES));
+    finalizeSupportTextEntry(metadata, previewBuffer, actualSize, previewBuffer.length, contentById);
+    pushEntry();
+  }
+
+  if (!entries.length) {
+    throw new Error('The ZIP archive did not contain any readable entries.');
+  }
+
+  const tree = buildSupportArchiveTree(entries);
+  const summary = createSupportTroubleshootingSummary(entries, contentById);
+  return {
+    entries,
+    tree,
+    filesById,
+    contentById,
+    summary,
+    stats: {
+      entryCount: entries.length,
+      fileCount: countSupportTreeNodes(tree, 'file'),
+      directoryCount: countSupportTreeNodes(tree, 'directory'),
+      textFileCount: entries.filter(entry => entry.type === 'file' && entry.textAvailable).length
+    }
+  };
 }
 
 function createPlainTextSupportArchive(filePath, fileBuffer, stats) {
@@ -1740,6 +1911,24 @@ async function readSupportArchiveFromFilePath(filePath) {
   }
 
   let archiveError = null;
+
+  // Digi's *.bin support bundles are ZIP archives; detect them by signature and
+  // parse before falling through to the gzip/tar and plain-text paths.
+  if (bufferHasZipSignature(compressedFile)) {
+    try {
+      const archive = parseSupportZipArchive(compressedFile);
+      return {
+        success: true,
+        fileName: path.basename(filePath),
+        compressedFile,
+        stats,
+        archive
+      };
+    } catch (error) {
+      archiveError = error;
+    }
+  }
+
   try {
     const tarBuffer = await gunzipBuffer(compressedFile, {
       maxOutputLength: MAX_UNCOMPRESSED_ARCHIVE_BYTES
