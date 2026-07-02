@@ -66,23 +66,52 @@ const redactArgs = (name, args) => {
   return args.map(redactSensitive);
 };
 
+const redactSavedFile = (file) => {
+  if (!file || typeof file !== 'object') return file;
+  return {
+    ...file,
+    notes: typeof file.notes === 'string' ? `[${file.notes.length} chars]` : ''
+  };
+};
+
 const redactResult = (name, result) => {
   if (name === 'sshAdminPassword' && result && typeof result === 'object') {
     return { ...result, password: result.hasPassword ? '[redacted]' : '' };
   }
+  // Archive open results carry the whole file tree and summary; log sizes only
+  // so the console does not retain (and print) huge structures.
+  if (['importSupportFile', 'openSavedSupportFile'].includes(name) && result && typeof result === 'object') {
+    return {
+      ...result,
+      tree: Array.isArray(result.tree) ? `[${result.tree.length} root nodes]` : result.tree,
+      summary: result.summary ? '[summary]' : result.summary,
+      savedFile: redactSavedFile(result.savedFile)
+    };
+  }
+  // Entry content can be megabytes of text; log its length only.
+  if (name === 'getSupportFileEntryContent' && result && typeof result === 'object') {
+    return {
+      ...result,
+      text: typeof result.text === 'string' ? `[${result.text.length} chars]` : result.text
+    };
+  }
+  if (name === 'searchSupportArchive' && result && typeof result === 'object') {
+    return {
+      ...result,
+      files: Array.isArray(result.files) ? `[${result.files.length} files, ${result.totalMatches || 0} matches]` : result.files
+    };
+  }
+  if (name === 'compareSupportArchives' && result && typeof result === 'object') {
+    return {
+      ...result,
+      files: Array.isArray(result.files) ? `[${result.files.length} files]` : result.files
+    };
+  }
   if ([
     'listSavedSupportFiles',
-    'openSavedSupportFile',
     'updateSavedSupportFile',
     'deleteSavedSupportFile'
   ].includes(name) && result && typeof result === 'object') {
-    const redactSavedFile = (file) => {
-      if (!file || typeof file !== 'object') return file;
-      return {
-        ...file,
-        notes: typeof file.notes === 'string' ? `[${file.notes.length} chars]` : ''
-      };
-    };
     return {
       ...result,
       file: redactSavedFile(result.file),

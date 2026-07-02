@@ -1,5 +1,6 @@
 /**
- * Lightweight HTTP server that serves the UI bundle so Electron can load it via http://localhost:600.
+ * Optional lightweight HTTP server that serves the UI bundle and the headless
+ * API endpoints (/api/generate-template, /api/digi/devices).
  */
 
 const http = require('http');
@@ -9,6 +10,10 @@ const { generateSupportTemplate } = require('./template-generator');
 const digiRemoteService = require('./digi-remote-service');
 
 const PORT = Number(process.env.DIGI_TECHSUPPORT_HTTP_PORT) || 3000;
+// Bind to loopback by default: /api/digi/devices answers with the DRM
+// inventory using the credentials stored on this machine, so the server must
+// not be reachable from the LAN unless explicitly requested.
+const HOST = process.env.DIGI_TECHSUPPORT_HTTP_HOST || '127.0.0.1';
 const DEFAULT_FILE = 'index.html';
 
 function resolveStaticRoot() {
@@ -160,7 +165,7 @@ async function handleRequest(req, res) {
     let filePath = path.join(STATIC_ROOT, safePath);
     filePath = path.normalize(filePath);
 
-    if (!filePath.startsWith(STATIC_ROOT)) {
+    if (filePath !== STATIC_ROOT && !filePath.startsWith(STATIC_ROOT + path.sep)) {
       sendNotFound(res);
       return;
     }
@@ -197,6 +202,6 @@ async function handleRequest(req, res) {
 
 const server = http.createServer(handleRequest);
 
-server.listen(PORT, () => {
-  console.log(`HTTP server serving ${STATIC_ROOT} on http://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`HTTP server serving ${STATIC_ROOT} on http://${HOST}:${PORT}`);
 });

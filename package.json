@@ -23,7 +23,21 @@
       "**/*",
       "!node_modules/cpu-features/**",
       "!digi-support-*",
-      "!digi-support-*/**"
+      "!digi-support-*/**",
+      "!Radius-syslog.bin",
+      "!Support Report Refresher 2023.7z",
+      "!server[0-9].js",
+      "!server10.js",
+      "!ips.md",
+      "!catalog-ips.md",
+      "!test/**",
+      "!docs/**",
+      "!img-readme/**",
+      "!release*.md",
+      "!release2.webp",
+      "!README_AI_scan.md",
+      "!.atl/**",
+      "!.claude/**"
     ],
     "extraResources": [
       { "from": "build/icon.png", "to": "icon.png" },

@@ -2312,20 +2312,22 @@ function setupIPCHandlers() {
             });
           }
 
-          stream.on('close', () => {
-            sshSessions.delete(sessionId);
-            conn.end();
-            if (!event.sender.isDestroyed()) {
-              event.sender.send('ssh-close', { sessionId });
-            }
-          });
-
-          event.sender.once('destroyed', () => {
+          const handleSenderDestroyed = () => {
             const session = sshSessions.get(sessionId);
             if (session) {
               session.stream.end();
               session.conn.end();
               sshSessions.delete(sessionId);
+            }
+          };
+          event.sender.once('destroyed', handleSenderDestroyed);
+
+          stream.on('close', () => {
+            event.sender.removeListener('destroyed', handleSenderDestroyed);
+            sshSessions.delete(sessionId);
+            conn.end();
+            if (!event.sender.isDestroyed()) {
+              event.sender.send('ssh-close', { sessionId });
             }
           });
 
@@ -2474,7 +2476,13 @@ function createWindow() {
 
 app.whenReady().then(() => {
   app.on('certificate-error', (event, _webContents, url, error, _certificate, callback) => {
-    if (error === 'net::ERR_CERT_AUTHORITY_INVALID' && isRouterCertificateURL(url)) {
+    // Router web consoles use self-signed certs and are usually opened by IP,
+    // which surfaces as an authority or common-name error.
+    const trustedRouterCertErrors = [
+      'net::ERR_CERT_AUTHORITY_INVALID',
+      'net::ERR_CERT_COMMON_NAME_INVALID'
+    ];
+    if (trustedRouterCertErrors.includes(error) && isRouterCertificateURL(url)) {
       event.preventDefault();
       callback(true);
       return;

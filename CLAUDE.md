@@ -21,6 +21,7 @@ npm run build -- --linux         # Linux
 
 HTTP server env vars:
 - `DIGI_TECHSUPPORT_HTTP_PORT` — change port (default 3000)
+- `DIGI_TECHSUPPORT_HTTP_HOST` — change bind address (default `127.0.0.1`; the server exposes DRM data, so only widen this deliberately)
 - `DIGI_TECHSUPPORT_STATIC_ROOT` — change served folder (defaults to `dist/` if it exists, else project root)
 
 AI model env vars:
@@ -35,8 +36,8 @@ This is an **Electron desktop app** for Digi device technical support workflows.
 
 | File | Process | Role |
 |------|---------|------|
-| `index.js` | Main (Node) | Electron entry point. IPC handlers for TCP tests, ping, SSH sessions, support archive parsing, template generation, and file I/O. Creates `BrowserWindow` loading `http://localhost:600`. |
-| `main.js` | Main (legacy) | Earlier version of the main process. Largely superseded by `index.js` but still wired to the app entry point via `package.json`'s `"main"` field. |
+| `index.js` | Main (Node) | Electron entry point (`package.json` `"main"`). IPC handlers for TCP tests, ping, SSH sessions, support archive parsing, template generation, and file I/O. Creates the `BrowserWindow` and loads `index.html` directly via `loadFile`. |
+| `main.js` | Main (legacy) | Earlier version of the main process, fully superseded by `index.js`. Not referenced anywhere; kept for reference only. |
 | `preload.js` | Main → Renderer bridge | Exposes `window.appAPI` to the renderer via `contextBridge`. Every call is wrapped with a `logWrapper` that redacts sensitive fields before console logging. |
 | `renderer.js` | Renderer | All UI logic — product line/card management, TCP/ping polling, SSH terminal (xterm.js), templates workspace, file support viewer, settings modal. Loaded as an ES module (`import`). |
 | `server-http.js` | Standalone Node | Optional static file server. Also exposes `POST /api/generate-template` for headless template generation. |
@@ -77,6 +78,6 @@ Four CSS files: `styles.css` (Digi), `styles_aqua.css`, `styles_dark.css`, `styl
 
 ### Security notes
 
-- `contextIsolation: false` and `nodeIntegration: true` are set on the BrowserWindow — this is intentional for the Electron renderer to directly use Node APIs, but means XSS in renderer JS has full Node access. Do not load untrusted remote content.
-- SSH to router devices is restricted to private/local IP ranges via `isPrivateOrLocalHost()` in `index.js`.
+- `contextIsolation: true` and `nodeIntegration: false` are set on the BrowserWindow — the renderer only reaches main-process functionality through `window.appAPI` (contextBridge in `preload.js`). Do not load untrusted remote content.
+- `isPrivateOrLocalHost()` in `index.js` gates router web-console windows and self-signed certificate trust to private/local hosts. SSH connections themselves are not host-restricted.
 - Support archive extraction caps: 512 MB per file, 1 GB uncompressed total, path traversal blocked via `normalizeSupportEntryPath()`.
