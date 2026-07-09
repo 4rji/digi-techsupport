@@ -144,8 +144,27 @@ contextBridge.exposeInMainWorld('appAPI', {
   testTCPPort: logWrapper('testTCPPort', (host, port, timeout = 3000) => {
     return ipcRenderer.invoke('test-tcp-port', host, port, timeout);
   }),
-  sshConnect: logWrapper('sshConnect', (options) => {
-    return ipcRenderer.invoke('ssh-connect', options);
+  sshConnect: logWrapper('sshConnect', (options = {}) => {
+    const {
+      host,
+      username,
+      password,
+      port,
+      directShell,
+      command,
+      cols,
+      rows
+    } = options || {};
+    return ipcRenderer.invoke('ssh-connect', {
+      host,
+      username,
+      password,
+      port,
+      directShell,
+      command,
+      cols,
+      rows
+    });
   }),
   sshDefaults: logWrapper('sshDefaults', (host) => {
     return ipcRenderer.invoke('ssh-defaults', host);

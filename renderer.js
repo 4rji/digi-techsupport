@@ -1,5 +1,10 @@
 import { Terminal } from './node_modules/@xterm/xterm/lib/xterm.mjs';
 import { FitAddon } from './node_modules/@xterm/addon-fit/lib/addon-fit.mjs';
+import {
+  DEFAULT_SSH_LOG_PATH,
+  SSH_LOG_PATH_STORAGE_KEY,
+  buildTailCommand
+} from './ssh-log-command.mjs';
 
 const PRODUCT_LINES_STORAGE_KEY = 'product_lines';
 const TEMPLATES_STORAGE_KEY = 'support_templates';
@@ -10074,7 +10079,23 @@ function sshStatusState(status) {
 
 // Creates a Session with its own xterm instance mounted in its own container.
 // The xterm is opened once and never moved between containers.
-function createSSHSession(itemId, item, host, port, username) {
+function formatSSHSessionLabels(username, host, port, { logPath = '' } = {}) {
+  const userHost = `${username}@${host}`;
+  if (logPath) {
+    const label = `tail -f ${logPath} \u2014 ${userHost}`;
+    return {
+      label,
+      compactLabel: label
+    };
+  }
+
+  return {
+    label: userHost,
+    compactLabel: `${userHost}:${port}`
+  };
+}
+
+function createSSHSession(itemId, item, host, port, username, options = {}) {
   const hostArea = document.getElementById('ssh-terminal-container');
   if (!hostArea) return null;
 
@@ -10099,6 +10120,7 @@ function createSSHSession(itemId, item, host, port, username) {
   const fitAddon = new FitAddon();
   terminal.loadAddon(fitAddon);
   terminal.open(containerEl);
+  const labels = formatSSHSessionLabels(username, host, port, options);
 
   const session = {
     clientId: nextSshClientId(),
@@ -10111,7 +10133,9 @@ function createSSHSession(itemId, item, host, port, username) {
     terminal,
     fitAddon,
     containerEl,
-    label: `${username}@${host}`,
+    label: labels.label,
+    compactLabel: labels.compactLabel,
+    logPath: options.logPath || '',
     status: 'connecting',
     minimized: false
   };
@@ -10149,7 +10173,7 @@ function setActiveSshSession(clientId) {
   const compactInfo = document.getElementById('ssh-compact-info');
   if (title) title.textContent = (session.item && session.item.name) || 'SSH Terminal';
   if (eyebrow) eyebrow.textContent = `SSH to ${session.host}`;
-  if (compactInfo) compactInfo.textContent = `${session.label}:${session.port}`;
+  if (compactInfo) compactInfo.textContent = session.compactLabel || `${session.label}:${session.port}`;
 
   setSSHFormState(true);
   setSSHStatus(sshStatusText(session.status), sshStatusState(session.status));
@@ -10228,7 +10252,7 @@ function updateSSHDock() {
     label.type = 'button';
     label.className = 'ssh-session-pill-label';
     label.textContent = session.label;
-    label.title = `Restore ${session.label}:${session.port}`;
+    label.title = `Restore ${session.compactLabel || `${session.label}:${session.port}`}`;
     label.addEventListener('click', () => restoreSSHSession(session.clientId));
 
     const close = document.createElement('button');
@@ -10342,6 +10366,8 @@ function setSSHFormState(isConnected, isConnecting = false) {
   const portInput = document.getElementById('ssh-port');
   const saveAdminPasswordInput = document.getElementById('ssh-save-admin-password');
   const directShellInput = document.getElementById('ssh-direct-shell');
+  const logPathInput = document.getElementById('ssh-log-path');
+  const viewLogsButton = document.getElementById('ssh-view-logs-btn');
 
   if (form) form.style.display = isConnected ? 'none' : '';
   if (compactBar) compactBar.style.display = isConnected ? 'flex' : 'none';
@@ -10353,7 +10379,10 @@ function setSSHFormState(isConnected, isConnecting = false) {
   if (disconnectButton) {
     disconnectButton.disabled = !isConnected && !isConnecting;
   }
-  [usernameInput, passwordInput, portInput].forEach(input => {
+  if (viewLogsButton) {
+    viewLogsButton.disabled = isConnected || isConnecting;
+  }
+  [usernameInput, passwordInput, portInput, logPathInput].forEach(input => {
     if (input) input.disabled = isConnected || isConnecting;
   });
   if (saveAdminPasswordInput) {
@@ -10436,6 +10465,23 @@ function registerSSHEventListeners() {
   }
 }
 
+function getSavedSSHLogPath() {
+  try {
+    const savedPath = localStorage.getItem(SSH_LOG_PATH_STORAGE_KEY);
+    return savedPath && savedPath.trim() ? savedPath : DEFAULT_SSH_LOG_PATH;
+  } catch (_error) {
+    return DEFAULT_SSH_LOG_PATH;
+  }
+}
+
+function saveSSHLogPath(path) {
+  try {
+    localStorage.setItem(SSH_LOG_PATH_STORAGE_KEY, path);
+  } catch (_error) {
+    // Ignore storage errors; the log session can still run.
+  }
+}
+
 function openSSHTerminalModal(itemId) {
   const modal = document.getElementById('ssh-terminal-modal');
   const title = document.getElementById('ssh-terminal-title');
@@ -10446,6 +10492,7 @@ function openSSHTerminalModal(itemId) {
   const passwordInput = document.getElementById('ssh-password');
   const saveAdminPasswordInput = document.getElementById('ssh-save-admin-password');
   const directShellInput = document.getElementById('ssh-direct-shell');
+  const logPathInput = document.getElementById('ssh-log-path');
   const match = findItemById(itemId);
 
   if (!modal || !hostInput || !match) return;
@@ -10483,6 +10530,7 @@ function openSSHTerminalModal(itemId) {
   if (passwordInput) passwordInput.value = '';
   if (saveAdminPasswordInput) saveAdminPasswordInput.checked = false;
   if (directShellInput) directShellInput.checked = true;
+  if (logPathInput) logPathInput.value = getSavedSSHLogPath();
   if (title) title.textContent = match.item.name || 'SSH Terminal';
   if (eyebrow) eyebrow.textContent = `SSH to ${match.item.ip}`;
 
@@ -10542,7 +10590,7 @@ async function applySSHDefaults(host) {
   }
 }
 
-async function connectSSHFromForm() {
+async function connectSSHFromForm(options = {}) {
   const networkAPI = getNetworkAPI();
   const hostInput = document.getElementById('ssh-host');
   const usernameInput = document.getElementById('ssh-username');
@@ -10550,6 +10598,8 @@ async function connectSSHFromForm() {
   const portInput = document.getElementById('ssh-port');
   const saveAdminPasswordInput = document.getElementById('ssh-save-admin-password');
   const directShellInput = document.getElementById('ssh-direct-shell');
+  const command = typeof options.command === 'string' ? options.command : '';
+  const logPath = typeof options.logPath === 'string' ? options.logPath.trim() : '';
 
   if (!networkAPI || typeof networkAPI.sshConnect !== 'function') {
     setSSHStatus('SSH is only available in the Electron app', 'error');
@@ -10561,7 +10611,7 @@ async function connectSSHFromForm() {
   const username = usernameInput.value.trim();
   const password = passwordInput ? passwordInput.value : '';
   const port = portInput ? parseInt(portInput.value, 10) : 22;
-  const directShell = Boolean(directShellInput && directShellInput.checked);
+  const directShell = command ? false : Boolean(directShellInput && directShellInput.checked);
 
   if (!host || !username) {
     setSSHStatus('Host and username are required', 'error');
@@ -10578,7 +10628,7 @@ async function connectSSHFromForm() {
     }
   }
 
-  const session = createSSHSession(item.id, item, host, safePort, username);
+  const session = createSSHSession(item.id, item, host, safePort, username, { logPath });
   if (!session) {
     setSSHStatus('Could not create terminal', 'error');
     return;
@@ -10588,11 +10638,15 @@ async function connectSSHFromForm() {
   setSSHStatus('Connecting...', 'connecting');
 
   const target = `${username}@${host}:${safePort}`;
-  session.terminal.writeln(directShell
-    ? `Connecting to ${target} and starting /bin/sh...`
-    : `Connecting to ${target}...`);
+  if (command && logPath) {
+    session.terminal.writeln(`Connecting to ${target} and viewing log: ${logPath}...`);
+  } else {
+    session.terminal.writeln(directShell
+      ? `Connecting to ${target} and starting /bin/sh...`
+      : `Connecting to ${target}...`);
+  }
 
-  const result = await networkAPI.sshConnect({
+  const connectOptions = {
     host,
     username,
     password,
@@ -10600,7 +10654,12 @@ async function connectSSHFromForm() {
     directShell,
     cols: session.terminal.cols || 80,
     rows: session.terminal.rows || 24
-  });
+  };
+  if (command) {
+    connectOptions.command = command;
+  }
+
+  const result = await networkAPI.sshConnect(connectOptions);
 
   if (!result || !result.success) {
     session.terminal.writeln(`\r\n[Connection failed] ${result?.error || 'Unknown error'}`);
@@ -10612,11 +10671,30 @@ async function connectSSHFromForm() {
 
   session.sessionId = result.sessionId;
   session.status = 'connected';
+  if (options.persistLogPath && logPath) {
+    saveSSHLogPath(logPath);
+  }
   setSSHStatus('Connected', 'connected');
   const compactInfo = document.getElementById('ssh-compact-info');
-  if (compactInfo) compactInfo.textContent = target;
+  if (compactInfo) compactInfo.textContent = session.compactLabel || target;
   fitSSHTerminal();
   session.terminal.focus();
+}
+
+async function viewSSHLogsFromForm() {
+  const logPathInput = document.getElementById('ssh-log-path');
+  const logPath = logPathInput ? logPathInput.value.trim() : DEFAULT_SSH_LOG_PATH;
+  const command = buildTailCommand(logPath);
+  if (!command) {
+    setSSHStatus('Enter a valid log path without line breaks', 'error');
+    return;
+  }
+
+  await connectSSHFromForm({
+    command,
+    logPath,
+    persistLogPath: true
+  });
 }
 
 // Disconnects a session (the active one if no clientId is given). If it was the
@@ -10662,6 +10740,7 @@ function setupSSHTerminalModal() {
   const form = document.getElementById('ssh-login-form');
   const closeButton = document.getElementById('close-ssh-terminal');
   const disconnectButton = document.getElementById('ssh-disconnect-btn');
+  const viewLogsButton = document.getElementById('ssh-view-logs-btn');
   const container = document.getElementById('ssh-terminal-container');
 
   if (!modal || !form) return;
@@ -10674,6 +10753,12 @@ function setupSSHTerminalModal() {
   if (disconnectButton) {
     disconnectButton.addEventListener('click', () => {
       disconnectSSHSession();
+    });
+  }
+
+  if (viewLogsButton) {
+    viewLogsButton.addEventListener('click', () => {
+      viewSSHLogsFromForm();
     });
   }
 

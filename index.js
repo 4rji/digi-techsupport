@@ -2448,9 +2448,19 @@ function setupIPCHandlers() {
     const cols = Math.max(20, Math.min(Number(options.cols) || 80, 240));
     const rows = Math.max(10, Math.min(Number(options.rows) || 24, 80));
     const directShell = Boolean(options.directShell);
+    let command = null;
 
     if (!host || !username) {
       return { success: false, error: 'Host and username are required' };
+    }
+    if (options.command !== undefined && options.command !== null) {
+      if (typeof options.command !== 'string') {
+        return { success: false, error: 'SSH command must be a string' };
+      }
+      command = options.command.trim();
+      if (!command || command.length > 512) {
+        return { success: false, error: 'SSH command must be 1-512 characters' };
+      }
     }
 
     const sessionId = crypto.randomUUID();
@@ -2470,9 +2480,11 @@ function setupIPCHandlers() {
           cols,
           rows
         };
-        const openStream = directShell
-          ? callback => conn.exec('/bin/sh', { pty: ptyOptions }, callback)
-          : callback => conn.shell(ptyOptions, callback);
+        const openStream = command
+          ? callback => conn.exec(command, { pty: ptyOptions }, callback)
+          : directShell
+            ? callback => conn.exec('/bin/sh', { pty: ptyOptions }, callback)
+            : callback => conn.shell(ptyOptions, callback);
 
         openStream((error, stream) => {
           if (error) {

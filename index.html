@@ -152,8 +152,13 @@
           <input type="checkbox" id="ssh-direct-shell">
           <span>Access shell directly</span>
         </label>
+        <div class="form-group ssh-log-path-group">
+          <label for="ssh-log-path">Log file</label>
+          <input type="text" id="ssh-log-path" autocomplete="off" value="/var/log/messages">
+        </div>
         <div class="form-buttons ssh-login-buttons">
           <button type="button" id="ssh-disconnect-btn" class="cancel-button" disabled>Disconnect</button>
+          <button type="button" id="ssh-view-logs-btn" class="save-button">View logs</button>
           <button type="submit" id="ssh-connect-btn" class="save-button">Connect</button>
         </div>
       </form>

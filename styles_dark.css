@@ -1655,6 +1655,10 @@ body {
   margin: 0;
 }
 
+.ssh-log-path-group {
+  grid-column: 1 / span 4;
+}
+
 .ssh-login-form input[readonly] {
   color: #b9ffbf;
   border-color: rgba(76, 175, 80, 0.35);
@@ -1692,7 +1696,7 @@ body {
 
 .ssh-login-buttons {
   grid-column: 5;
-  grid-row: 1 / span 2;
+  grid-row: 1 / span 3;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -3887,6 +3891,7 @@ body {
 
   .ssh-save-password-option,
   .ssh-direct-shell-option,
+  .ssh-log-path-group,
   .ssh-login-buttons {
     grid-column: auto;
     grid-row: auto;
