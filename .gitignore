@@ -15,3 +15,5 @@ docs/superpowers/specs/2026-07-09-ssh-quick-log-viewer-design.md
 .atl/skill-registry.md
 .atl/.skill-registry.cache.json
 docs/superpowers/specs/2026-07-09-ssh-quick-log-viewer-design.md
+.claude/settings.local.json
+2026-07-10-drm-ssh-implementation-instructions.md
