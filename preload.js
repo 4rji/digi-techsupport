@@ -245,6 +245,9 @@ contextBridge.exposeInMainWorld('appAPI', {
   digiRebootDevice: logWrapper('digiRebootDevice', (options) => {
     return ipcRenderer.invoke('digi-reboot-device', options);
   }),
+  digiRunDeviceCli: logWrapper('digiRunDeviceCli', (options) => {
+    return ipcRenderer.invoke('digi-run-device-cli', options);
+  }),
   digiGetDeviceLogs: logWrapper('digiGetDeviceLogs', (options) => {
     return ipcRenderer.invoke('digi-get-device-logs', options);
   }),

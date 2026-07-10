@@ -3832,7 +3832,10 @@ function getDeviceEnrichment(deviceId) {
     stateLoading: false,
     stateError: '',
     stats: null,
-    rebooting: false
+    rebooting: false,
+    cliOpen: false,
+    cliRunning: false,
+    cliHistory: []
   };
 }
 
@@ -3951,6 +3954,124 @@ function handleDeviceReboot(device, onUpdate) {
   });
 }
 
+// --- DRM device console (SCI single-command CLI) ---------------------------
+
+const CLI_MAX_HISTORY = 100;          // bound the in-memory transcript
+const CLI_MAX_OUTPUT_CHARS = 100000;  // per-entry output cap (~100 KB)
+// Device whose console input should regain focus after the next re-render.
+let pendingCliFocusDeviceId = null;
+
+// Run one CLI command on a device via SCI, appending the result (or error) to
+// the device's in-memory console history. Request/response — not a live shell.
+function runDeviceCliCommand(device, command, onUpdate) {
+  const id = device && device.id;
+  const cmd = String(command || '').trim();
+  if (!id || !cmd) return;
+
+  const api = getNetworkAPI();
+  if (!api || typeof api.digiRunDeviceCli !== 'function') {
+    showNotification('Console is unavailable');
+    return;
+  }
+
+  setDeviceEnrichment(id, { cliRunning: true });
+  pendingCliFocusDeviceId = id;
+  if (onUpdate) onUpdate();
+
+  const appendEntry = (entry) => {
+    const prev = getDeviceEnrichment(id);
+    const history = [...prev.cliHistory, entry].slice(-CLI_MAX_HISTORY);
+    setDeviceEnrichment(id, { cliRunning: false, cliHistory: history });
+    pendingCliFocusDeviceId = id;
+    if (onUpdate) onUpdate();
+  };
+
+  api.digiRunDeviceCli({ deviceId: id, command: cmd }).then((result) => {
+    if (result && result.success) {
+      const output = String(result.output || '').slice(0, CLI_MAX_OUTPUT_CHARS);
+      appendEntry({ command: cmd, output, error: '' });
+    } else {
+      appendEntry({ command: cmd, output: '', error: (result && result.error) || 'Command failed' });
+    }
+  }).catch((error) => {
+    appendEntry({ command: cmd, output: '', error: error.message || 'Command failed' });
+  });
+}
+
+// Build the console pane: scrollable transcript + a command input row. Reads
+// only from the enrichment cache, so it is safe to rebuild on every re-render.
+function createDeviceConsole(device, data, onUpdate) {
+  const pane = document.createElement('div');
+  pane.className = 'device-console';
+
+  const history = document.createElement('div');
+  history.className = 'device-console-history';
+  if (!data.cliHistory.length) {
+    const empty = document.createElement('p');
+    empty.className = 'device-console-empty';
+    empty.textContent = 'Run a single command through Remote Manager (e.g. "show system", "show network interface"). Output comes back here.';
+    history.appendChild(empty);
+  } else {
+    data.cliHistory.forEach((entry) => {
+      const block = document.createElement('div');
+      block.className = 'device-console-entry';
+
+      const cmdLine = document.createElement('div');
+      cmdLine.className = 'device-console-command';
+      cmdLine.textContent = `$ ${entry.command}`;
+      block.appendChild(cmdLine);
+
+      const out = document.createElement('pre');
+      out.className = `device-console-output${entry.error ? ' is-error' : ''}`;
+      out.textContent = entry.error || entry.output || '(no output)';
+      block.appendChild(out);
+
+      history.appendChild(block);
+    });
+  }
+  pane.appendChild(history);
+
+  const form = document.createElement('form');
+  form.className = 'device-console-form';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'device-console-input';
+  input.placeholder = data.cliRunning ? 'Running…' : 'Type a command and press Enter';
+  input.disabled = data.cliRunning;
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  form.appendChild(input);
+
+  const runBtn = document.createElement('button');
+  runBtn.type = 'submit';
+  runBtn.className = 'device-action-button device-console-run';
+  runBtn.textContent = data.cliRunning ? 'Running…' : 'Run';
+  runBtn.disabled = data.cliRunning;
+  form.appendChild(runBtn);
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const cmd = input.value.trim();
+    if (!cmd) return;
+    input.value = '';
+    runDeviceCliCommand(device, cmd, onUpdate);
+  });
+  pane.appendChild(form);
+
+  // Keep the transcript scrolled to the newest output and restore input focus
+  // after the enrichment container re-renders following a completed run.
+  requestAnimationFrame(() => {
+    history.scrollTop = history.scrollHeight;
+    if (pendingCliFocusDeviceId === device.id && !data.cliRunning) {
+      pendingCliFocusDeviceId = null;
+      input.focus();
+    }
+  });
+
+  return pane;
+}
+
 // Fetch DRM device logs and open them in the existing Support Archive Viewer
 // (reuses the same session model as an imported archive — no new log viewer).
 async function handleOpenDeviceLogs(device) {
@@ -4018,6 +4139,13 @@ function renderDeviceEnrichment(container, device, onUpdate) {
     disabled: data.stateLoading || !isConnected,
     onClick: () => queryDeviceLiveState(device, onUpdate)
   }));
+  actions.appendChild(createDeviceActionButton(data.cliOpen ? 'Hide console' : 'Console', {
+    disabled: !isConnected,
+    onClick: () => {
+      setDeviceEnrichment(device.id, { cliOpen: !data.cliOpen });
+      if (onUpdate) onUpdate();
+    }
+  }));
   actions.appendChild(createDeviceActionButton('Open logs', {
     onClick: () => handleOpenDeviceLogs(device)
   }));
@@ -4061,6 +4189,10 @@ function renderDeviceEnrichment(container, device, onUpdate) {
       }
     }
     container.appendChild(stateBlock);
+  }
+
+  if (data.cliOpen) {
+    container.appendChild(createDeviceConsole(device, data, onUpdate));
   }
 
   if (data.loading) {

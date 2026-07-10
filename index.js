@@ -2526,6 +2526,21 @@ function setupIPCHandlers() {
     }
   });
 
+  ipcMain.handle('digi-run-device-cli', async (_event, options = {}) => {
+    try {
+      const { keyId, keySecret } = digiRemoteService.readCredentials(app.getPath('userData'));
+      const result = await digiRemoteService.runDeviceCli({
+        keyId,
+        keySecret,
+        deviceId: String(options.deviceId || '').trim(),
+        command: String(options.command || '')
+      });
+      return { success: true, ...result };
+    } catch (error) {
+      return { success: false, error: error.message, code: error.code || 'DIGI_ERROR' };
+    }
+  });
+
   ipcMain.handle('digi-get-device-logs', async (event, options = {}) => {
     try {
       const deviceId = String(options.deviceId || '').trim();

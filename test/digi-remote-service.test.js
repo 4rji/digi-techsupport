@@ -12,6 +12,8 @@ const {
   assertNoSciError,
   buildQueryStateSci,
   buildRebootSci,
+  buildCliSci,
+  parseCliOutput,
   formatDeviceLogEntry
 } = require('../digi-remote-service');
 
@@ -137,6 +139,46 @@ test('SCI builders: escape XML-significant characters in the device id', () => {
   const xml = buildRebootSci('a&b"<c>');
   assert.match(xml, /id="a&amp;b&quot;&lt;c&gt;"/);
   assert.doesNotMatch(xml, /id="a&b"<c>"/);
+});
+
+// ---------------------------------------------------------------------------
+// buildCliSci / parseCliOutput (device console)
+// ---------------------------------------------------------------------------
+
+test('buildCliSci: wraps the command in a cli/execute block with the device id', () => {
+  const xml = buildCliSci('DEV-7', 'show system');
+  assert.match(xml, /<cli><targets><device id="DEV-7"\/><\/targets>/);
+  assert.match(xml, /<execute timeout="15">show system<\/execute>/);
+});
+
+test('buildCliSci: escapes XML-significant characters in the command', () => {
+  const xml = buildCliSci('DEV-7', 'grep "a" & <b>');
+  assert.match(xml, /<execute timeout="15">grep "a" &amp; &lt;b&gt;<\/execute>/);
+});
+
+test('buildCliSci: clamps a non-numeric or sub-second timeout to a safe value', () => {
+  assert.match(buildCliSci('DEV-7', 'ls', 'nope'), /timeout="15"/);
+  assert.match(buildCliSci('DEV-7', 'ls', 0), /timeout="1"/);
+  assert.match(buildCliSci('DEV-7', 'ls', 30), /timeout="30"/);
+});
+
+test('parseCliOutput: unwraps CDATA command output literally', () => {
+  const reply = '<sci_reply><cli><device id="X"><execute><![CDATA[line1\nline2]]></execute></device></cli></sci_reply>';
+  assert.equal(parseCliOutput(reply), 'line1\nline2');
+});
+
+test('parseCliOutput: decodes entity-encoded output', () => {
+  const reply = '<cli><device id="X"><command_response>a &lt;b&gt; &amp; c</command_response></device></cli>';
+  assert.equal(parseCliOutput(reply), 'a <b> & c');
+});
+
+test('parseCliOutput: falls back to the device element inner text', () => {
+  const reply = '<cli><device id="X">plain output</device></cli>';
+  assert.equal(parseCliOutput(reply), 'plain output');
+});
+
+test('parseCliOutput: returns an empty string when there is no output', () => {
+  assert.equal(parseCliOutput('<sci_reply><cli></cli></sci_reply>'), '');
 });
 
 // ---------------------------------------------------------------------------

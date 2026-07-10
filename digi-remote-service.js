@@ -451,6 +451,85 @@ async function rebootDevice({ keyId, keySecret, deviceId } = {}) {
   return { requested: true };
 }
 
+// --- Device console (single CLI command over SCI) --------------------------
+
+// SCI runs one command per request/response — not an interactive shell. Kept
+// short so a wedged device doesn't hang the whole request; the tech re-runs if
+// a command legitimately needs longer.
+const CLI_TIMEOUT_SECONDS = 15;
+
+/** Escape text that goes inside an XML element body (not an attribute). */
+function escapeXmlText(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/** Decode the XML entities a CLI reply may wrap command output in. */
+function decodeXmlEntities(text) {
+  return String(text || '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
+function buildCliSci(deviceId, command, timeout = CLI_TIMEOUT_SECONDS) {
+  const id = escapeXmlAttr(deviceId);
+  const parsed = Number(timeout);
+  const seconds = Number.isFinite(parsed) ? Math.max(1, Math.trunc(parsed)) : CLI_TIMEOUT_SECONDS;
+  return `<sci_request version="1.0">`
+    + `<cli><targets><device id="${id}"/></targets>`
+    + `<execute timeout="${seconds}">${escapeXmlText(command)}</execute>`
+    + `</cli></sci_request>`;
+}
+
+function normalizeCliOutput(raw) {
+  const cdata = /<!\[CDATA\[([\s\S]*?)\]\]>/.exec(raw);
+  const value = cdata ? cdata[1] : decodeXmlEntities(raw);
+  return value.replace(/\r\n/g, '\n').replace(/[ \t]+$/gm, '').trim();
+}
+
+/**
+ * Pull the command output text out of an SCI `<cli>` reply. The reply shape
+ * varies by firmware, so a few known output-bearing tags are tried before
+ * falling back to the inner text of the <device> element. CDATA is unwrapped
+ * literally; otherwise XML entities are decoded.
+ */
+function parseCliOutput(xml) {
+  const text = String(xml || '');
+  for (const tag of ['command_response', 'execute', 'output', 'response']) {
+    const raw = extractXmlTagValue(text, tag);
+    if (raw) return normalizeCliOutput(raw);
+  }
+  const deviceInner = extractXmlTagValue(text, 'device');
+  if (deviceInner) return normalizeCliOutput(deviceInner.replace(/<[^>]+>/g, ''));
+  return '';
+}
+
+/**
+ * Run a single CLI command on a device via SCI and return its output. This is
+ * request/response (one command → one result), not an interactive shell — the
+ * live streaming console is a Remote Manager web-UI-only feature. Reuses the
+ * same API key as reboot/live-state, so it works even behind NAT/cellular.
+ * @returns {Promise<{ output: string }>}
+ */
+async function runDeviceCli({ keyId, keySecret, deviceId, command, timeout = CLI_TIMEOUT_SECONDS } = {}) {
+  const id = String(deviceId || '').trim();
+  if (!id) {
+    throw new ConfigurationError('A device id is required');
+  }
+  const cmd = String(command || '').trim();
+  if (!cmd) {
+    throw new ConfigurationError('A command is required');
+  }
+  const reply = await sciRequest({ keyId, keySecret, xml: buildCliSci(id, cmd, timeout) });
+  assertNoSciError(reply);
+  return { output: parseCliOutput(reply) };
+}
+
 // --- Device logs ----------------------------------------------------------
 
 /** Format one raw device_log entry into a single readable line. */
@@ -501,6 +580,8 @@ module.exports = {
   assertNoSciError,
   buildQueryStateSci,
   buildRebootSci,
+  buildCliSci,
+  parseCliOutput,
   formatDeviceLogEntry,
   getDevices,
   getDeviceDetail,
@@ -508,5 +589,6 @@ module.exports = {
   getDeviceAlerts,
   queryDeviceState,
   rebootDevice,
+  runDeviceCli,
   getDeviceLogs
 };
