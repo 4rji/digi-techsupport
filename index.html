@@ -122,6 +122,8 @@
         <div class="ssh-header-toolbar">
           <button id="ssh-font-decrease" type="button" class="ssh-toolbar-btn" title="Decrease font size">A−</button>
           <button id="ssh-font-increase" type="button" class="ssh-toolbar-btn" title="Increase font size">A+</button>
+          <button id="ssh-search-btn" type="button" class="ssh-toolbar-btn" title="Find in terminal (Ctrl+F)">&#128269;</button>
+          <button id="ssh-save-transcript-btn" type="button" class="ssh-toolbar-btn" title="Save transcript">&#128190;</button>
           <button id="ssh-minimize" type="button" class="ssh-toolbar-btn ssh-window-btn ssh-window-btn--min" title="Minimize (keep connected)">&#9472;</button>
           <button id="ssh-maximize" type="button" class="ssh-toolbar-btn ssh-window-btn ssh-window-btn--max" title="Maximize terminal">&#10530;</button>
         </div>
@@ -143,6 +145,18 @@
         <div class="form-group">
           <label for="ssh-password">Password</label>
           <input type="password" id="ssh-password" autocomplete="current-password">
+        </div>
+        <label class="ssh-key-option" for="ssh-use-key">
+          <input type="checkbox" id="ssh-use-key">
+          <span>Use SSH key (identity file)</span>
+        </label>
+        <div class="form-group ssh-key-path-group" id="ssh-key-path-group" style="display:none;">
+          <label for="ssh-key-path">Private key</label>
+          <div class="ssh-key-path-row">
+            <input type="text" id="ssh-key-path" autocomplete="off" placeholder="/path/to/id_rsa" readonly>
+            <button type="button" id="ssh-key-browse-btn" class="config-transfer-button">Browse…</button>
+          </div>
+          <input type="password" id="ssh-key-passphrase" autocomplete="off" placeholder="Key passphrase (optional)">
         </div>
         <label class="ssh-save-password-option" for="ssh-save-admin-password">
           <input type="checkbox" id="ssh-save-admin-password">

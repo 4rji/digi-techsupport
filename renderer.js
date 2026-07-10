@@ -1,5 +1,6 @@
 import { Terminal } from './node_modules/@xterm/xterm/lib/xterm.mjs';
 import { FitAddon } from './node_modules/@xterm/addon-fit/lib/addon-fit.mjs';
+import { SearchAddon } from './node_modules/@xterm/addon-search/lib/addon-search.mjs';
 import {
   DEFAULT_SSH_LOG_PATH,
   SSH_LOG_PATH_STORAGE_KEY,
@@ -2282,6 +2283,8 @@ let imageViewerState = {
 let imageSwipeStartX = null;
 let portPollTimer = null;
 const sshSessions = new Map(); // clientId -> Session
+// Per-session transcript is kept in memory only, bounded like the archive caps.
+const SSH_TRANSCRIPT_MAX = 4 * 1024 * 1024;
 let activeSshClientId = null;
 let sshPendingItem = null;
 let sshClientCounter = 0;
@@ -3750,7 +3753,11 @@ const devicesState = {
   filterStatus: 'connected', // all | connected | disconnected
   sortBy: 'name', // name | status
   expandedId: '', // device id whose detail panel is open
-  viewMode: 'grid' // list | grid
+  viewMode: 'grid', // list | grid
+  // Lazily-fetched per-device enrichment (detail/events/alerts/live state),
+  // keyed by device id. Only populated for a device the tech opens — these are
+  // N+1 calls, so they are never fetched during a plain list render.
+  detailById: {}
 };
 
 const DEVICE_DETAIL_GROUPS = [
@@ -3809,6 +3816,318 @@ function getDeviceProductImage(name) {
     if (normalized.includes(pattern)) return imgPath;
   }
   return null;
+}
+
+// --- Per-device DRM enrichment (detail / events / alerts / live state) ------
+
+function getDeviceEnrichment(deviceId) {
+  return devicesState.detailById[deviceId] || {
+    loading: false,
+    loaded: false,
+    error: '',
+    detail: null,
+    events: [],
+    alerts: [],
+    alertCount: 0,
+    stateLoading: false,
+    stateError: '',
+    stats: null,
+    rebooting: false
+  };
+}
+
+function setDeviceEnrichment(deviceId, patch) {
+  const prev = devicesState.detailById[deviceId] || getDeviceEnrichment(deviceId);
+  devicesState.detailById[deviceId] = { ...prev, ...patch };
+}
+
+// Fetch detail + events + alerts once for a device the tech has opened. Guards
+// against duplicate fetches; calls onUpdate() when data lands so the open view
+// can re-render.
+function ensureDeviceEnrichment(device, onUpdate) {
+  const id = device && device.id;
+  if (!id) return;
+
+  const existing = devicesState.detailById[id];
+  if (existing && (existing.loading || existing.loaded)) return;
+
+  const api = getNetworkAPI();
+  if (!api || typeof api.digiGetDeviceDetail !== 'function') {
+    setDeviceEnrichment(id, { loading: false, loaded: true, error: 'Digi integration is unavailable' });
+    if (onUpdate) onUpdate();
+    return;
+  }
+
+  setDeviceEnrichment(id, { loading: true, loaded: false, error: '' });
+
+  Promise.allSettled([
+    api.digiGetDeviceDetail({ deviceId: id }),
+    api.digiGetDeviceEvents({ deviceId: id }),
+    api.digiGetDeviceAlerts({ deviceId: id })
+  ]).then(([detailR, eventsR, alertsR]) => {
+    const detail = detailR.status === 'fulfilled' ? detailR.value : null;
+    const events = eventsR.status === 'fulfilled' ? eventsR.value : null;
+    const alerts = alertsR.status === 'fulfilled' ? alertsR.value : null;
+
+    const patch = { loading: false, loaded: true, error: '' };
+    if (detail && detail.success && detail.device) {
+      patch.detail = detail.device;
+    } else if (detail && !detail.success) {
+      // Detail is the primary call; surface its error but still show events/alerts.
+      patch.error = detail.error || '';
+    }
+    patch.events = events && events.success && Array.isArray(events.events) ? events.events : [];
+    patch.alerts = alerts && alerts.success && Array.isArray(alerts.alerts) ? alerts.alerts : [];
+    patch.alertCount = patch.alerts.length;
+
+    setDeviceEnrichment(id, patch);
+    if (onUpdate) onUpdate();
+  });
+
+  if (onUpdate) onUpdate();
+}
+
+function queryDeviceLiveState(device, onUpdate) {
+  const id = device && device.id;
+  if (!id) return;
+  const api = getNetworkAPI();
+  if (!api || typeof api.digiQueryDeviceState !== 'function') {
+    showNotification('Live state is unavailable');
+    return;
+  }
+
+  setDeviceEnrichment(id, { stateLoading: true, stateError: '', stats: null });
+  if (onUpdate) onUpdate();
+
+  api.digiQueryDeviceState({ deviceId: id }).then((result) => {
+    if (result && result.success) {
+      setDeviceEnrichment(id, { stateLoading: false, stateError: '', stats: result.stats || null });
+    } else {
+      setDeviceEnrichment(id, {
+        stateLoading: false,
+        stateError: (result && result.error) || 'Could not query device state',
+        stats: null
+      });
+    }
+    if (onUpdate) onUpdate();
+  }).catch((error) => {
+    setDeviceEnrichment(id, {
+      stateLoading: false,
+      stateError: error.message || 'Could not query device state',
+      stats: null
+    });
+    if (onUpdate) onUpdate();
+  });
+}
+
+function handleDeviceReboot(device, onUpdate) {
+  const id = device && device.id;
+  if (!id) return;
+  const name = device.name || id || 'this device';
+  // Destructive — confirm exactly like the app's other delete/destroy actions.
+  if (!window.confirm(`Reboot ${name} now?\n\nThe device will drop its connection and restart.`)) return;
+
+  const api = getNetworkAPI();
+  if (!api || typeof api.digiRebootDevice !== 'function') {
+    showNotification('Reboot is unavailable');
+    return;
+  }
+
+  setDeviceEnrichment(id, { rebooting: true });
+  if (onUpdate) onUpdate();
+
+  api.digiRebootDevice({ deviceId: id }).then((result) => {
+    if (result && result.success) {
+      showNotification(`Reboot command sent to ${name}`);
+    } else {
+      showNotification((result && result.error) || 'Reboot failed');
+    }
+    setDeviceEnrichment(id, { rebooting: false });
+    if (onUpdate) onUpdate();
+  }).catch((error) => {
+    showNotification(error.message || 'Reboot failed');
+    setDeviceEnrichment(id, { rebooting: false });
+    if (onUpdate) onUpdate();
+  });
+}
+
+// Fetch DRM device logs and open them in the existing Support Archive Viewer
+// (reuses the same session model as an imported archive — no new log viewer).
+async function handleOpenDeviceLogs(device) {
+  const id = device && device.id;
+  if (!id) return;
+  const api = getNetworkAPI();
+  if (!api || typeof api.digiGetDeviceLogs !== 'function') {
+    showNotification('Device logs are unavailable');
+    return;
+  }
+
+  showNotification('Fetching device logs…');
+  try {
+    const result = await api.digiGetDeviceLogs({ deviceId: id, deviceName: device.name || '' });
+    if (!result || !result.success) {
+      showNotification((result && result.error) || 'Could not load device logs');
+      return;
+    }
+    closeDeviceDetailModal();
+    activeLineId = FILE_SUPPORT_VIEW_ID;
+    saveProductLines();
+    applySupportFileLoadResult(result, 'Device logs loaded');
+    renderProductApp();
+  } catch (error) {
+    showNotification(error.message || 'Could not load device logs');
+  }
+}
+
+// Small square action button used across the DRM enrichment panel + modal.
+function createDeviceActionButton(label, { danger = false, disabled = false, onClick } = {}) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = `device-action-button${danger ? ' is-danger' : ''}`;
+  btn.textContent = label;
+  btn.disabled = Boolean(disabled);
+  if (onClick) {
+    btn.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onClick();
+    });
+  }
+  return btn;
+}
+
+function createDeviceAlertCountBadge(count) {
+  const badge = document.createElement('span');
+  badge.className = 'device-alert-badge';
+  badge.title = `${count} active alert${count === 1 ? '' : 's'}`;
+  badge.setAttribute('aria-label', `${count} active alert${count === 1 ? '' : 's'}`);
+  badge.textContent = count > 99 ? '99+' : String(count);
+  return badge;
+}
+
+// Render the alerts / events / live-state / actions block for an opened device.
+// Reads only from the enrichment cache, so it is safe to call repeatedly.
+function renderDeviceEnrichment(container, device, onUpdate) {
+  container.innerHTML = '';
+  const data = getDeviceEnrichment(device.id);
+
+  const actions = document.createElement('div');
+  actions.className = 'device-enrichment-actions';
+  const isConnected = device.status === 'connected';
+  actions.appendChild(createDeviceActionButton(data.stateLoading ? 'Querying…' : 'Live state', {
+    disabled: data.stateLoading || !isConnected,
+    onClick: () => queryDeviceLiveState(device, onUpdate)
+  }));
+  actions.appendChild(createDeviceActionButton('Open logs', {
+    onClick: () => handleOpenDeviceLogs(device)
+  }));
+  actions.appendChild(createDeviceActionButton(data.rebooting ? 'Rebooting…' : 'Reboot', {
+    danger: true,
+    disabled: data.rebooting,
+    onClick: () => handleDeviceReboot(device, onUpdate)
+  }));
+  container.appendChild(actions);
+
+  if (data.stateLoading || data.stateError || data.stats) {
+    const stateBlock = document.createElement('div');
+    stateBlock.className = 'device-live-state';
+    if (data.stateLoading) {
+      stateBlock.textContent = 'Querying live state…';
+    } else if (data.stateError) {
+      stateBlock.classList.add('is-error');
+      stateBlock.textContent = data.stateError;
+    } else if (data.stats) {
+      const rows = [
+        ['CPU', data.stats.cpu],
+        ['Uptime', data.stats.uptime],
+        ['Memory used', data.stats.usedMemory],
+        ['Memory free', data.stats.freeMemory],
+        ['Memory total', data.stats.totalMemory]
+      ].filter(([, value]) => String(value || '').trim() !== '');
+      if (rows.length === 0) {
+        stateBlock.textContent = 'No live state returned by the device';
+      } else {
+        const grid = document.createElement('dl');
+        grid.className = 'device-live-state-grid';
+        rows.forEach(([label, value]) => {
+          const dt = document.createElement('dt');
+          dt.textContent = label;
+          const dd = document.createElement('dd');
+          dd.textContent = value;
+          grid.appendChild(dt);
+          grid.appendChild(dd);
+        });
+        stateBlock.appendChild(grid);
+      }
+    }
+    container.appendChild(stateBlock);
+  }
+
+  if (data.loading) {
+    const loading = document.createElement('p');
+    loading.className = 'device-enrichment-loading';
+    loading.textContent = 'Loading alerts & events…';
+    container.appendChild(loading);
+    return;
+  }
+
+  if (data.error) {
+    const err = document.createElement('p');
+    err.className = 'device-enrichment-error';
+    err.textContent = data.error;
+    container.appendChild(err);
+  }
+
+  const alertsSection = createDeviceListSection(
+    `Alerts${data.alerts.length ? ` (${data.alerts.length})` : ''}`,
+    data.alerts.map((alert) => {
+      const sev = String(alert.severity || '').trim();
+      const prefix = sev ? `[${sev}] ` : '';
+      const stamp = alert.timestamp ? ` — ${alert.timestamp}` : '';
+      return `${prefix}${alert.message || alert.id || 'Alert'}${stamp}`;
+    }),
+    'No active alerts'
+  );
+  container.appendChild(alertsSection);
+
+  const eventsSection = createDeviceListSection(
+    'Recent events',
+    data.events.map((evt) => {
+      const type = evt.type ? `${evt.type}: ` : '';
+      const stamp = evt.timestamp ? `${evt.timestamp} — ` : '';
+      return `${stamp}${type}${evt.summary || ''}`.trim();
+    }),
+    'No recent events'
+  );
+  container.appendChild(eventsSection);
+}
+
+function createDeviceListSection(title, lines, emptyText) {
+  const section = document.createElement('div');
+  section.className = 'device-enrichment-section';
+
+  const heading = document.createElement('h4');
+  heading.className = 'device-detail-title';
+  heading.textContent = title;
+  section.appendChild(heading);
+
+  if (!lines || lines.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'device-enrichment-empty';
+    empty.textContent = emptyText;
+    section.appendChild(empty);
+    return section;
+  }
+
+  const list = document.createElement('ul');
+  list.className = 'device-enrichment-list';
+  lines.slice(0, 50).forEach((line) => {
+    const item = document.createElement('li');
+    item.textContent = line;
+    list.appendChild(item);
+  });
+  section.appendChild(list);
+  return section;
 }
 
 let devicesAutoRefreshTimer = null;
@@ -3964,7 +4283,10 @@ function createDeviceDetailValueCell(label, value) {
 }
 
 function createDeviceDetailPanel(device) {
-  const details = device.details || {};
+  const enrich = getDeviceEnrichment(device.id);
+  // Prefer the fresher single-device detail once it has loaded; fall back to
+  // the fields already present from the inventory list.
+  const details = (enrich.detail && enrich.detail.details) || device.details || {};
   const panel = document.createElement('div');
   panel.className = 'device-detail';
 
@@ -3982,7 +4304,6 @@ function createDeviceDetailPanel(device) {
     empty.className = 'device-detail-empty';
     empty.textContent = 'No additional details available for this device';
     panel.appendChild(empty);
-    return panel;
   }
 
   groups.forEach((group) => {
@@ -4005,6 +4326,15 @@ function createDeviceDetailPanel(device) {
     section.appendChild(grid);
     panel.appendChild(section);
   });
+
+  const onUpdate = () => {
+    if (devicesState.expandedId === device.id) renderDevicesBody();
+  };
+  const enrichment = document.createElement('div');
+  enrichment.className = 'device-enrichment';
+  renderDeviceEnrichment(enrichment, device, onUpdate);
+  panel.appendChild(enrichment);
+  ensureDeviceEnrichment(device, onUpdate);
 
   return panel;
 }
@@ -4048,6 +4378,8 @@ function createDeviceRow(device) {
 
   const meta = document.createElement('div');
   meta.className = 'device-row-meta';
+  const rowAlertCount = getDeviceEnrichment(device.id).alertCount;
+  if (rowAlertCount > 0) meta.appendChild(createDeviceAlertCountBadge(rowAlertCount));
   meta.appendChild(createDeviceStatusBadge(device.status));
   const chevron = document.createElement('span');
   chevron.className = 'device-row-chevron';
@@ -4188,6 +4520,15 @@ function openDeviceDetailModal(device) {
       });
       bodyEl.appendChild(groupsWrap);
     }
+
+    // The modal is not rebuilt by renderDevicesBody, so enrichment updates
+    // re-render just this container in place.
+    const enrichment = document.createElement('div');
+    enrichment.className = 'device-enrichment';
+    const onUpdate = () => renderDeviceEnrichment(enrichment, device, onUpdate);
+    renderDeviceEnrichment(enrichment, device, onUpdate);
+    bodyEl.appendChild(enrichment);
+    ensureDeviceEnrichment(device, onUpdate);
   }
 
   modal.style.display = 'flex';
@@ -4309,6 +4650,13 @@ function createDeviceCard(device) {
   }
 
   card.appendChild(content);
+
+  const cardAlertCount = getDeviceEnrichment(device.id).alertCount;
+  if (cardAlertCount > 0) {
+    const badge = createDeviceAlertCountBadge(cardAlertCount);
+    badge.classList.add('device-card-alert-badge');
+    card.appendChild(badge);
+  }
 
   const open = () => openDeviceDetailModal(device);
   card.addEventListener('click', open);
@@ -10119,6 +10467,8 @@ function createSSHSession(itemId, item, host, port, username, options = {}) {
   });
   const fitAddon = new FitAddon();
   terminal.loadAddon(fitAddon);
+  const searchAddon = new SearchAddon();
+  terminal.loadAddon(searchAddon);
   terminal.open(containerEl);
   const labels = formatSSHSessionLabels(username, host, port, options);
 
@@ -10132,10 +10482,19 @@ function createSSHSession(itemId, item, host, port, username, options = {}) {
     username,
     terminal,
     fitAddon,
+    searchAddon,
     containerEl,
     label: labels.label,
     compactLabel: labels.compactLabel,
     logPath: options.logPath || '',
+    // Reconnect params (memory only) — populated at connect time so a
+    // closed/errored pill can re-run the same connection into this slot.
+    password: '',
+    directShell: false,
+    command: '',
+    privateKeyPath: '',
+    passphrase: '',
+    transcript: '',
     status: 'connecting',
     minimized: false
   };
@@ -10236,14 +10595,17 @@ async function destroySSHSession(clientId, { disconnect = true } = {}) {
 function updateSSHDock() {
   const dock = document.getElementById('ssh-session-dock');
   if (!dock) return;
-  const minimized = [...sshSessions.values()].filter(s => s.minimized);
+  // Minimized live sessions, plus closed/errored ones kept for reconnect.
+  const pills = [...sshSessions.values()].filter(
+    s => s.minimized || s.status === 'closed' || s.status === 'error'
+  );
   dock.innerHTML = '';
-  if (minimized.length === 0) {
+  if (pills.length === 0) {
     dock.style.display = 'none';
     return;
   }
   dock.style.display = 'flex';
-  minimized.forEach(session => {
+  pills.forEach(session => {
     const pill = document.createElement('div');
     pill.className = 'ssh-session-pill';
     pill.dataset.state = session.status;
@@ -10254,19 +10616,32 @@ function updateSSHDock() {
     label.textContent = session.label;
     label.title = `Restore ${session.compactLabel || `${session.label}:${session.port}`}`;
     label.addEventListener('click', () => restoreSSHSession(session.clientId));
+    pill.appendChild(label);
+
+    if (session.status === 'closed' || session.status === 'error') {
+      const reconnect = document.createElement('button');
+      reconnect.type = 'button';
+      reconnect.className = 'ssh-session-pill-reconnect';
+      reconnect.textContent = '↻';
+      reconnect.title = 'Reconnect session';
+      reconnect.addEventListener('click', (event) => {
+        event.stopPropagation();
+        reconnectSSHSession(session.clientId);
+      });
+      pill.appendChild(reconnect);
+    }
 
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'ssh-session-pill-close';
     close.textContent = '×';
-    close.title = 'Disconnect session';
+    close.title = 'Remove session';
     close.addEventListener('click', (event) => {
       event.stopPropagation();
       disconnectSSHSession(session.clientId);
     });
-
-    pill.appendChild(label);
     pill.appendChild(close);
+
     dock.appendChild(pill);
   });
 }
@@ -10436,7 +10811,14 @@ function registerSSHEventListeners() {
     removeSSHDataListener = networkAPI.onSSHData(payload => {
       if (!payload) return;
       const session = findSessionBySessionId(payload.sessionId);
-      if (session && session.terminal) session.terminal.write(payload.data || '');
+      if (!session) return;
+      const chunk = payload.data || '';
+      if (session.terminal) session.terminal.write(chunk);
+      // Keep a bounded in-memory transcript for "Save transcript".
+      session.transcript += chunk;
+      if (session.transcript.length > SSH_TRANSCRIPT_MAX) {
+        session.transcript = session.transcript.slice(session.transcript.length - SSH_TRANSCRIPT_MAX);
+      }
     });
   }
 
@@ -10531,6 +10913,16 @@ function openSSHTerminalModal(itemId) {
   if (saveAdminPasswordInput) saveAdminPasswordInput.checked = false;
   if (directShellInput) directShellInput.checked = true;
   if (logPathInput) logPathInput.value = getSavedSSHLogPath();
+  // Reset SSH-key auth fields and any stale DRM-reboot fallback banner.
+  const useKeyInput = document.getElementById('ssh-use-key');
+  const keyPathInput = document.getElementById('ssh-key-path');
+  const keyPassphraseInput = document.getElementById('ssh-key-passphrase');
+  const keyPathGroup = document.getElementById('ssh-key-path-group');
+  if (useKeyInput) useKeyInput.checked = false;
+  if (keyPathInput) keyPathInput.value = '';
+  if (keyPassphraseInput) keyPassphraseInput.value = '';
+  if (keyPathGroup) keyPathGroup.style.display = 'none';
+  clearDrmRebootBanner();
   if (title) title.textContent = match.item.name || 'SSH Terminal';
   if (eyebrow) eyebrow.textContent = `SSH to ${match.item.ip}`;
 
@@ -10590,6 +10982,67 @@ async function applySSHDefaults(host) {
   }
 }
 
+// Match an SSH host (IP) against the current DRM inventory so the connect-
+// failure state can offer a "reboot via DRM" fallback. Loads the inventory
+// lazily if the DRM tab hasn't been opened yet this session.
+async function findDrmDeviceForHost(host) {
+  const ip = String(host || '').trim();
+  if (!ip) return null;
+
+  const matchIn = (list) => (Array.isArray(list) ? list : []).find((device) => {
+    const det = device.details || {};
+    return [det.ip, det.publicIp, det.privateIp].some((value) => value && String(value).trim() === ip);
+  });
+
+  const cached = matchIn(devicesState.devices);
+  if (cached) return cached;
+
+  const api = getNetworkAPI();
+  if (!api || typeof api.digiGetDevices !== 'function') return null;
+  try {
+    const result = await api.digiGetDevices();
+    if (result && result.success && Array.isArray(result.devices)) {
+      // Cache so the DRM tab and any later lookups reuse it.
+      devicesState.devices = result.devices;
+      return matchIn(result.devices) || null;
+    }
+  } catch (_error) {
+    // Ignore — no fallback offered if DRM is unreachable.
+  }
+  return null;
+}
+
+function clearDrmRebootBanner() {
+  const el = document.getElementById('ssh-drm-fallback');
+  if (el && el.parentNode) el.parentNode.removeChild(el);
+}
+
+async function maybeShowDrmRebootFallback(host) {
+  clearDrmRebootBanner();
+  const device = await findDrmDeviceForHost(host);
+  if (!device) return; // don't offer an action that can't work
+
+  const status = document.getElementById('ssh-terminal-status');
+  if (!status || !status.parentNode) return;
+
+  const banner = document.createElement('div');
+  banner.id = 'ssh-drm-fallback';
+  banner.className = 'ssh-drm-fallback';
+
+  const msg = document.createElement('span');
+  msg.className = 'ssh-drm-fallback-text';
+  msg.textContent = "Can't reach it over SSH — reboot it via Digi Remote Manager instead?";
+  banner.appendChild(msg);
+
+  const btn = createDeviceActionButton(`Reboot ${device.name || device.id} via DRM`, {
+    danger: true,
+    onClick: () => handleDeviceReboot(device, () => {})
+  });
+  banner.appendChild(btn);
+
+  status.parentNode.insertBefore(banner, status.nextSibling);
+}
+
 async function connectSSHFromForm(options = {}) {
   const networkAPI = getNetworkAPI();
   const hostInput = document.getElementById('ssh-host');
@@ -10617,6 +11070,13 @@ async function connectSSHFromForm(options = {}) {
     setSSHStatus('Host and username are required', 'error');
     return;
   }
+
+  clearDrmRebootBanner();
+
+  const useKeyInput = document.getElementById('ssh-use-key');
+  const keyPathInput = document.getElementById('ssh-key-path');
+  const keyPassphraseInput = document.getElementById('ssh-key-passphrase');
+  const useKey = Boolean(useKeyInput && useKeyInput.checked && keyPathInput && keyPathInput.value.trim());
 
   const safePort = Number.isNaN(port) ? 22 : port;
   const item = sshPendingItem || { id: null, name: host, ip: host };
@@ -10658,17 +11118,38 @@ async function connectSSHFromForm(options = {}) {
   if (command) {
     connectOptions.command = command;
   }
+  if (useKey) {
+    connectOptions.privateKeyPath = keyPathInput.value.trim();
+    if (keyPassphraseInput && keyPassphraseInput.value) {
+      connectOptions.passphrase = keyPassphraseInput.value;
+    }
+  }
+
+  // Stash the params (memory only) so this slot can be reconnected later.
+  session.password = password;
+  session.directShell = directShell;
+  session.command = command || '';
+  session.privateKeyPath = useKey ? connectOptions.privateKeyPath : '';
+  session.passphrase = useKey ? (connectOptions.passphrase || '') : '';
 
   const result = await networkAPI.sshConnect(connectOptions);
 
   if (!result || !result.success) {
     session.terminal.writeln(`\r\n[Connection failed] ${result?.error || 'Unknown error'}`);
-    await destroySSHSession(session.clientId, { disconnect: false });
+    // Keep the session (marked error) as a reconnectable dock pill instead of
+    // throwing it away — the tech shouldn't have to re-enter host/user.
+    session.status = 'error';
+    session.minimized = true;
     showSSHFormMode();
+    updateSSHDock();
     setSSHStatus(result?.error || 'Could not connect', 'error');
+    // A device that's wedged over SSH is exactly the one a tech wants to reboot
+    // via DRM — offer it inline, but only if the host is a known DRM device.
+    maybeShowDrmRebootFallback(host);
     return;
   }
 
+  clearDrmRebootBanner();
   session.sessionId = result.sessionId;
   session.status = 'connected';
   if (options.persistLogPath && logPath) {
@@ -10679,6 +11160,182 @@ async function connectSSHFromForm(options = {}) {
   if (compactInfo) compactInfo.textContent = session.compactLabel || target;
   fitSSHTerminal();
   session.terminal.focus();
+}
+
+// Re-run the last connection into the SAME session slot, reusing its terminal
+// and scrollback (a closed/errored pill's Reconnect action).
+async function reconnectSSHSession(clientId) {
+  const session = sshSessions.get(clientId);
+  if (!session) return;
+  if (session.status !== 'closed' && session.status !== 'error') return;
+
+  const networkAPI = getNetworkAPI();
+  if (!networkAPI || typeof networkAPI.sshConnect !== 'function') {
+    showNotification('SSH is only available in the Electron app');
+    return;
+  }
+
+  const modal = document.getElementById('ssh-terminal-modal');
+  if (modal) modal.style.display = 'flex';
+  registerSSHEventListeners();
+  session.minimized = false;
+  session.status = 'connecting';
+  setActiveSshSession(clientId);
+  updateSSHDock();
+  setSSHStatus('Reconnecting...', 'connecting');
+  clearDrmRebootBanner();
+  session.terminal.writeln('\r\n--- reconnecting ---');
+
+  const connectOptions = {
+    host: session.host,
+    username: session.username,
+    password: session.password || '',
+    port: session.port,
+    directShell: session.directShell,
+    cols: session.terminal.cols || 80,
+    rows: session.terminal.rows || 24
+  };
+  if (session.command) connectOptions.command = session.command;
+  if (session.privateKeyPath) {
+    connectOptions.privateKeyPath = session.privateKeyPath;
+    if (session.passphrase) connectOptions.passphrase = session.passphrase;
+  }
+
+  const result = await networkAPI.sshConnect(connectOptions);
+  if (!result || !result.success) {
+    session.status = 'error';
+    session.terminal.writeln(`\r\n[Reconnect failed] ${result?.error || 'Unknown error'}`);
+    setSSHStatus(result?.error || 'Could not reconnect', 'error');
+    updateSSHDock();
+    maybeShowDrmRebootFallback(session.host);
+    return;
+  }
+
+  session.sessionId = result.sessionId;
+  session.status = 'connected';
+  setSSHStatus('Connected', 'connected');
+  const compactInfo = document.getElementById('ssh-compact-info');
+  if (compactInfo) compactInfo.textContent = session.compactLabel || `${session.username}@${session.host}:${session.port}`;
+  fitSSHTerminal();
+  session.terminal.focus();
+  updateSSHDock();
+}
+
+// Strip ANSI/control sequences so a saved transcript is plain, readable text
+// (keeps tabs/newlines/carriage returns).
+function stripAnsiForTranscript(text) {
+  return String(text || '')
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '') // OSC sequences
+    .replace(/\x1b[@-Z\\-_]/g, '')                      // single-char ESC
+    .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')          // CSI sequences
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');       // other control chars
+}
+
+async function saveSSHTranscript() {
+  const active = getActiveSession();
+  if (!active) {
+    showNotification('No active session');
+    return;
+  }
+  const text = stripAnsiForTranscript(active.transcript || '');
+  if (!text.trim()) {
+    showNotification('Nothing to save yet');
+    return;
+  }
+  const networkAPI = getNetworkAPI();
+  if (!networkAPI || typeof networkAPI.saveTextFile !== 'function') {
+    showNotification('Saving is not available');
+    return;
+  }
+  const safeHost = String(active.host || 'session').replace(/[^\w.-]+/g, '_');
+  const result = await networkAPI.saveTextFile({
+    title: 'Save SSH transcript',
+    buttonLabel: 'Save transcript',
+    defaultPath: `${safeHost}-ssh-transcript.txt`,
+    content: text,
+    filters: [
+      { name: 'Text files', extensions: ['txt'] },
+      { name: 'All files', extensions: ['*'] }
+    ]
+  });
+  if (result && result.success) {
+    showNotification('Transcript saved');
+  } else if (result && !result.canceled) {
+    showNotification(result.error || 'Could not save transcript');
+  }
+}
+
+// --- In-terminal search (active session only) ---
+function ensureSSHFindBar() {
+  let bar = document.getElementById('ssh-find-bar');
+  if (bar) return bar;
+  const container = document.getElementById('ssh-terminal-container');
+  if (!container || !container.parentNode) return null;
+
+  bar = document.createElement('div');
+  bar.id = 'ssh-find-bar';
+  bar.className = 'ssh-find-bar';
+  bar.style.display = 'none';
+
+  const input = document.createElement('input');
+  input.type = 'search';
+  input.id = 'ssh-find-input';
+  input.className = 'ssh-find-input';
+  input.placeholder = 'Find in terminal…';
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      sshFind(event.shiftKey ? 'prev' : 'next');
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      toggleSSHFindBar(false);
+    }
+  });
+
+  const makeBtn = (label, title, onClick) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ssh-find-btn';
+    b.textContent = label;
+    b.title = title;
+    b.addEventListener('click', onClick);
+    return b;
+  };
+
+  bar.appendChild(input);
+  bar.appendChild(makeBtn('↑', 'Previous match', () => sshFind('prev')));
+  bar.appendChild(makeBtn('↓', 'Next match', () => sshFind('next')));
+  bar.appendChild(makeBtn('×', 'Close find', () => toggleSSHFindBar(false)));
+
+  container.parentNode.insertBefore(bar, container);
+  return bar;
+}
+
+function toggleSSHFindBar(show) {
+  const bar = ensureSSHFindBar();
+  if (!bar) return;
+  const shouldShow = show === undefined ? bar.style.display === 'none' : Boolean(show);
+  bar.style.display = shouldShow ? 'flex' : 'none';
+  if (shouldShow) {
+    const input = document.getElementById('ssh-find-input');
+    if (input) { input.focus(); input.select(); }
+  } else {
+    const active = getActiveSession();
+    if (active && active.searchAddon && typeof active.searchAddon.clearDecorations === 'function') {
+      active.searchAddon.clearDecorations();
+    }
+    if (active && active.terminal) active.terminal.focus();
+  }
+}
+
+function sshFind(direction) {
+  const active = getActiveSession();
+  const input = document.getElementById('ssh-find-input');
+  if (!active || !active.searchAddon || !input) return;
+  const term = input.value;
+  if (!term) return;
+  if (direction === 'prev') active.searchAddon.findPrevious(term);
+  else active.searchAddon.findNext(term);
 }
 
 async function viewSSHLogsFromForm() {
@@ -10761,6 +11418,56 @@ function setupSSHTerminalModal() {
       viewSSHLogsFromForm();
     });
   }
+
+  const useKeyInput = document.getElementById('ssh-use-key');
+  const keyPathGroup = document.getElementById('ssh-key-path-group');
+  const keyBrowseButton = document.getElementById('ssh-key-browse-btn');
+  const keyPathInput = document.getElementById('ssh-key-path');
+
+  if (useKeyInput && keyPathGroup) {
+    useKeyInput.addEventListener('change', () => {
+      keyPathGroup.style.display = useKeyInput.checked ? '' : 'none';
+    });
+  }
+
+  if (keyBrowseButton && keyPathInput) {
+    keyBrowseButton.addEventListener('click', () => {
+      // Electron exposes the absolute path on File objects from a file input,
+      // so reuse a hidden picker rather than adding a new IPC dialog channel.
+      let picker = document.getElementById('ssh-key-file-input');
+      if (!picker) {
+        picker = document.createElement('input');
+        picker.type = 'file';
+        picker.id = 'ssh-key-file-input';
+        picker.style.display = 'none';
+        picker.addEventListener('change', () => {
+          const file = picker.files && picker.files[0];
+          if (file && file.path) keyPathInput.value = file.path;
+          picker.value = '';
+        });
+        document.body.appendChild(picker);
+      }
+      picker.click();
+    });
+  }
+
+  const searchButton = document.getElementById('ssh-search-btn');
+  if (searchButton) {
+    searchButton.addEventListener('click', () => toggleSSHFindBar(true));
+  }
+
+  const saveTranscriptButton = document.getElementById('ssh-save-transcript-btn');
+  if (saveTranscriptButton) {
+    saveTranscriptButton.addEventListener('click', () => saveSSHTranscript());
+  }
+
+  // Ctrl/Cmd+F opens the find bar for the active session.
+  modal.addEventListener('keydown', (event) => {
+    if ((event.ctrlKey || event.metaKey) && (event.key === 'f' || event.key === 'F')) {
+      event.preventDefault();
+      toggleSSHFindBar(true);
+    }
+  });
 
   const usernameInput = document.getElementById('ssh-username');
   const passwordInput = document.getElementById('ssh-password');

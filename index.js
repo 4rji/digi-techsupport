@@ -1727,16 +1727,14 @@ function parseSupportZipArchive(zipBuffer) {
   };
 }
 
-function createPlainTextSupportArchive(filePath, fileBuffer, stats) {
-  const fileName = path.basename(filePath);
-  const entryPath = normalizeSupportEntryPath(fileName) || 'text-file.txt';
+/**
+ * Build a single-entry, text-file support "archive" from a name + buffer.
+ * Shared by the plain-text file import path and DRM-sourced device logs, so
+ * both feed the exact same session shape into the Support Archive Viewer.
+ */
+function buildTextArchive(name, fileBuffer, meta = {}) {
+  const entryPath = normalizeSupportEntryPath(path.basename(String(name || ''))) || 'text-file.txt';
   const previewBuffer = fileBuffer.subarray(0, Math.min(fileBuffer.length, MAX_TEXT_PREVIEW_BYTES));
-  const isText = bufferLooksLikeText(previewBuffer, entryPath);
-
-  if (!isText) {
-    return null;
-  }
-
   const id = 'support-entry-0';
   const truncated = fileBuffer.length > previewBuffer.length;
   const metadata = {
@@ -1745,9 +1743,11 @@ function createPlainTextSupportArchive(filePath, fileBuffer, stats) {
     path: entryPath,
     type: 'file',
     kind: 'text-file',
-    size: Math.max(0, Number(stats?.size) || fileBuffer.length),
-    mode: typeof stats?.mode === 'number' ? stats.mode : null,
-    mtime: stats?.mtime instanceof Date ? stats.mtime.toISOString() : null,
+    size: Math.max(0, Number(meta.size) || fileBuffer.length),
+    mode: typeof meta.mode === 'number' ? meta.mode : null,
+    mtime: meta.mtime instanceof Date
+      ? meta.mtime.toISOString()
+      : (typeof meta.mtime === 'string' ? meta.mtime : null),
     isText: true,
     textAvailable: true,
     truncated
@@ -1771,6 +1771,21 @@ function createPlainTextSupportArchive(filePath, fileBuffer, stats) {
       textFileCount: 1
     }
   };
+}
+
+function createPlainTextSupportArchive(filePath, fileBuffer, stats) {
+  const fileName = path.basename(filePath);
+  const entryPath = normalizeSupportEntryPath(fileName) || 'text-file.txt';
+  const previewBuffer = fileBuffer.subarray(0, Math.min(fileBuffer.length, MAX_TEXT_PREVIEW_BYTES));
+  if (!bufferLooksLikeText(previewBuffer, entryPath)) {
+    return null;
+  }
+
+  return buildTextArchive(fileName, fileBuffer, {
+    size: stats?.size,
+    mode: stats?.mode,
+    mtime: stats?.mtime
+  });
 }
 
 function pruneSupportArchiveSessions() {
@@ -2440,6 +2455,95 @@ function setupIPCHandlers() {
     }
   });
 
+  ipcMain.handle('digi-get-device-detail', async (_event, options = {}) => {
+    try {
+      const { keyId, keySecret } = digiRemoteService.readCredentials(app.getPath('userData'));
+      const result = await digiRemoteService.getDeviceDetail({
+        keyId,
+        keySecret,
+        deviceId: String(options.deviceId || '').trim()
+      });
+      return { success: true, ...result };
+    } catch (error) {
+      return { success: false, error: error.message, code: error.code || 'DIGI_ERROR' };
+    }
+  });
+
+  ipcMain.handle('digi-get-device-events', async (_event, options = {}) => {
+    try {
+      const { keyId, keySecret } = digiRemoteService.readCredentials(app.getPath('userData'));
+      const result = await digiRemoteService.getDeviceEvents({
+        keyId,
+        keySecret,
+        deviceId: String(options.deviceId || '').trim(),
+        size: options.size
+      });
+      return { success: true, ...result };
+    } catch (error) {
+      return { success: false, error: error.message, code: error.code || 'DIGI_ERROR' };
+    }
+  });
+
+  ipcMain.handle('digi-get-device-alerts', async (_event, options = {}) => {
+    try {
+      const { keyId, keySecret } = digiRemoteService.readCredentials(app.getPath('userData'));
+      const result = await digiRemoteService.getDeviceAlerts({
+        keyId,
+        keySecret,
+        deviceId: String(options.deviceId || '').trim()
+      });
+      return { success: true, ...result };
+    } catch (error) {
+      return { success: false, error: error.message, code: error.code || 'DIGI_ERROR' };
+    }
+  });
+
+  ipcMain.handle('digi-query-device-state', async (_event, options = {}) => {
+    try {
+      const { keyId, keySecret } = digiRemoteService.readCredentials(app.getPath('userData'));
+      const result = await digiRemoteService.queryDeviceState({
+        keyId,
+        keySecret,
+        deviceId: String(options.deviceId || '').trim()
+      });
+      return { success: true, ...result };
+    } catch (error) {
+      return { success: false, error: error.message, code: error.code || 'DIGI_ERROR' };
+    }
+  });
+
+  ipcMain.handle('digi-reboot-device', async (_event, options = {}) => {
+    try {
+      const { keyId, keySecret } = digiRemoteService.readCredentials(app.getPath('userData'));
+      const result = await digiRemoteService.rebootDevice({
+        keyId,
+        keySecret,
+        deviceId: String(options.deviceId || '').trim()
+      });
+      return { success: true, ...result };
+    } catch (error) {
+      return { success: false, error: error.message, code: error.code || 'DIGI_ERROR' };
+    }
+  });
+
+  ipcMain.handle('digi-get-device-logs', async (event, options = {}) => {
+    try {
+      const deviceId = String(options.deviceId || '').trim();
+      const deviceName = String(options.deviceName || '').trim();
+      const { keyId, keySecret } = digiRemoteService.readCredentials(app.getPath('userData'));
+      const { text, count } = await digiRemoteService.getDeviceLogs({ keyId, keySecret, deviceId });
+      if (!count) {
+        return { success: false, error: 'No device logs available in Remote Manager', code: 'DIGI_NO_LOGS' };
+      }
+      const baseName = (deviceName || deviceId || 'device').replace(/[^\w.-]+/g, '_');
+      const fileName = `${baseName}-drm-logs.txt`;
+      const archive = buildTextArchive(fileName, Buffer.from(text, 'utf8'), {});
+      return createSupportArchiveSession(event.sender, { fileName, archive });
+    } catch (error) {
+      return { success: false, error: error.message, code: error.code || 'DIGI_ERROR' };
+    }
+  });
+
   ipcMain.handle('ssh-connect', async (event, options = {}) => {
     const host = String(options.host || '').trim();
     const username = String(options.username || '').trim();
@@ -2448,6 +2552,10 @@ function setupIPCHandlers() {
     const cols = Math.max(20, Math.min(Number(options.cols) || 80, 240));
     const rows = Math.max(10, Math.min(Number(options.rows) || 24, 80));
     const directShell = Boolean(options.directShell);
+    // Optional SSH key (identity file) auth. Additive — password auth is
+    // unchanged when no key path is provided. Never logged.
+    const privateKeyPath = String(options.privateKeyPath || '').trim();
+    const passphrase = typeof options.passphrase === 'string' ? options.passphrase : '';
     let command = null;
 
     if (!host || !username) {
@@ -2552,12 +2660,23 @@ function setupIPCHandlers() {
         sshSessions.delete(sessionId);
       });
 
+      let privateKey = null;
+      if (privateKeyPath) {
+        try {
+          privateKey = fs.readFileSync(privateKeyPath);
+        } catch (error) {
+          finish({ success: false, error: `Could not read SSH key file: ${error.message}` });
+          return;
+        }
+      }
+
       try {
         conn.connect({
           host,
           port,
           username,
           password,
+          ...(privateKey ? { privateKey, passphrase: passphrase || undefined } : {}),
           tryKeyboard: true,
           readyTimeout: 20000,
           keepaliveInterval: 10000,

@@ -148,6 +148,42 @@ async function handleDigiDevicesRequest(req, res) {
   }
 }
 
+// GET /api/digi/devices/:id, /:id/events, /:id/alerts — read-only mirrors of
+// the Phase 1 IPC channels for headless use.
+async function handleDigiDeviceDetailRequest(req, res, deviceId, sub) {
+  if (req.method !== 'GET') {
+    sendJson(res, 405, { success: false, error: 'Method not allowed' });
+    return;
+  }
+
+  try {
+    const { keyId, keySecret } = resolveDigiCredentials();
+    let result;
+    if (sub === '/events') {
+      result = await digiRemoteService.getDeviceEvents({ keyId, keySecret, deviceId });
+    } else if (sub === '/alerts') {
+      result = await digiRemoteService.getDeviceAlerts({ keyId, keySecret, deviceId });
+    } else {
+      result = await digiRemoteService.getDeviceDetail({ keyId, keySecret, deviceId });
+    }
+    sendJson(res, 200, result);
+  } catch (error) {
+    if (error instanceof digiRemoteService.ConfigurationError) {
+      sendJson(res, 400, { error: error.message });
+      return;
+    }
+    if (error instanceof digiRemoteService.AuthError) {
+      sendJson(res, 401, { error: error.message });
+      return;
+    }
+    if (error instanceof digiRemoteService.NotFoundError) {
+      sendJson(res, 404, { error: error.message });
+      return;
+    }
+    sendJson(res, 500, { error: error.message });
+  }
+}
+
 async function handleRequest(req, res) {
   try {
     const requestUrl = new URL(req.url, `http://localhost`);
@@ -157,6 +193,16 @@ async function handleRequest(req, res) {
     }
     if (requestUrl.pathname === '/api/digi/devices') {
       await handleDigiDevicesRequest(req, res);
+      return;
+    }
+    const deviceDetailMatch = /^\/api\/digi\/devices\/([^/]+)(\/events|\/alerts)?$/.exec(requestUrl.pathname);
+    if (deviceDetailMatch) {
+      await handleDigiDeviceDetailRequest(
+        req,
+        res,
+        decodeURIComponent(deviceDetailMatch[1]),
+        deviceDetailMatch[2] || ''
+      );
       return;
     }
 

@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 console.log('Preload script starting...');
 
-const SENSITIVE_FIELD_NAMES = ['password', 'token', 'secret', 'key'];
+const SENSITIVE_FIELD_NAMES = ['password', 'passphrase', 'token', 'secret', 'key'];
 
 const redactSensitive = (value) => {
   if (Array.isArray(value)) {
@@ -153,7 +153,9 @@ contextBridge.exposeInMainWorld('appAPI', {
       directShell,
       command,
       cols,
-      rows
+      rows,
+      privateKeyPath,
+      passphrase
     } = options || {};
     return ipcRenderer.invoke('ssh-connect', {
       host,
@@ -163,7 +165,9 @@ contextBridge.exposeInMainWorld('appAPI', {
       directShell,
       command,
       cols,
-      rows
+      rows,
+      privateKeyPath,
+      passphrase
     });
   }),
   sshDefaults: logWrapper('sshDefaults', (host) => {
@@ -225,6 +229,24 @@ contextBridge.exposeInMainWorld('appAPI', {
   }),
   digiGetDevices: logWrapper('digiGetDevices', (options) => {
     return ipcRenderer.invoke('digi-get-devices', options);
+  }),
+  digiGetDeviceDetail: logWrapper('digiGetDeviceDetail', (options) => {
+    return ipcRenderer.invoke('digi-get-device-detail', options);
+  }),
+  digiGetDeviceEvents: logWrapper('digiGetDeviceEvents', (options) => {
+    return ipcRenderer.invoke('digi-get-device-events', options);
+  }),
+  digiGetDeviceAlerts: logWrapper('digiGetDeviceAlerts', (options) => {
+    return ipcRenderer.invoke('digi-get-device-alerts', options);
+  }),
+  digiQueryDeviceState: logWrapper('digiQueryDeviceState', (options) => {
+    return ipcRenderer.invoke('digi-query-device-state', options);
+  }),
+  digiRebootDevice: logWrapper('digiRebootDevice', (options) => {
+    return ipcRenderer.invoke('digi-reboot-device', options);
+  }),
+  digiGetDeviceLogs: logWrapper('digiGetDeviceLogs', (options) => {
+    return ipcRenderer.invoke('digi-get-device-logs', options);
   }),
   onSSHData: (callback) => {
     const listener = (_event, payload) => callback(payload);

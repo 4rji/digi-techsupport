@@ -5349,3 +5349,115 @@ body.is-compare-fullscreen .compare-view {
   background: var(--app-background, #121417);
   box-sizing: border-box;
 }
+/* --- DRM device enrichment (detail expansion: alerts, events, live state) --- */
+.device-card { position: relative; }
+.device-enrichment {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(127, 127, 127, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.device-enrichment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.device-action-button {
+  appearance: none;
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  background: rgba(127, 127, 127, 0.08);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+.device-action-button:hover:not(:disabled) { background: rgba(127, 127, 127, 0.18); }
+.device-action-button:disabled { opacity: 0.5; cursor: default; }
+.device-action-button.is-danger { border-color: rgba(210, 60, 60, 0.55); color: #d23c3c; }
+.device-action-button.is-danger:hover:not(:disabled) { background: rgba(210, 60, 60, 0.14); }
+.device-live-state {
+  font-size: 12px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(127, 127, 127, 0.08);
+}
+.device-live-state.is-error { color: #d23c3c; background: rgba(210, 60, 60, 0.1); }
+.device-live-state-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+.device-live-state-grid dt { opacity: 0.7; }
+.device-live-state-grid dd { margin: 0; font-variant-numeric: tabular-nums; }
+.device-enrichment-section { display: flex; flex-direction: column; gap: 6px; }
+.device-enrichment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.device-enrichment-list li {
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: rgba(127, 127, 127, 0.06);
+  word-break: break-word;
+}
+.device-enrichment-empty,
+.device-enrichment-loading,
+.device-enrichment-error { font-size: 12px; opacity: 0.7; margin: 0; }
+.device-enrichment-error { color: #d23c3c; opacity: 1; }
+.device-alert-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #d23c3c;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.device-card-alert-badge { position: absolute; top: 8px; right: 8px; }
+/* --- SSH key auth fields + DRM-reboot fallback banner (Phase 4) --- */
+.ssh-key-option { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 4px 0; cursor: pointer; }
+.ssh-key-path-row { display: flex; gap: 8px; align-items: center; }
+.ssh-key-path-row input { flex: 1 1 auto; }
+.ssh-key-path-group input[type="password"] { margin-top: 8px; width: 100%; }
+.ssh-drm-fallback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(210, 60, 60, 0.5);
+  background: rgba(210, 60, 60, 0.1);
+}
+.ssh-drm-fallback-text { font-size: 12px; flex: 1 1 200px; }
+
+/* --- SSH find bar + reconnect pill (Phase 4.1/4.2) --- */
+.ssh-find-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: rgba(0, 0, 0, 0.35); border-bottom: 1px solid rgba(127, 127, 127, 0.3); }
+.ssh-find-input { flex: 1 1 auto; min-width: 120px; font-size: 12px; padding: 4px 8px; border-radius: 5px; border: 1px solid rgba(127, 127, 127, 0.4); background: rgba(255, 255, 255, 0.06); color: inherit; }
+.ssh-find-btn { appearance: none; border: 1px solid rgba(127, 127, 127, 0.4); background: rgba(127, 127, 127, 0.12); color: inherit; font: inherit; font-size: 12px; line-height: 1; padding: 4px 8px; border-radius: 5px; cursor: pointer; }
+.ssh-find-btn:hover { background: rgba(127, 127, 127, 0.24); }
+.ssh-session-pill-reconnect { appearance: none; border: none; background: transparent; color: inherit; font-size: 14px; line-height: 1; padding: 0 4px; cursor: pointer; opacity: 0.85; }
+.ssh-session-pill-reconnect:hover { opacity: 1; }
+.ssh-session-pill[data-state="error"] { border-color: rgba(210, 60, 60, 0.6); }
+.ssh-session-pill[data-state="closed"] { opacity: 0.8; }

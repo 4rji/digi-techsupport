@@ -42,7 +42,7 @@ This is an **Electron desktop app** for Digi device technical support workflows.
 | `renderer.js` | Renderer | All UI logic — product line/card management, TCP/ping polling, SSH terminal (xterm.js), templates workspace, file support viewer, settings modal. Loaded as an ES module (`import`). |
 | `server-http.js` | Standalone Node | Optional static file server. Also exposes `POST /api/generate-template` for headless template generation. |
 | `template-generator.js` | Main + HTTP server | Shared AI generation logic. Calls OpenAI Responses API or Anthropic Messages API depending on `provider`. Shared constants cap output tokens and context size. |
-| `digi-remote-service.js` | Main + HTTP server | Digi Remote Manager (DRM) integration. `getDevices()` fetches `/ws/v1/devices/inventory` and maps to `{ id, name, status }`. Credential read/write helpers store `digi-remote-credentials.json` (mode 0o600) in userData. Throws `ConfigurationError` (no key) / `AuthError` (401). Never logs or returns the secret. |
+| `digi-remote-service.js` | Main + HTTP server | Digi Remote Manager (DRM) integration. `getDevices()` fetches `/ws/v1/devices/inventory` and maps to `{ id, name, status }`. `getDeviceDetail`/`getDeviceEvents`/`getDeviceAlerts` fetch per-device data (v1 REST); `queryDeviceState`/`rebootDevice` use SCI (`POST /ws/sci`, XML, reuses the same API key); `getDeviceLogs` returns log text for the Support Archive Viewer. All share a `drmRequest` helper. Credential read/write helpers store `digi-remote-credentials.json` (mode 0o600) in userData. Throws `ConfigurationError` (no key) / `AuthError` (401) / `NotFoundError` (404). Never logs or returns the secret. |
 
 
 ### IPC surface (preload.js → index.js)
@@ -52,6 +52,9 @@ The renderer communicates with the main process only through `window.appAPI`. Ke
 - `ssh-connect`, `ssh-write`, `ssh-resize`, `ssh-disconnect` — SSH session lifecycle
 - `generate-support-template`, `analyze-support-file` — AI calls
 - `digi-get-credentials`, `digi-save-credentials`, `digi-get-devices` — Digi Remote Manager (secret stays in main; only `keyId`/`hasCredentials` returned). HTTP server mirrors `GET /api/digi/devices`.
+- `digi-get-device-detail`, `digi-get-device-events`, `digi-get-device-alerts` — per-device DRM data, lazily fetched when a device row/card is opened. HTTP server mirrors `GET /api/digi/devices/:id`, `/:id/events`, `/:id/alerts`.
+- `digi-query-device-state` (live CPU/mem/uptime via SCI), `digi-reboot-device` (SCI reboot — renderer confirms first; destructive, not exposed over HTTP).
+- `digi-get-device-logs` — fetches DRM device logs and builds a Support Archive Viewer session (reuses the plain-text `buildTextArchive` path), so logs open in the File Support view like an imported archive.
 - `import-support-file`, `get-support-file-entry-content` — support archive (.bin/.gz/.tgz/.tar) and text-file parsing
 - `list/open/update/delete-saved-support-files` — support library CRUD
 - `save-text-file` — native save dialog
