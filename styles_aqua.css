@@ -1145,8 +1145,8 @@ body {
 
 .docs-search-form {
   display: flex;
+  flex-direction: column;
   width: 100%;
-  min-height: 34px;
   margin-top: 10px;
   border: 1px solid rgba(120, 190, 240, 0.24);
   border-radius: 6px;
@@ -1155,7 +1155,8 @@ body {
 }
 
 .docs-search-input {
-  flex: 1 1 auto;
+  width: 100%;
+  min-height: 34px;
   min-width: 0;
   border: 0;
   border-radius: 0;
@@ -1164,6 +1165,24 @@ body {
   color: #fff;
   font-size: 0.82rem;
   outline: none;
+  box-sizing: border-box;
+}
+
+.docs-search-button-row {
+  display: flex;
+  border-top: 1px solid rgba(120, 190, 240, 0.2);
+}
+
+.docs-search-button-row .docs-search-button,
+.docs-search-button-row .ai-search-button {
+  flex: 1 1 0;
+  min-height: 32px;
+  text-align: center;
+  border-left: 0;
+}
+
+.docs-search-button-row > *:not(:first-child) {
+  border-left: 1px solid rgba(120, 190, 240, 0.2);
 }
 
 .docs-search-input::placeholder {

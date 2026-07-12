@@ -8532,18 +8532,18 @@ function renderFileSupportView(workspace) {
 
   const aiSearchForm = document.createElement('form');
   aiSearchForm.className = 'ai-search-form';
-  aiSearchForm.setAttribute('aria-label', 'Ask the Digi AI chatbot');
+  aiSearchForm.setAttribute('aria-label', 'Ask Digibot');
 
   const aiSearchInput = document.createElement('input');
   aiSearchInput.type = 'search';
   aiSearchInput.className = 'ai-search-input';
-  aiSearchInput.placeholder = 'Ask AI';
+  aiSearchInput.placeholder = 'Ask Digibot';
   aiSearchInput.autocomplete = 'off';
 
   const aiSearchButton = document.createElement('button');
   aiSearchButton.type = 'submit';
   aiSearchButton.className = 'ai-search-button';
-  aiSearchButton.textContent = 'AI';
+  aiSearchButton.textContent = 'Digibot';
 
   aiSearchForm.appendChild(aiSearchInput);
   aiSearchForm.appendChild(aiSearchButton);
@@ -10227,7 +10227,7 @@ function createDocsSearchForm(item) {
   const button = document.createElement('button');
   button.type = 'submit';
   button.className = 'docs-search-button';
-  button.textContent = 'Search';
+  button.textContent = 'Docs Search';
 
   const aiButton = document.createElement('button');
   aiButton.type = 'submit';
@@ -10235,8 +10235,8 @@ function createDocsSearchForm(item) {
   aiButton.textContent = 'Digibot';
   aiButton.title = `Ask Digibot about ${productMetadataName}`;
 
-  buttonRow.appendChild(button);
   buttonRow.appendChild(aiButton);
+  buttonRow.appendChild(button);
 
   form.appendChild(input);
   form.appendChild(buttonRow);
