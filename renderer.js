@@ -2919,6 +2919,22 @@ function getDocsGuideSlug(itemName) {
   return match ? `${match[1].toLowerCase()}_userguide` : '';
 }
 
+// Extracts a short model code ("IX40") out of a full product name
+// ("Digi IX40 5G Edge Computing Industrial IoT Solution") so it can be
+// appended to an AI chatbot query. Falls back to the full name when no
+// "Digi <MODEL>" pattern is found (e.g. custom/manually-named cards).
+function getProductModelLabel(itemName) {
+  const name = String(itemName || '').trim();
+  const match = name.match(/\bDigi\s+([A-Z]+[0-9]*)\b/i);
+  return match ? match[1].toUpperCase() : name;
+}
+
+function buildAiChatbotQuery(itemName, searchTerm) {
+  const model = getProductModelLabel(itemName);
+  const trimmedSearchTerm = String(searchTerm || '').trim();
+  return trimmedSearchTerm ? `${trimmedSearchTerm} ${model}`.trim() : model;
+}
+
 function buildDocsSearchUrl(itemName, searchTerm = '') {
   const productDocsUrl = PRODUCT_DOCS_URLS[itemName];
   const guideSlug = getDocsGuideSlug(itemName);
@@ -10205,13 +10221,25 @@ function createDocsSearchForm(item) {
   input.placeholder = 'Search docs';
   input.autocomplete = 'off';
 
+  const buttonRow = document.createElement('div');
+  buttonRow.className = 'docs-search-button-row';
+
   const button = document.createElement('button');
   button.type = 'submit';
   button.className = 'docs-search-button';
   button.textContent = 'Search';
 
+  const aiButton = document.createElement('button');
+  aiButton.type = 'submit';
+  aiButton.className = 'ai-search-button';
+  aiButton.textContent = 'Digibot';
+  aiButton.title = `Ask Digibot about ${productMetadataName}`;
+
+  buttonRow.appendChild(button);
+  buttonRow.appendChild(aiButton);
+
   form.appendChild(input);
-  form.appendChild(button);
+  form.appendChild(buttonRow);
 
   ['click', 'keydown', 'pointerdown'].forEach(eventName => {
     form.addEventListener(eventName, (event) => {
@@ -10222,7 +10250,11 @@ function createDocsSearchForm(item) {
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     event.stopPropagation();
-    openDocsSearch(productMetadataName, input.value);
+    if (event.submitter === aiButton) {
+      openAiChatbotSearch(buildAiChatbotQuery(productMetadataName, input.value));
+    } else {
+      openDocsSearch(productMetadataName, input.value);
+    }
   });
 
   return form;
