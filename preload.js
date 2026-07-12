@@ -251,6 +251,9 @@ contextBridge.exposeInMainWorld('appAPI', {
   digiGetDeviceLogs: logWrapper('digiGetDeviceLogs', (options) => {
     return ipcRenderer.invoke('digi-get-device-logs', options);
   }),
+  openAiChatbot: logWrapper('openAiChatbot', (options) => {
+    return ipcRenderer.invoke('open-ai-chatbot', options);
+  }),
   onSSHData: (callback) => {
     const listener = (_event, payload) => callback(payload);
     ipcRenderer.on('ssh-data', listener);

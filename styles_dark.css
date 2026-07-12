@@ -1496,6 +1496,53 @@ body {
   color: #fff;
 }
 
+.ai-search-form {
+  display: flex;
+  width: min(240px, 100%);
+  min-height: 34px;
+  border: 1px solid rgba(120, 190, 240, 0.24);
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ai-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 8px 9px;
+  background: transparent;
+  color: #fff;
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.ai-search-input::placeholder {
+  color: #8c9aa8;
+}
+
+.ai-search-input:focus {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ai-search-button {
+  flex: 0 0 auto;
+  border: 0;
+  border-left: 1px solid rgba(120, 190, 240, 0.2);
+  padding: 0 12px;
+  background: rgba(80, 160, 220, 0.18);
+  color: #d8efff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ai-search-button:hover {
+  background: rgba(80, 160, 220, 0.28);
+  color: #fff;
+}
+
 .monitor-card-title {
   width: 100%;
   display: flex;

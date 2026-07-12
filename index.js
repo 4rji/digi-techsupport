@@ -13,6 +13,7 @@ const digiRemoteService = require('./digi-remote-service');
 const { searchSupportArchiveSession, classifySupportEntry } = require('./support-search');
 const { buildCompareManifest, compareCategoryForTags, normalizeCompareEntryPath } = require('./support-diff');
 
+const AI_CHATBOT_URL = 'https://chatbot.digi-ai-lab.dev/';
 const APP_ICON_NAME = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
 const APP_ICON_PATH = app.isPackaged
   ? path.join(process.resourcesPath, APP_ICON_NAME)
@@ -83,6 +84,33 @@ function openInDefaultBrowser(rawURL) {
   } catch (_error) {
     return false;
   }
+}
+
+// Polls until the chatbot page is ready, then submits the question through the
+// page's own sendSuggestion(). Waits for the greeting bubble first because
+// sendSuggestion() silently no-ops while the greeting is still streaming; a
+// user bubble appearing confirms the send and stops the polling.
+function buildAiChatbotAutoAskScript(question) {
+  return `
+    (() => {
+      const question = ${JSON.stringify(question)};
+      if (!question) return;
+      const startedAt = Date.now();
+      const timer = setInterval(() => {
+        if (Date.now() - startedAt > 20000) {
+          clearInterval(timer);
+          return;
+        }
+        if (document.querySelector('#chat-history .user.message')) {
+          clearInterval(timer);
+          return;
+        }
+        if (typeof window.sendSuggestion !== 'function') return;
+        if (!document.querySelector('#chat-history .bot.message')) return;
+        window.sendSuggestion(question);
+      }, 500);
+    })();
+  `;
 }
 
 function getSavedAdminPassword() {
@@ -2557,6 +2585,49 @@ function setupIPCHandlers() {
     } catch (error) {
       return { success: false, error: error.message, code: error.code || 'DIGI_ERROR' };
     }
+  });
+
+  // Opens the Digi AI chatbot in an app window and auto-sends the question by
+  // driving the page's own sendSuggestion() — the public site does not read
+  // URL parameters, and an external browser cannot be scripted. The URL is a
+  // fixed constant; the renderer only supplies the question text.
+  ipcMain.handle('open-ai-chatbot', (_event, options = {}) => {
+    const question = String(options?.question || '').trim().slice(0, 2000);
+
+    const chatbotWindow = new BrowserWindow({
+      width: 1100,
+      height: 800,
+      autoHideMenuBar: true,
+      icon: APP_ICON_PATH,
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+        // Unique in-memory session per window: without this the persisted
+        // digi_session cookie resumes the previous conversation and the
+        // auto-ask script sees old messages and never sends the question.
+        partition: `ai-chatbot-${crypto.randomUUID()}`
+      }
+    });
+
+    chatbotWindow.webContents.setWindowOpenHandler((details) => {
+      openInDefaultBrowser(details?.url);
+      return { action: 'deny' };
+    });
+
+    if (question) {
+      chatbotWindow.webContents.on('did-finish-load', () => {
+        chatbotWindow.webContents.executeJavaScript(buildAiChatbotAutoAskScript(question)).catch(error => {
+          console.error('Could not auto-send AI chatbot question:', error);
+        });
+      });
+    }
+
+    chatbotWindow.loadURL(AI_CHATBOT_URL).catch(error => {
+      console.error('Could not load AI chatbot:', error);
+    });
+
+    return { success: true };
   });
 
   ipcMain.handle('ssh-connect', async (event, options = {}) => {

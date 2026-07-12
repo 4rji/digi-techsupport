@@ -2158,6 +2158,7 @@ const PRODUCT_SPECS = {
   }
 };
 const DOCS_PORTAL_BASE_URL = 'https://docsportal.digi.com';
+const AI_CHATBOT_BASE_URL = 'https://chatbot.digi-ai-lab.dev/';
 const PRODUCT_DOCS_URLS = {
   '2 Plus': 'https://docs.digi.com/resources/documentation/digidocs/90002383/default.htm',
   '8 Plus': 'https://docs.digi.com/resources/documentation/digidocs/90002383/default.htm',
@@ -2942,6 +2943,24 @@ function openDocsSearch(itemName, searchTerm) {
   }
 
   window.open(searchUrl, '_blank', 'noopener,noreferrer');
+}
+
+function buildAiChatbotUrl(searchTerm = '') {
+  const trimmedSearchTerm = String(searchTerm || '').trim();
+  return trimmedSearchTerm
+    ? `${AI_CHATBOT_BASE_URL}?q=${encodeURIComponent(trimmedSearchTerm)}`
+    : AI_CHATBOT_BASE_URL;
+}
+
+function openAiChatbotSearch(searchTerm) {
+  const question = String(searchTerm || '').trim();
+  if (window.appAPI?.openAiChatbot) {
+    window.appAPI.openAiChatbot({ question }).catch(() => {
+      window.open(buildAiChatbotUrl(question), '_blank', 'noopener,noreferrer');
+    });
+    return;
+  }
+  window.open(buildAiChatbotUrl(question), '_blank', 'noopener,noreferrer');
 }
 
 function normalizePorts(value) {
@@ -8494,6 +8513,30 @@ function renderFileSupportView(workspace) {
 
   const controls = document.createElement('div');
   controls.className = 'template-top-controls file-support-controls';
+
+  const aiSearchForm = document.createElement('form');
+  aiSearchForm.className = 'ai-search-form';
+  aiSearchForm.setAttribute('aria-label', 'Ask the Digi AI chatbot');
+
+  const aiSearchInput = document.createElement('input');
+  aiSearchInput.type = 'search';
+  aiSearchInput.className = 'ai-search-input';
+  aiSearchInput.placeholder = 'Ask AI';
+  aiSearchInput.autocomplete = 'off';
+
+  const aiSearchButton = document.createElement('button');
+  aiSearchButton.type = 'submit';
+  aiSearchButton.className = 'ai-search-button';
+  aiSearchButton.textContent = 'AI';
+
+  aiSearchForm.appendChild(aiSearchInput);
+  aiSearchForm.appendChild(aiSearchButton);
+  aiSearchForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    openAiChatbotSearch(aiSearchInput.value);
+  });
+  controls.appendChild(aiSearchForm);
+
   const importButton = document.createElement('button');
   importButton.type = 'button';
   importButton.className = 'config-transfer-button file-support-import-button';
