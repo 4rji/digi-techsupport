@@ -2968,8 +2968,137 @@ function buildAiChatbotUrl(searchTerm = '') {
     : AI_CHATBOT_BASE_URL;
 }
 
+// Same polling script the main process uses for the standalone chatbot
+// window (index.js buildAiChatbotAutoAskScript): waits for the greeting
+// bubble, then submits through the page's own sendSuggestion(). Duplicated
+// here because the embedded <webview> is driven from the renderer.
+function buildAiChatbotAutoAskScript(question) {
+  return `
+    (() => {
+      const question = ${JSON.stringify(question)};
+      if (!question) return;
+      const startedAt = Date.now();
+      const timer = setInterval(() => {
+        if (Date.now() - startedAt > 20000) {
+          clearInterval(timer);
+          return;
+        }
+        if (document.querySelector('#chat-history .user.message')) {
+          clearInterval(timer);
+          return;
+        }
+        if (typeof window.sendSuggestion !== 'function') return;
+        if (!document.querySelector('#chat-history .bot.message')) return;
+        window.sendSuggestion(question);
+      }, 500);
+    })();
+  `;
+}
+
+// Prototype: embeds the Digibot chat in an in-app overlay via <webview>
+// (requires webviewTag: true on the main window). Inline styles on purpose —
+// once the UX is validated this should move into the theme stylesheets.
+function openEmbeddedAiChatbot(question) {
+  document.getElementById('ai-chatbot-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'ai-chatbot-overlay';
+  Object.assign(overlay.style, {
+    position: 'fixed',
+    inset: '0',
+    zIndex: '3000',
+    background: 'rgba(0, 0, 0, 0.45)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  });
+
+  const panel = document.createElement('div');
+  Object.assign(panel.style, {
+    position: 'relative',
+    width: 'min(1100px, 92vw)',
+    height: 'min(800px, 90vh)',
+    background: '#fff',
+    borderRadius: '10px',
+    overflow: 'hidden',
+    boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)'
+  });
+
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.textContent = '✕';
+  closeButton.setAttribute('aria-label', 'Close Digibot');
+  Object.assign(closeButton.style, {
+    position: 'absolute',
+    top: '8px',
+    right: '8px',
+    zIndex: '1',
+    width: '28px',
+    height: '28px',
+    border: 'none',
+    borderRadius: '50%',
+    background: 'rgba(0, 0, 0, 0.55)',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: '14px',
+    lineHeight: '28px',
+    padding: '0'
+  });
+
+  const webview = document.createElement('webview');
+  webview.setAttribute('src', AI_CHATBOT_BASE_URL);
+  // Unique in-memory session per overlay, matching the standalone window:
+  // a persisted digi_session cookie would resume the previous conversation
+  // and the auto-ask script would never send the question.
+  webview.setAttribute('partition', `ai-chatbot-${crypto.randomUUID()}`);
+  Object.assign(webview.style, { width: '100%', height: '100%', border: 'none' });
+
+  if (question) {
+    webview.addEventListener('did-finish-load', () => {
+      webview.executeJavaScript(buildAiChatbotAutoAskScript(question)).catch(error => {
+        console.error('Could not auto-send embedded Digibot question:', error);
+      });
+    }, { once: true });
+  }
+
+  const onKeyDown = (event) => {
+    if (event.key === 'Escape') closeOverlay();
+  };
+  const closeOverlay = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKeyDown);
+    document.removeEventListener('ai-chatbot-close', closeOverlay);
+  };
+  closeButton.addEventListener('click', closeOverlay);
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) closeOverlay();
+  });
+  document.addEventListener('keydown', onKeyDown);
+  // Fired by the main process when Escape is pressed while the webview
+  // guest has focus (host keydown listeners never see those keys).
+  document.addEventListener('ai-chatbot-close', closeOverlay);
+
+  panel.appendChild(webview);
+  panel.appendChild(closeButton);
+  overlay.appendChild(panel);
+  document.body.appendChild(overlay);
+
+  // Without webviewTag enabled the element attaches but never gets the
+  // guest-page API — bail out so the caller falls back to the app window.
+  if (typeof webview.executeJavaScript !== 'function') {
+    closeOverlay();
+    return false;
+  }
+  return true;
+}
+
 function openAiChatbotSearch(searchTerm) {
   const question = String(searchTerm || '').trim();
+  try {
+    if (openEmbeddedAiChatbot(question)) return;
+  } catch (error) {
+    console.error('Embedded Digibot failed, falling back to app window:', error);
+  }
   if (window.appAPI?.openAiChatbot) {
     window.appAPI.openAiChatbot({ question }).catch(() => {
       window.open(buildAiChatbotUrl(question), '_blank', 'noopener,noreferrer');

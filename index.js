@@ -2838,6 +2838,10 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
+      // Needed for the embedded Digibot chat (<webview> overlay in the
+      // renderer). The webview runs the remote chatbot page in its own
+      // isolated guest process; the renderer itself loads no remote content.
+      webviewTag: true,
       preload: path.join(__dirname, 'preload.js')
     },
     autoHideMenuBar: true
@@ -2881,6 +2885,25 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Guest pages in <webview> (embedded Digibot chat) must not spawn app
+  // windows — send any link they open to the default browser instead.
+  app.on('web-contents-created', (_event, contents) => {
+    if (contents.getType() !== 'webview') return;
+    contents.setWindowOpenHandler((details) => {
+      openInDefaultBrowser(details?.url);
+      return { action: 'deny' };
+    });
+
+    // When the chat has keyboard focus, the host document never sees keys —
+    // forward Escape so the renderer can close the overlay from anywhere.
+    contents.on('before-input-event', (_inputEvent, input) => {
+      if (input.type !== 'keyDown' || input.key !== 'Escape') return;
+      contents.hostWebContents?.executeJavaScript(
+        "document.dispatchEvent(new Event('ai-chatbot-close'));"
+      ).catch(() => {});
+    });
+  });
+
   app.on('certificate-error', (event, _webContents, url, error, _certificate, callback) => {
     // Router web consoles use self-signed certs and are usually opened by IP,
     // which surfaces as an authority or common-name error.
