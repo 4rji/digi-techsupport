@@ -1,7 +1,7 @@
 {
   "name": "digi-techsupport",
   "productName": "Digi TechSupport",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Digi TechSupport TCP checker",
   "author": "Havi Arji <havi@4rji.com>",
   "main": "index.js",
