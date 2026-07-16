@@ -5557,13 +5557,6 @@ function handleFileSupportSearchShortcut(event) {
     return;
   }
 
-  // Ctrl+C: toggle cut (only when grep is active so copy still works normally)
-  if (key === 'c' && event.ctrlKey && !event.metaKey && !event.altKey && supportGrepEnabled && fileReady) {
-    event.preventDefault();
-    supportGrepCutMatches = !supportGrepCutMatches;
-    renderProductApp();
-    return;
-  }
 }
 
 function setupFileSupportKeyboardShortcuts() {
@@ -8915,6 +8908,36 @@ function renderFileSupportView(workspace) {
     requestAnimationFrame(() => focusSupportSearchInput('file-support-content-search'));
   });
   grepControls.appendChild(cutButton);
+
+  const autoCopyButton = document.createElement('button');
+  autoCopyButton.type = 'button';
+  autoCopyButton.className = 'file-support-grep-button file-support-autocopy-button';
+  autoCopyButton.textContent = 'AutoCopy';
+  autoCopyButton.title = 'Copy selected file content to clipboard';
+  autoCopyButton.disabled = !supportFileState.selectedFileId || supportFileState.selectedLoading || Boolean(supportFileState.selectedError);
+  autoCopyButton.addEventListener('click', async () => {
+    const content = supportFileState.selectedContent;
+    if (!content) return;
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(content);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = content;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      showNotification('Copiado');
+    } catch {
+      showNotification('No se pudo copiar');
+    }
+  });
+  grepControls.appendChild(autoCopyButton);
+
   contentSearch.appendChild(grepControls);
   if (normalizeSearchQuery(supportContentSearchQuery) && selectedContentPresentation) {
     const contentSearchStatus = document.createElement('span');
