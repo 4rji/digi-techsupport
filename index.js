@@ -86,6 +86,21 @@ function openInDefaultBrowser(rawURL) {
   }
 }
 
+function configureChatbotExternalLinks(webContents) {
+  webContents.setWindowOpenHandler((details) => {
+    openInDefaultBrowser(details?.url);
+    return { action: 'deny' };
+  });
+
+  // Some chatbot answers render regular same-window anchors instead of
+  // target="_blank" links. Keep the chat open and hand those navigations to
+  // the user's browser too.
+  webContents.on('will-navigate', (event, url) => {
+    if (!openInDefaultBrowser(url)) return;
+    event.preventDefault();
+  });
+}
+
 // Polls until the chatbot page is ready, then submits the question through the
 // page's own sendSuggestion(). Waits for the greeting bubble first because
 // sendSuggestion() silently no-ops while the greeting is still streaming; a
@@ -2610,10 +2625,7 @@ function setupIPCHandlers() {
       }
     });
 
-    chatbotWindow.webContents.setWindowOpenHandler((details) => {
-      openInDefaultBrowser(details?.url);
-      return { action: 'deny' };
-    });
+    configureChatbotExternalLinks(chatbotWindow.webContents);
 
     if (question) {
       chatbotWindow.webContents.on('did-finish-load', () => {
@@ -2889,10 +2901,7 @@ app.whenReady().then(() => {
   // windows — send any link they open to the default browser instead.
   app.on('web-contents-created', (_event, contents) => {
     if (contents.getType() !== 'webview') return;
-    contents.setWindowOpenHandler((details) => {
-      openInDefaultBrowser(details?.url);
-      return { action: 'deny' };
-    });
+    configureChatbotExternalLinks(contents);
 
     // When the chat has keyboard focus, the host document never sees keys —
     // forward Escape so the renderer can close the overlay from anywhere.
